@@ -1,0 +1,141 @@
+// Generates the Supabase Auth email templates into ../../supabase/templates/*.html
+// Run from apps/web:  node scripts/build-email-templates.mjs
+// Variables like {{ .SiteURL }} are Supabase (Go template) placeholders and are left untouched.
+import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const outDir = fileURLToPath(new URL("../../../supabase/templates/", import.meta.url));
+
+const BRAND = "ND Automations";
+const confirmLink = (type) => `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=${type}`;
+
+const templates = {
+  "confirm-signup": {
+    subject: "Confirm your email for ND Automations",
+    preheader: "One click to verify your address and open your private workspace.",
+    heading: "Confirm your email",
+    intro: "Welcome to ND Automations. Please confirm that <strong>{{ .Email }}</strong> is your address so we can open your private workspace.",
+    button: "Confirm my email",
+    href: confirmLink("email"),
+    note: "This link works once and expires after a short time. New accounts cannot see anyone else’s customer records.",
+    ignore: "If you didn’t create an account, you can safely ignore this email. No account will be activated.",
+  },
+  "reset-password": {
+    subject: "Reset your ND Automations password",
+    preheader: "Use this link to choose a new password.",
+    heading: "Reset your password",
+    intro: "We received a request to reset the password for <strong>{{ .Email }}</strong>. Press the button to choose a new one.",
+    button: "Choose a new password",
+    href: confirmLink("recovery"),
+    note: "For your security the link works once and expires soon. Your current password stays valid until you set a new one.",
+    ignore: "If you didn’t ask for this, ignore this email. Your password has not changed. If these emails keep arriving, tell your workspace administrator.",
+  },
+  "magic-link": {
+    subject: "Your ND Automations sign-in link",
+    preheader: "Sign in to your workspace with one click.",
+    heading: "Sign in to your workspace",
+    intro: "Use the button below to sign in as <strong>{{ .Email }}</strong>. No password needed.",
+    button: "Sign in",
+    href: confirmLink("magiclink"),
+    note: "This link works once and expires soon. Open it on the device you want to use.",
+    ignore: "If you didn’t request a sign-in link, you can ignore this email. Nobody can sign in without it.",
+  },
+  "invite-user": {
+    subject: "You’re invited to ND Automations",
+    preheader: "Accept your invitation to join the workspace.",
+    heading: "You’ve been invited",
+    intro: "You have been invited to join a workspace on ND Automations with the address <strong>{{ .Email }}</strong>. Accept the invitation to get started.",
+    button: "Accept invitation",
+    href: confirmLink("invite"),
+    note: "You will only see the customers and records you have been given access to.",
+    ignore: "If you weren’t expecting this invitation, you can ignore it. Nothing is created until you accept.",
+  },
+  "change-email": {
+    subject: "Confirm your new email address",
+    preheader: "Confirm the change to your ND Automations sign-in email.",
+    heading: "Confirm your new email",
+    intro: "You asked to change your sign-in email from <strong>{{ .Email }}</strong> to <strong>{{ .NewEmail }}</strong>. Confirm to finish the change.",
+    button: "Confirm new email",
+    href: confirmLink("email_change"),
+    note: "Until you confirm, you keep signing in with your current address.",
+    ignore: "If you didn’t request this change, ignore this email and consider changing your password.",
+  },
+  reauthentication: {
+    subject: "Your ND Automations security code",
+    preheader: "Enter this code to confirm it’s you.",
+    heading: "Confirm it’s you",
+    intro: "Enter this code in the app to continue with a sensitive change on <strong>{{ .Email }}</strong>.",
+    code: "{{ .Token }}",
+    note: "The code works once and expires in a few minutes. We will never ask you to read it out to anyone.",
+    ignore: "If you didn’t request a code, ignore this email and consider changing your password.",
+  },
+};
+
+const render = (t) => `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>${t.subject}</title>
+<style>
+  @media (max-width: 620px) { .container { width: 100% !important; } .px { padding-left: 22px !important; padding-right: 22px !important; } .h1 { font-size: 24px !important; } }
+  @media (prefers-color-scheme: dark) {
+    .bg { background-color: #0a1020 !important; }
+    .card { background-color: #111a2d !important; border-color: #1e2c45 !important; }
+    .text { color: #e8eef9 !important; }
+    .muted { color: #aab7cd !important; }
+    .rule { border-top-color: #1e2c45 !important; }
+    .code { background-color: #172238 !important; color: #e8eef9 !important; border-color: #30436a !important; }
+    .link { color: #8db4ff !important; }
+  }
+</style>
+</head>
+<body class="bg" style="margin:0;padding:0;background-color:#f3f5f9;-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${t.preheader}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bg" style="background-color:#f3f5f9;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" class="container" style="width:560px;max-width:560px;">
+      <tr><td style="padding:0 4px 18px 4px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td width="40" height="40" align="center" valign="middle" style="width:40px;height:40px;background-color:#2563eb;border-radius:11px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;letter-spacing:-1px;">ND</td>
+          <td style="padding-left:12px;font-family:Arial,Helvetica,sans-serif;">
+            <div class="text" style="font-size:16px;font-weight:700;color:#0f1b2d;line-height:1.2;">${BRAND}</div>
+            <div class="muted" style="font-size:10px;letter-spacing:1.6px;color:#5f6f86;margin-top:3px;">CUSTOMER WORKSPACE</div>
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td class="card" style="background-color:#ffffff;border:1px solid #e3e8ef;border-radius:14px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td height="4" style="height:4px;line-height:4px;font-size:0;background-color:#2563eb;border-radius:14px 14px 0 0;">&nbsp;</td></tr>
+          <tr><td class="px" style="padding:34px 36px 8px 36px;font-family:Arial,Helvetica,sans-serif;">
+            <h1 class="text h1" style="margin:0 0 14px 0;font-size:28px;line-height:1.25;letter-spacing:-0.5px;color:#0f1b2d;font-weight:700;">${t.heading}</h1>
+            <p class="text" style="margin:0 0 26px 0;font-size:16px;line-height:1.65;color:#0f1b2d;">${t.intro}</p>
+${t.code ? `            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;"><tr><td class="code" align="center" style="background-color:#f3f5f9;border:1px solid #cdd6e2;border-radius:10px;padding:16px 28px;font-family:'Courier New',Courier,monospace;font-size:30px;letter-spacing:8px;font-weight:700;color:#0f1b2d;">${t.code}</td></tr></table>` : `            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;"><tr><td align="center" bgcolor="#2563eb" style="background-color:#2563eb;border-radius:9px;"><a href="${t.href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9px;">${t.button}</a></td></tr></table>
+            <p class="muted" style="margin:0 0 6px 0;font-size:13px;line-height:1.6;color:#5f6f86;">Button not working? Copy this link into your browser:</p>
+            <p style="margin:0 0 24px 0;font-size:13px;line-height:1.6;word-break:break-all;"><a class="link" href="${t.href}" target="_blank" style="color:#1d4ed8;text-decoration:underline;">${t.href}</a></p>`}
+            <p class="muted" style="margin:0;font-size:14px;line-height:1.65;color:#46556b;">${t.note}</p>
+          </td></tr>
+          <tr><td class="px" style="padding:22px 36px 32px 36px;font-family:Arial,Helvetica,sans-serif;">
+            <div class="rule" style="border-top:1px solid #e3e8ef;padding-top:18px;">
+              <p class="muted" style="margin:0;font-size:13px;line-height:1.6;color:#5f6f86;">${t.ignore}</p>
+            </div>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td align="center" style="padding:22px 12px 0 12px;font-family:Arial,Helvetica,sans-serif;">
+        <p class="muted" style="margin:0 0 6px 0;font-size:12px;line-height:1.6;color:#5f6f86;">Sent by ${BRAND} · Your private customer workspace</p>
+        <p class="muted" style="margin:0;font-size:12px;line-height:1.6;color:#5f6f86;">This is an automated security email. Please do not reply to it.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
+`;
+
+mkdirSync(outDir, { recursive: true });
+for (const [name, template] of Object.entries(templates)) writeFileSync(`${outDir}${name}.html`, render(template), "utf8");
+writeFileSync(`${outDir}subjects.json`, `${JSON.stringify(Object.fromEntries(Object.entries(templates).map(([name, t]) => [name, t.subject])), null, 2)}\n`, "utf8");
+console.log(`Wrote ${Object.keys(templates).length} templates to ${outDir}`);
