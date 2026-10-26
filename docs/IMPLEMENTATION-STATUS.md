@@ -28,9 +28,9 @@ Standalone customer reporting foundation. The existing desktop/browser automatio
 | Reporting snapshots | IMPLEMENTED / LOCALLY TESTED for calculation | Day cohort vs comment creation/first observation, safe CSV export; partial loaded-data limits shown and incomplete exports disabled |
 | OpenCode MCP | CONNECTED / VERIFIED | Context7 and isolated local-UI Playwright; `/nd-next`, `/nd-check`, `/nd-review` commands |
 | Supabase project connection | CONNECTED / MIGRATION APPLIED | Project `xtefjnfdjnxwrpkoydaj`; publishable key configured locally. `reporting_foundation` applied to hosted staging on 2026-10-26 (version `20261026185223`); all 8 `reporting_*` tables present, migration history recorded. |
-| GitHub remote | CONNECTED LOCALLY / VERIFIED | `main`, origin `https://github.com/boostera385-afk/nd-automation.git`; portable Git checksum verified; no staging, commits or pushes |
+| GitHub remote | PUBLISHED 2026-10-27 / VERIFIED | `main` pushed to `https://github.com/boostera385-afk/nd-automation.git` as 15 logical commits (201 files). Before staging: a content scan for keys, tokens, Apps Script URLs, passwords, mailboxes and customer data found only deliberate fake test fixtures; two docs had a Windows username path, which was removed. GitHub and the local clone point at the same commit. Commits use the repo-local identity `boostera385-afk` with the GitHub no-reply address. Intermediate web commits share files and are not individually buildable; the final commit is the verified state. |
 | Public-repository exclusions | IMPLEMENTED / VERIFIED | Local config, exports, credentials, screenshots, browser traces and historical live-writing scratch tests ignored |
-| GitHub Actions CI | IMPLEMENTED; remote execution PENDING | Node 24 install, types, lint, tests, build and production dependency audit; cannot run on GitHub until an approved push |
+| GitHub Actions CI | PASSING on GitHub (run #1, 2026-10-27) | Clean Linux install from the lockfile on Node 24, then typecheck, lint, tests, production build and `npm audit --omit=dev`: all steps succeeded on commit `233eeb8` |
 
 ## Validation log
 
@@ -62,7 +62,7 @@ Standalone customer reporting foundation. The existing desktop/browser automatio
 
 1. Finish hosted Auth configuration — Site URL `http://127.0.0.1:3100` and redirect allowlist containing `/auth/callback` — via the Supabase MCP auth feature after re-authorization, or the same values in the dashboard. Email confirmation stays enabled; built-in email is acceptable for low-volume staging.
 2. Execute the authenticated end-to-end acceptance checklist in `docs/DEVELOPMENT.md` using authorized staging accounts.
-3. Review staged files together, then commit and push to `origin main` only with explicit user approval (remote is public and empty).
+3. Done 2026-10-27 with explicit approval. Further commits and pushes still need explicit approval; the repository is public, so scan staged content for secrets and customer data each time.
 4. Add proper server pagination, invitation/customer-access management UI, immutable report versions and delivery as separately approved reporting milestones.
 
 ## Current local preview
@@ -87,6 +87,6 @@ Standalone customer reporting foundation. The existing desktop/browser automatio
 
 ## What has not changed
 
-The existing `core/`, `gui/`, desktop launchers, live accounts and source workbook were not modified or executed. The only cloud change is the reviewed reporting schema applied to the supplied staging Supabase project; no paid resource, production deployment, Edge Function or customer dataset was created. No files were staged, committed or pushed. Only the standalone reporting foundation, developer tooling/docs and safe repository connection were added.
+The existing `core/`, `gui/`, desktop launchers, live accounts and source workbook were not modified or executed. The only cloud change is the reviewed reporting schema applied to the supplied staging Supabase project; no paid resource, production deployment, Edge Function or customer dataset was created. The work was committed and pushed to GitHub on 2026-10-27 with explicit approval (see the GitHub remote row). Only the standalone reporting app, developer tooling/docs, the sheet integration script and the legacy code as-is were published.
 
 Developer setup and migrations live in documentation/admin workflows, not in the user-facing app. No live customer data or platform actions have been used for this implementation.
