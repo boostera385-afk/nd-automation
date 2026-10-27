@@ -2,7 +2,45 @@
 
 ## Current milestone
 
-Standalone customer reporting foundation. The existing desktop/browser automation is unchanged and is not connected to this app. Session buttons track human work only. The historical full automation plan is not the delivered scope of this milestone.
+**Sheet-first implementation (2026-10-27):** staff navigation now has Home,
+Master Sheet, Run automation, Profiles and Results, with Settings / More holding
+all advanced and manual fallback routes. Home no longer asks for routine manual
+post/comment entry. The new master-tab preview reads safe metadata from the
+existing Sheet; known-link sync reuses persistent exact customer/profile bindings.
+Profiles provides a one-time name/group selector and saved mapping list. Run
+automation enables/disables up to 100 mapped monitoring profiles with one explicit
+batch confirmation and shows recent check progress. Results consolidates post
+links, checks, comments and check problems with date/customer/search filters.
+All prior routes remain accessible; no desktop/Fudge functionality was removed.
+**This is not complete desktop execution parity:** only the monitoring agent is
+connected in source; posting/listing/onboarding/cookie/proxy execution stays in
+the desktop app. The new connector has not been deployed to a live Sheet and
+requires workspace-scoped server configuration. No Sheet writeback or unattended
+ingestion was added. See `SHEET-FIRST-WORKFLOW.md` for exact daily/setup steps.
+
+User workflow correction / review (2026-10-27): the user reports that the current
+reporting-first dashboard adds work compared with Fudge → cleanup → master Sheet
+→ desktop/Incogniton. Reviewed screenshot, dashboard/desktop source, public Fudge
+source over HTTPS, and rechecked the offline workbook aggregates. See
+`SHEET-FIRST-UX-REVIEW.md` for concrete friction and the proposed sheet-first
+experience. **Review only:** no app/database/live Sheet changes or tests run for
+this review; no signed-in whole-dashboard browser walkthrough is claimed. A newly
+created sibling Fudge clone was removed immediately following the user's
+"only check, do not clone" correction; Fudge is not retained or integrated.
+
+Latest implementation follow-up (2026-10-27): content preparation/approval and
+profile inventory are implemented and staged (versions `20261027200411` and
+`20261027200913`). A further publishing-job protocol is implemented/tested
+**locally only** (`202610270006_publish_jobs.sql`) with an inspection page, but
+no dashboard release action and no publishing agent. Full automation remains
+incomplete. `PUBLISHING-PROTOCOL.md` is authoritative for this newer slice;
+earlier statements below about "no publishing RPC" describe earlier milestones.
+
+For the latest monitoring implementation, see `WORKER-BRIDGE.md`. `AUTOMATION-READINESS-AUDIT.md` records the earlier audit snapshot. Full desktop automation is not complete. Earlier test rows are historical records, not live connection or feature-parity guarantees.
+
+Reporting foundation plus an initial read-only dashboard-to-worker bridge implemented in source, with staging database setup applied on 2026-10-27. The original desktop code is unchanged; its posting, onboarding, cookie/proxy and other write workflows remain unconnected. Actual worker pairing and live acceptance are pending. Explicitly authorized monitoring claims are gated by work sessions; session buttons alone never enable publishing or account creation. The historical full automation plan is not delivered scope.
+
+The user has requested full desktop-to-dashboard parity and authorized updating `AGENTS.md` for a phased migration. `DASHBOARD-PARITY-ROADMAP.md` records the direction and feature-family gaps. `apps/worker/agent.py` now implements the outbound monitoring protocol, reusing the opt-in pilot runner. It needs the new reviewed migration, private pairing, a compatible Python/Playwright environment and validated selectors. No live automation pilot, recurring Sheet ingestion or Sheet result writeback is implemented/validated by this change.
 
 ## Completed implementation — local foundation
 
@@ -10,6 +48,9 @@ Standalone customer reporting foundation. The existing desktop/browser automatio
 
 | Area | State | Actual scope |
 |---|---|---|
+| Monitoring worker bridge | IMPLEMENTED / LOCAL VALIDATION / STAGING DATABASE APPLIED; WORKER NOT PAIRED OR LIVE-TESTED | Staff-only Automation control, private hashed worker credentials, explicit profile/customer/account binding, session-authorized due-check planning, leases/deduplication, atomic auto-check/comment/notification submission, cancellation, revocation and reviewed expired-lease/replacement-worker flows. Hosted versions: `20261027185858` (bridge), `20261027190052` (six covering indexes and schema comments). Agent never accepts publishing, onboarding or arbitrary executable jobs. See `WORKER-BRIDGE.md` for exact limits and deferred acceptance. |
+| Content drafts and human approval (F14/F23 preparation slice) | IMPLEMENTED / LOCALLY TESTED / STAGING APPLIED | Staff-only `/dashboard/content`: create/edit text-post and listing drafts bound to an explicit authorized worker/customer/profile assignment; unpublished preview; revision-bound save/approve/return/archive with optimistic concurrency; immutable per-revision content + exact-target snapshots (binding, customer, worker, profile UUID, account label) and actor attribution. Validation in both UI (zod) and SQL (`valid_draft_content`); exact decimal USD price parsing without floats; no credentials/media fields accepted. Migration `202610270004_content_drafts.sql` applied to staging as `20261027200411`; host verification confirmed RLS on both tables, anon access denied (permission errors in rolled-back transactions), authenticated read-only table access with all writes through the two RPCs, and 0 drafts/revisions. **No publishing RPC, worker job type, scheduling, attachments, or browser submission exists.** Approval is preparation only. |
+| Profile inventory (F03 foundation) | IMPLEMENTED / LOCALLY TESTED / STAGING APPLIED | Staff-only `/dashboard/profiles`: preview-validated CSV import (max 5,000 rows / 1 MB; legacy `id`/`Profile Name` aliases; credential columns rejected) into a tenant-scoped UUID/name/group inventory; explicit full-sync archiving (double confirmation), per-profile archive/reactivate, accurate insert/update/archive counts, payload-duplicate rejection, import serialization per workspace. Automation assignment form offers inventory claims as `<datalist>` suggestions while still requiring the exact UUID. Validation parity zod ↔ SQL (`valid_profile_row`); writes via two RPCs only. Migration `202610270005_profile_inventory.sql` staged as `20261027200913`; host verified RLS, anon denied, read-only client access, 0 rows. Inventory is a claim, **not** live existence/readiness and never authorizes launches; duplicate real-world profile names still resolve by exact UUID. |
 | Next.js/TypeScript application and lockfile | IMPLEMENTED / LOCALLY TESTED | Production build, strict types, lint and local tests; no fake customer dataset |
 | User-facing authentication | IMPLEMENTED; hosted validation BLOCKED | Sign-up/sign-in/reset actions, email callback, safe redirects, validated server user, empty workspace creation |
 | Refined authentication UI | IMPLEMENTED / BROWSER SMOKE TESTED | ND branding, responsive split layout, password toggle, password-manager support, pending/error states, keyboard focus and reduced motion; desktop/mobile screenshots reviewed |
@@ -34,11 +75,95 @@ Standalone customer reporting foundation. The existing desktop/browser automatio
 
 ## Validation log
 
+Sheet-first implementation validation (2026-10-27): typecheck PASS, lint PASS
+(zero warnings), full web/database suite **387 tests / 22 files PASS**, production
+build PASS including `/dashboard/master-sheet`, `/dashboard/run` and
+`/dashboard/results`. New tests cover five-item navigation/role visibility,
+fixture-rendered Home and Run screens, exact/ambiguous mapping behavior, bounded
+and partially failing batch operations, known-link deduplication/import provenance,
+all eight metadata-only connector tabs and the legacy cookie alias, credential
+column exclusion, unheaded side-data exclusion, strict response validation and
+workspace isolation before connector fetch. One test initially compared a URL
+object with a string; corrected the assertion. Typecheck also caught an obsolete
+esbuild JSX setting for the installed oxc-based test transformer; removed it.
+Final checks above passed without that configuration warning.
+
+The server-side Sheet connection now requires `SHEET_SYNC_ORGANIZATION_ID` as
+well as URL/token, and `requireWorkspace(true)` plus matching workspace ownership
+before fetching Google. This closes the previous server-global connector risk
+across multiple workspaces. No secrets were copied or configured by this change.
+`getTaskRows` is an additive read-only connector action; `getPostRecords` retains
+its original two-tab boundary. Existing desktop/Fudge scripts are unchanged.
+
+Restarted only this project's port-3000 preview after building. `/login` returned
+HTTP 200; signed-out Home, Master Sheet, Run, Profiles, Results, Settings and
+legacy manual/setup routes returned HTTP 307. Isolated Playwright navigation to
+`/dashboard` redirected to login, so a real signed-in desktop/mobile acceptance
+test remains pending. The rendered UI tests use fixtures, not a live customer
+session or invented application data. No migration, browser job, Sheet write,
+commit or push was performed. Python code was unchanged; its earlier 35-test
+result was not rerun for this UI/connector change.
+
+Publishing protocol follow-up (2026-10-27): added local-only migration
+`202610270006_publish_jobs.sql`, immutable content/target snapshots, withdrawn
+approval cancellation, cross-type worker lease serialization, exact canonical
+kind-matching URL capture, timestamp/fingerprint validation, duplicate-link
+reconciliation, bounded diagnostics and replay-idempotent completion. Revocation
+and reassignment now account for publishing leases in this migration. Expired
+publishing leases become ambiguous completed results, blocking reposting even
+after reapproval. Added staff-only `/dashboard/publishing` inspection and
+cancel/acknowledgement actions; there is no enqueue server action/button and the
+local monitoring agent's RPC allowlist remains unchanged. 36 local PGlite protocol
+tests; full web suite 327 tests / 18 files passed. Python unit/mock suite: 35
+passed. Typecheck passed; lint initially found one JSX apostrophe, fixed, then
+passed with zero warnings; production build passed including all five new
+content/profile/publishing routes. `git diff --check` passed with existing Windows
+line-ending warnings. Inventory upload checks size before reading; the action
+transport limit is 4 MB to accommodate reviewed JSON expansion while inventory
+CSV remains capped at 1 MB. Context7 DNS lookup failed; consulted official Next.js
+serverActions configuration documentation directly for the request limit.
+**Publishing migration not deployed**; no publish worker/submit path or real
+browser test exists. Authenticated UI acceptance remains blocked on account
+access. See `PUBLISHING-PROTOCOL.md` for remaining safety gates.
+
+Final follow-up: removed operational diagnostic text from potentially
+customer-readable publish notifications; details remain in staff-only jobs.
+All 36 publish-protocol tests passed again after that SQL change. Restarted the
+production preview at `http://127.0.0.1:3000`; `/login` returned HTTP 200, and
+signed-out `/dashboard/content`, `/dashboard/content/new`, `/dashboard/profiles`
+and `/dashboard/publishing` returned HTTP 307 as expected. This is route/auth-gate
+smoke coverage only, not signed-in UI or live automation acceptance. No commits
+or pushes were made.
+
+Profile inventory milestone (2026-10-27): added `202610270005_profile_inventory.sql` (table, `valid_profile_row`, import/archive RPCs), `/dashboard/profiles` page with preview→confirm import and explicit full-sync archiving, automation-form datalist suggestions, and navigation entry. 33 new PGlite tests cover zod↔SQL validation parity, legacy CSV header aliases, payload-duplicate atomicity, accurate merge counts, explicit archive choice requirement, archive/reactivate cycles, RLS/tenant/customer isolation, direct-write denial, anon denial, cross-tenant denial and the 5,000-row cap. Full suite after this change: 291 tests in 17 files PASS; typecheck PASS; lint PASS; production build PASS (new `/dashboard/profiles` route). Applied to staging via MCP as `profile_inventory` (`20261027200913`) and host-verified (RLS on, anon denied on table + both RPCs, authenticated read-only, 0 rows). No Incogniton connection, profile launch, or live export was involved; import remains a staff claim used for exact-UUID selection.
+
+Content drafts milestone (2026-10-27): added `202610270004_content_drafts.sql` (two tables, `valid_draft_content`, save/review RPCs), `/dashboard/content` list/new/detail pages, revision history UI, composer with live unpublished preview, and navigation entry. 47 new Postgres/PGlite tests cover validation parity (UI schema ↔ SQL), tenant isolation, RLS, direct-write denial, replay/stale-revision protection, confirmed-review requirement, approve/return/archive transitions, worker-revocation guard, and reassignment requiring a fresh snapshot. Full suite: 258 tests in 16 files PASS; typecheck PASS; lint PASS (0 warnings); production build PASS (3 new routes). Applied to staging via MCP as `content_drafts` (`20261027200411`) and verified host RLS/permissions/anon rejection; advisors show 19 authenticated and 3 anon SECURITY DEFINER notices (the two new content RPCs among the 19), 1 intentional no-policy INFO, 25 unused-index INFOs on the mostly empty DB. No customer content, worker, or job was created; publishing, scheduling and attachments remain unimplemented.
+
+Workbook-copy review (2026-10-27): inspected the user-supplied XLSX read-only using ZIP/XML parsing, without evaluating formulas or following hyperlinks. Compared seven tabs against the checked-in desktop/Apps Script code. Auto Posting: 82 Posted claims, 77 recorded links (61 canonical, 16 normalizable) and 5 missing links. Auto Listing: 95 mapped rows (63 Posted-prefixed with No link extracted, 15 Failed-prefixed, 17 blank); no recorded exact links. Profile sheet: 87 mapped rows, declared ID column empty. Other tabs contain unheaded side-column material that must not be treated as valid jobs. Existing status authorship/live-sheet behavior cannot be inferred from the snapshot. No credentials, customer content, links or workbook bytes were added to the repository or imported to Supabase. See `WORKBOOK-WORKFLOW-REVIEW.md`. No application code changed and no validation checks were rerun for this read-only analysis/documentation update.
+
+Hosted worker DB setup (2026-10-27, explicit user approval): verified project identity, both existing migrations and compatible schema prerequisites via MCP. Applied `monitoring_worker_bridge` (`20261027185858`) and an additive, versioned `worker_bridge_indexes` follow-up (`20261027190052`). Verified RLS on all four new tables, private credential/client permission denial, staff RPC restrictions, six covering indexes and empty worker/credential/job tables. All three worker RPCs rejected invalid credentials under anon in a rolled-back transaction. The performance advisor now reports only unused-index INFOs (19); security reports 3 anon and 17 authenticated SECURITY DEFINER notices plus the intentional private-table no-policy INFO. These are documented in `WORKER-BRIDGE.md`, not dismissed as a security certification. The new migration/index test suite passed 35 tests locally. Full typecheck and lint passed; 211 web/database tests in 15 files passed after the follow-up. Build not rerun for DB/index/test/documentation-only changes. No account role, worker credential, customer record or browser job was created. The preserved workspace has zero memberships; live pairing/UI/HTTP acceptance remain pending.
+
+Monitoring bridge implementation (2026-10-27): typecheck and lint passed; 210 web/database tests across 15 files passed, including 34 new worker-bridge Postgres/PGlite tests; 35 Python unit/mock tests passed. `git diff --check` passed with Windows line-ending warnings. The final production build passed, including `/dashboard/automation`. The local production server was restarted and `/login` returned HTTP 200. No new migration was applied to hosted Supabase, no private worker was paired, and no live profile, post, comment, Sheet or authenticated-UI acceptance test was run. Setup and deferred production features are documented in `WORKER-BRIDGE.md`.
+
+Readiness re-audit (2026-10-27): all 34 original core/gui files match after line-ending normalization. Web typecheck/lint passed; 176 web tests and 27 worker unit/mock tests passed. Web Sheet endpoint/token remain missing; local Incogniton health unavailable; Playwright not installed in the shell-selected Python environment. Production build and live browser/Sheet/hosted schema acceptance were not rerun. See `AUTOMATION-READINESS-AUDIT.md` for all F01–F36 dispositions and actual connection steps. No live operations were executed.
+
+Password-recovery runtime fix (2026-10-27): the server on port 3000 had been started before local Supabase configuration was added, causing `authenticate` to return its configuration-unavailable message before calling Supabase. Restarted only this project's server to load the configured environment/current build. Through isolated Playwright MCP, submitted one recovery request for the user-provided address; the UI returned the neutral success message, "If the address is registered, a reset link will arrive shortly." Email delivery, email-link destination and successful password change remain unverified. No account password or hosted Auth settings were changed.
+
+Fresh Windows clone validation (2026-10-27): Node 24.22.1, `npm.cmd ci` succeeded (0 reported vulnerabilities; npm warned about an unapproved `unrs-resolver` postinstall script). `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd test` (176 tests across 14 files), and `npm.cmd run build` all passed. The local production server returned HTTP 200 for `/login` with a password field. No local Supabase credentials were configured; hosted authentication and signed-in acceptance were not tested.
+
+Fresh clone follow-up (2026-10-27): Supabase MCP connected to the configured project; both named repository migrations are recorded under hosted versions `20261026185223` and `20261026210947`. All 11 tables named in the two migration files exist with RLS enabled. The security advisor reports six authenticated SECURITY DEFINER RPC notices and disabled leaked-password protection. An active publishable key was configured locally; the app has not been rebuilt or tested with it, and migration content equivalence and authenticated acceptance were not verified. Context7, Playwright and Supabase MCPs report connected after Context7 configuration reload.
+
+Worker foundation follow-up (2026-10-27): `python -m unittest -v test_worker` passed 3 tests. The fixed loopback Incogniton `/alive` probe returned `unavailable`; no profile or browser operations were attempted. Web typecheck and lint passed; 176 tests in 14 files passed; production build passed with `.env.local` loaded. The running preview was not restarted and authenticated acceptance remains untested.
+
+Profile-inventory foundation (2026-10-27): added an offline, data-minimizing parser for the legacy Incogniton response shape. It rejects malformed records and duplicate IDs while preserving duplicate names for explicit resolution. `python -m unittest discover -v` passed 8 worker tests. No profile data was fetched, stored or sent; this parser is not connected to the dashboard or a worker service. Web checks were not rerun for this Python-only change.
+
+Local monitoring pilot runner (2026-10-27): added opt-in batch execution, fixed-loopback Incogniton launch/status/stop calls, loopback-only CDP validation, explicit profile UUID grouping, page observation adapters, initially rendered stable-ID comment extraction, per-result UTC/source/adapter attribution, private local output guidance and an OS-released single-checkout lock. Unknown or active profiles are skipped; uncertain launches or cleanup abort the batch. `python -m unittest discover -v` passed 27 tests (unit/mocks; no live browser); the synthetic manifest dry-run returned 1 post / 1 profile / 0 network calls. `git diff --check` passed with a Windows line-ending warning. Adapter examples deliberately reject execution until configured; no production selectors are claimed. No live profile/post/comment checks, Sheets connection, scheduling, Supabase submission, automatic resume or dashboard dispatch are implemented/validated by this runner. Web checks were not rerun because no web code changed. References elsewhere to no automatic checker describe the absent integrated dashboard worker, not this new standalone pilot.
+
 | Check | Latest recorded result |
 |---|---|
 | `npm.cmd run typecheck` | PASS; current auth source also checked by production build |
 | `npm.cmd run lint` | PASS after auth UI changes |
-| `npm.cmd test` | PASS: 153 tests in 12 files (56 original incl. real Postgres/PGlite authorization/transaction tests; +5 publication-filter; +14 sheet-status; +9 Apps Script; +4 URL-validation; +10 sheet-health; +44 post-checks/auth/emails/notifications, of which 34 run the new migration on real Postgres), 2026-10-27 |
+| `npm.cmd test` | PASS: 387 tests in 22 files after the sheet-first UI/connector milestone, 2026-10-27. Includes fixture-rendered UI, workflow actions, connector privacy/tenant isolation and existing PGlite suites. Not live browser/Incogniton acceptance. |
 | Typecheck / lint / build after all work to date | PASS / PASS (0 warnings) / PASS — 24 routes incl. `/auth/confirm`, `/dashboard/checks`, `/dashboard/notifications/feed`, `/dashboard/sheet-sync`, 2026-10-27 |
 | Preview checks after final build | PASS: `/login`, `/signup`, `/auth/confirm` render (200); an invalid link type shows the "link not valid" page; `/dashboard/*` and the notification feed redirect when signed out (307); no `SHEET_SYNC_TOKEN`, `service_role` or `sb_secret` text in the browser bundle. The real confirm page was viewed in headless Chrome. The signed-in Post checks page, bell, toast and sound were viewed only as a static mock built from the real stylesheet, never in a live signed-in session, and the sound has not been heard on a real device. |
 | Not verified | Live Supabase sign-up/sign-in/email delivery; the signed-in Post checks page, bell and sound against the real database; the Sheet sync against the real sheet; anything involving Incogniton or Nextdoor. |

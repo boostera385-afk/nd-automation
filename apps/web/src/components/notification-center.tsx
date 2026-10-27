@@ -29,7 +29,7 @@ function Toast({ item, onClose }: { item: NotificationItem; onClose: (id: string
   useEffect(() => { const timer = setTimeout(() => onClose(item.id), 7000); return () => clearTimeout(timer); }, [item.id, onClose]);
   return <div className={`toast tone-${item.tone}`} role="status">
     <Icon size={20} aria-hidden />
-    <div><strong>{item.title}</strong><p>{item.message}</p><Link href={notificationHref(item)} onClick={() => onClose(item.id)}>{item.publication_id ? "View post" : "View checks"}</Link></div>
+    <div><strong>{item.title}</strong><p>{item.message}</p><Link href={notificationHref(item)} onClick={() => onClose(item.id)}>{item.publication_id ? "View post" : item.kind === "publish_result" ? "View publishing" : "View checks"}</Link></div>
     <button type="button" className="toast-close" aria-label="Dismiss notification" onClick={() => onClose(item.id)}><X size={16} aria-hidden /></button>
   </div>;
 }

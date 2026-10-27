@@ -3,41 +3,27 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, CalendarDays, History, ClipboardCheck, Files, Users, MessageSquare, ChartNoAxesCombined, Clock3, Settings2, Menu, X, ArrowDownUp, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Files, Settings2, Menu, X, ArrowDownUp, MonitorCog, MonitorCheck } from "lucide-react";
+import { primaryNavigation, navigationSection } from "@/lib/workflow-navigation";
 
-type NavItem = readonly [href: string, label: string, icon: LucideIcon];
-
-function navGroups(isStaff: boolean): { label: string; items: NavItem[] }[] {
-  return [
-    { label: "Workspace", items: [["/dashboard", "Overview", LayoutDashboard], ["/dashboard/today", "Today", CalendarDays], ["/dashboard/yesterday", "Yesterday", History], ["/dashboard/checks", "Post checks", ClipboardCheck]] },
-    { label: "Records", items: [["/dashboard/posts", "All posts", Files], ["/dashboard/customers", "Customers", Users], ["/dashboard/comments", "Comments", MessageSquare], ...(isStaff ? [["/dashboard/sheet-sync", "Import & export", ArrowDownUp] as const] : [])] },
-    { label: "Insights", items: [["/dashboard/reports", "Reports", ChartNoAxesCombined], ["/dashboard/sessions", "Work sessions", Clock3]] },
-    { label: "Account", items: [["/dashboard/settings", "Workspace settings", Settings2]] },
-  ];
-}
+const icons = [LayoutDashboard, ArrowDownUp, MonitorCog, MonitorCheck, Files];
 
 const pageLabels: Record<string, string> = {
   today: "Today", yesterday: "Yesterday", checks: "Post checks", posts: "All posts", customers: "Customers", comments: "Comments",
-  reports: "Reports", sessions: "Work sessions", settings: "Workspace settings", "sheet-sync": "Import & export",
+  reports: "Reports", sessions: "Work sessions", settings: "Settings / More", "sheet-sync": "Advanced import & export", automation: "Worker setup", content: "Content & approvals", profiles: "Profiles", publishing: "Publishing diagnostics", "master-sheet": "Master Sheet", run: "Run automation", results: "Results",
 };
-
-function isActive(path: string, href: string) {
-  return href === "/dashboard" ? path === href : path === href || path.startsWith(`${href}/`);
-}
 
 export function Navigation({ isStaff = false }: { isStaff?: boolean }) {
   const path = usePathname();
+  const section = navigationSection(path);
   return (
     <nav aria-label="Main navigation" className="navigation">
-      {navGroups(isStaff).map((group) => (
-        <div className="nav-group" key={group.label}>
-          <p className="nav-group-label">{group.label}</p>
-          {group.items.map(([href, label, Icon]) => {
-            const active = isActive(path, href);
-            return <Link key={href} href={href} className={active ? "active" : ""} aria-current={active ? "page" : undefined}><Icon size={18} aria-hidden /><span>{label}</span></Link>;
-          })}
-        </div>
-      ))}
+      <div className="nav-group"><p className="nav-group-label">Your work</p>{primaryNavigation.map((item, index) => {
+        if (item.staff && !isStaff) return null;
+        const Icon = icons[index];
+        return <Link key={item.href} href={item.href} className={section === item.href ? "active" : ""} aria-current={section === item.href ? "page" : undefined}><Icon size={18} aria-hidden /><span>{item.label}</span></Link>;
+      })}</div>
+      <div className="nav-group"><Link href="/dashboard/settings" className={section === "/dashboard/settings" ? "active" : ""} aria-current={section === "/dashboard/settings" ? "page" : undefined}><Settings2 size={18} aria-hidden /><span>Settings / More</span></Link></div>
     </nav>
   );
 }
@@ -46,7 +32,7 @@ export function Breadcrumbs() {
   const path = usePathname();
   const [, , section, child] = path.split("/");
   const trail: { label: string; href?: string }[] = [{ label: "Workspace", href: "/dashboard" }];
-  if (!section) trail.push({ label: "Overview" });
+  if (!section) trail.push({ label: "Home" });
   else {
     const label = pageLabels[section] ?? "Page";
     if (!child) trail.push({ label });

@@ -23,7 +23,7 @@ export function formatAgo(iso: string, now = Date.now()): string {
 
 // Where a notification should take the reader.
 export function notificationHref(item: Pick<NotificationItem, "publication_id" | "kind">): string {
-  return item.publication_id ? `/dashboard/posts/${item.publication_id}` : "/dashboard/checks";
+  return item.publication_id ? `/dashboard/posts/${item.publication_id}` : item.kind === "publish_result" ? "/dashboard/publishing" : "/dashboard/checks";
 }
 
 // First run on a device records what already exists without announcing it; afterwards only unseen ids are announced.

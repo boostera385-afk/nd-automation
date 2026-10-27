@@ -1,6 +1,8 @@
 # ND Automations — reporting foundation
 
-An initial **standalone customer-reporting web app**, built with Next.js, TypeScript and Supabase. It records authorized customer post links, explicit manual visibility observations, observed comments and daily reporting sessions.
+A **customer-reporting web app**, built with Next.js, TypeScript and Supabase, plus an initial read-only local monitoring bridge. It records authorized post links, sourced visibility observations, observed comments and daily work sessions. Full desktop automation parity is not yet implemented.
+
+The monitoring bridge's staging database setup is applied, but the laptop worker is not paired and live browser acceptance is pending. See [worker setup and exact limits](docs/WORKER-BRIDGE.md) before enabling any monitoring.
 
 ## Start here
 
@@ -20,8 +22,8 @@ Open <http://localhost:3000>. Visitors see the sign-in page, never database/migr
 ## Current boundary
 
 - Default business timezone: **America/Los_Angeles**, with automatic PST/PDT. Device timezone is detected separately.
-- Daily **8–10 hour reporting sessions**, not a continuously running automation worker.
-- **No Nextdoor API** and no automatic platform checking, posting, account creation, random engagement or multi-profile orchestration.
+- Daily **8–10 hour work sessions**. Explicitly configured local monitoring is session-gated; no 24/7 execution.
+- **No Nextdoor API**, dashboard publishing, account creation or random engagement. Initial read-only post checks require a paired local agent, validated selectors and an approved pilot.
 - Existing `core/`, `gui/` and desktop launchers are preserved but **not connected** to this reporting app.
 - Reviewed CSV imports accept only post-reference fields and remain unverified until a sourced manual review is recorded.
 - Supabase Row Level Security separates organizations and explicitly assigned customer access. No service-role key is used by the application.

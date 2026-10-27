@@ -1,5 +1,8 @@
 import "server-only";
 import { parseSyncEndpoint, sheetResponseSchema, type SheetRow, type SheetTab } from "./sheet-status";
+import { masterResponseSchema, type MasterTab } from "./workflow";
+import { requireWorkspace } from "./data";
+import { z } from "zod";
 
 export type SheetSyncErrorCode = "not_configured" | "unreachable" | "unauthorized" | "bad_response" | "sheet_unavailable";
 
@@ -13,17 +16,27 @@ const TIMEOUT_MS = 25_000;
 function settings() {
   const endpoint = parseSyncEndpoint(process.env.SHEET_SYNC_URL);
   const token = process.env.SHEET_SYNC_TOKEN?.trim() ?? "";
-  return endpoint && token.length >= 24 ? { endpoint, token } : null;
+  const organization = z.uuid().safeParse(process.env.SHEET_SYNC_ORGANIZATION_ID);
+  return endpoint && token.length >= 24 && organization.success ? { endpoint, token, organizationId: organization.data } : null;
 }
 
-export function sheetSyncConfigured(): boolean {
-  return settings() !== null;
+export function sheetSyncConfigured(organizationId: string): boolean {
+  return settings()?.organizationId === organizationId;
 }
 
 // The token and endpoint stay on the server. Messages are written for the user and never echo either value.
 export async function fetchSheetRows(sheet: SheetTab): Promise<{ rows: SheetRow[]; fetchedAt: string; truncated: boolean }> {
+  return fetchRows(sheet, "getPostRecords");
+}
+
+export async function fetchMasterRows(sheet: MasterTab): Promise<{ rows: SheetRow[]; fetchedAt: string; truncated: boolean }> {
+  return fetchRows(sheet, "getTaskRows");
+}
+
+async function fetchRows(sheet: MasterTab, action: "getTaskRows" | "getPostRecords"): Promise<{ rows: SheetRow[]; fetchedAt: string; truncated: boolean }> {
+  const { organization } = await requireWorkspace(true);
   const config = settings();
-  if (!config) throw new SheetSyncError("not_configured", "The sheet connection is not set up yet.");
+  if (!config || config.organizationId !== organization.id) throw new SheetSyncError("not_configured", "The Sheet connection is not configured for this workspace. Ask your administrator to finish one-time setup.");
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -32,7 +45,7 @@ export async function fetchSheetRows(sheet: SheetTab): Promise<{ rows: SheetRow[
     const response = await fetch(config.endpoint, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "getPostRecords", sheet, token: config.token }),
+      body: JSON.stringify({ action, sheet, token: config.token }),
       redirect: "follow",
       cache: "no-store",
       signal: controller.signal,
@@ -50,14 +63,16 @@ export async function fetchSheetRows(sheet: SheetTab): Promise<{ rows: SheetRow[
   if (text.length > MAX_BODY_CHARS) throw bad();
   let json: unknown;
   try { json = JSON.parse(text); } catch { throw bad(); }
-  const parsed = sheetResponseSchema.safeParse(json);
+  const parsed = (action === "getTaskRows" ? masterResponseSchema : sheetResponseSchema).safeParse(json);
   if (!parsed.success) throw bad();
 
   if (!parsed.data.ok) {
     const code = parsed.data.error;
     if (code === "unauthorized") throw new SheetSyncError("unauthorized", "The sheet connection rejected the secret token. Check that both sides use the same value.");
-    if (code === "sheet_not_found" || code === "status_column_missing" || code === "invalid_sheet") throw new SheetSyncError("sheet_unavailable", "That tab was not found, or it has no Status column.");
+    if (code === "invalid_action") throw new SheetSyncError("sheet_unavailable", "Update the separate dashboard connector to enable master-tab previews. The desktop and Fudge scripts should not be replaced.");
+    if (["sheet_not_found", "status_column_missing", "profile_column_missing", "invalid_sheet"].includes(code)) throw new SheetSyncError("sheet_unavailable", "That tab is missing or its Profile Name / Status headers need checking. Nothing was changed.");
     throw bad();
   }
+  if (parsed.data.sheet !== sheet) throw bad();
   return { rows: parsed.data.rows, fetchedAt: parsed.data.fetchedAt, truncated: parsed.data.truncated };
 }

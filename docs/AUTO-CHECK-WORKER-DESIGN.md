@@ -1,6 +1,12 @@
 # Automatic next-day post checking: design for review
 
-**Status: design only. No checker code exists yet.** The dashboard, database, notifications and sheet understanding it needs are built and tested; the part that opens browsers is not, and should not ship without a short pilot on your PC (reasons below).
+Implementation update: the initial dashboard bridge and `apps/worker/agent.py`
+now exist in source; see `WORKER-BRIDGE.md`. The staging migrations are applied,
+selectors and browser compatibility remain unvalidated, and no live pilot has
+run. The following design sections describe the original proposal, not evidence
+of full delivery. The standalone pilot is still documented separately.
+
+**The remainder is the historical proposal, not the current acceptance report.** A dashboard agent and staging schema now exist, but pairing and validated page selectors are still required. The separate local pilot is documented in `apps/worker/MONITORING.md`. No successful live profile/post/comment check or Sheet writeback is claimed.
 
 ## What it will do
 

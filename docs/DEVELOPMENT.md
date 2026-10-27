@@ -1,5 +1,10 @@
 # Development guide — reporting foundation
 
+This guide covers the reporting foundation. The subsequent read-only monitoring
+bridge and its applied staging migrations are documented in `WORKER-BRIDGE.md`.
+Worker pairing and live browser acceptance remain pending; the full automation
+requirements are not a delivered desktop replacement.
+
 ## 1. What this release does
 
 This milestone is a standalone customer-reporting application in `apps/web`. It does not execute or wrap the legacy browser/account automation.

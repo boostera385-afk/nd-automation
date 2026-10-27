@@ -87,7 +87,7 @@ export async function sessionAction(_previous: FormState, form: FormData): Promi
   const { error } = await db.rpc("reporting_session_action", { org: organization.id, action: action.data, device_zone: zone.data });
   if (error) return { error: "Session could not be changed. Refresh and try again." };
   refresh();
-  return { success: "Reporting session updated. No browser automation was started." };
+  return { success: "Work session updated. Only explicitly enabled read-only monitoring follows this session; no publishing or account creation was started." };
 }
 
 export type ImportState = FormState & { rows?: ImportedRow[]; errors?: string[]; customerId?: string };

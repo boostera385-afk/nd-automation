@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   poweredByHeader: false,
-  experimental: { serverActions: { bodySizeLimit: "1mb" } },
+  // A 1 MB inventory CSV expands into reviewed JSON + action-state metadata.
+  // Individual actions retain their stricter file/row/field limits.
+  experimental: { serverActions: { bodySizeLimit: "4mb" } },
   async headers() {
     return [{ source: "/:path*", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },

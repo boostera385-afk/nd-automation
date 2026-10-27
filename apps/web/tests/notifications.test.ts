@@ -28,6 +28,7 @@ describe("notification helpers", () => {
   it("links a single-post result to the post and a batch to the checks page", () => {
     expect(notificationHref({ publication_id: "abc", kind: "check_result" })).toBe("/dashboard/posts/abc");
     expect(notificationHref({ publication_id: null, kind: "check_batch" })).toBe("/dashboard/checks");
+    expect(notificationHref({ publication_id: null, kind: "publish_result" })).toBe("/dashboard/publishing");
   });
 
   it("stays silent the first time a device sees existing notifications, then announces only new ones", () => {

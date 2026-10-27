@@ -4,8 +4,9 @@
  * A STANDALONE Apps Script project, separate from the script the desktop tool
  * uses. Deploying this does not change the existing automation in any way.
  *
- * What it does:  returns Profile Name, Post link, Status and a short title for
- *                each row of the "Auto Posting" or "Auto Listing" tab.
+ * What it does: getPostRecords returns Profile Name, Post link, Status and a
+ * short title for Auto Posting / Auto Listing. The additive getTaskRows action
+ * provides the same safe metadata projection for the desktop task tabs below.
  * What it never does:
  *   - write to the sheet (it only calls read methods);
  *   - read the Email, Password, Proxy, Cookies or any other column — only the
@@ -21,6 +22,18 @@
 const SYNC_TABS = {
   "Auto Posting": { titleHeader: "Post Text" },
   "Auto Listing": { titleHeader: "Title" }
+};
+// A separate metadata-only action supports the familiar desktop tabs. It never
+// reads credential, cookie, proxy, address or media columns, even for these tabs.
+const TASK_TABS = {
+  "Auto Posting": { titleHeader: "Post Text" },
+  "Auto Listing": { titleHeader: "Title" },
+  "Incog Profile Creation": { titleHeader: "" },
+  "ND Acc Creation": { titleHeader: "" },
+  "Bulk cookies import": { titleHeader: "", alias: "Bulk proxy import" },
+  "Bulk proxies import": { titleHeader: "" },
+  "Auto Warmup": { titleHeader: "" },
+  "Auto Random Posting": { titleHeader: "" }
 };
 const MAX_ROWS = 2000;
 const TITLE_MAX = 120;
@@ -38,12 +51,14 @@ function doPost(e) {
 
     if (!expected || expected.length < 24 || !sheetId) return json_({ ok: false, error: "not_configured" });
     if (!safeEqual_(String(body.token || ""), expected)) return json_({ ok: false, error: "unauthorized" });
-    if (body.action !== "getPostRecords") return json_({ ok: false, error: "invalid_action" });
+    if (body.action !== "getPostRecords" && body.action !== "getTaskRows") return json_({ ok: false, error: "invalid_action" });
 
     const tab = String(body.sheet || "Auto Posting");
-    if (!Object.prototype.hasOwnProperty.call(SYNC_TABS, tab)) return json_({ ok: false, error: "invalid_sheet" });
+    const allowed = body.action === "getTaskRows" ? TASK_TABS : SYNC_TABS;
+    if (!Object.prototype.hasOwnProperty.call(allowed, tab)) return json_({ ok: false, error: "invalid_sheet" });
 
-    const sheet = findSheet_(SpreadsheetApp.openById(sheetId), tab);
+    const book = SpreadsheetApp.openById(sheetId);
+    const sheet = findSheet_(book, tab) || (allowed[tab].alias ? findSheet_(book, allowed[tab].alias) : null);
     if (!sheet) return json_({ ok: false, error: "sheet_not_found" });
 
     const lastRow = sheet.getLastRow();
@@ -55,6 +70,7 @@ function doPost(e) {
     const col = function (name) { return headers.indexOf(name.toLowerCase()) + 1; }; // 0 when missing
     const statusCol = col("status");
     if (!statusCol) return json_({ ok: false, error: "status_column_missing" });
+    if (body.action === "getTaskRows" && !col("profile name")) return json_({ ok: false, error: "profile_column_missing" });
 
     const count = Math.min(lastRow - 1, MAX_ROWS);
     // Read ONLY these columns. Credentials in other columns are never loaded.
@@ -65,7 +81,7 @@ function doPost(e) {
     const names = read(col("profile name"));
     const links = read(col("post link"));
     const statuses = read(statusCol);
-    const titles = read(col(SYNC_TABS[tab].titleHeader));
+    const titles = read(allowed[tab].titleHeader ? col(allowed[tab].titleHeader) : 0);
 
     const rows = [];
     for (let i = 0; i < count; i++) {

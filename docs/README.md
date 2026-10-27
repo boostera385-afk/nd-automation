@@ -2,11 +2,25 @@
 
 ## Start here
 
+[Sheet-first dashboard](SHEET-FIRST-WORKFLOW.md) — five daily sections, one-time
+connections/profile mappings, and the exact desktop-versus-dashboard boundary.
+
+[Publishing preparation and protocol](PUBLISHING-PROTOCOL.md) — staged drafts and
+inventory, locally tested publish jobs, and the missing browser-execution gates.
+
+[Operational workbook workflow review](WORKBOOK-WORKFLOW-REVIEW.md) — read-only review of the supplied workbook copy, execution-versus-monitoring status mapping, missing-link reconciliation and unsafe column-layout assumptions.
+
+[Monitoring worker bridge](WORKER-BRIDGE.md) — dashboard controls, scoped agent protocol, automatic due-check policy and applied staging database setup. Worker pairing, live testing and the remaining desktop features are still deferred.
+
+[Current automation readiness audit](AUTOMATION-READINESS-AUDIT.md) — verified gaps across F01–F36, local connection blockers, and setup that is actually supported now. Full dashboard automation is not complete.
+
 [Actual implementation status](IMPLEMENTATION-STATUS.md) · [Development guide](DEVELOPMENT.md) · [OpenCode setup](OPENCODE-SETUP.md)
 
 **Current milestone:** Standalone reporting foundation. Existing Python/browser automation remains unchanged and unconnected. The historical plan below includes later/deferred capabilities; it is not a statement of what this release executes.
 
 [ND Automations Dashboard — Implementation Plan](ND-AUTOMATIONS-DASHBOARD-IMPLEMENTATION-PLAN.md)
+
+[Desktop-to-dashboard parity roadmap](DASHBOARD-PARITY-ROADMAP.md) — feature-family gaps and delivery gates for the authorized phased migration.
 
 The plan prioritizes **post today → verify the exact post during the next daily work session → collect available comments → update the dashboard and connected sheets**, while retaining the existing **Incogniton + Playwright browser system as the only Nextdoor execution path** and Supabase as the operational database.
 

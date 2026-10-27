@@ -1,0 +1,143 @@
+import unittest
+from unittest.mock import Mock, patch
+
+from local_incogniton import Incogniton, ProfileUnavailable, debug_endpoint
+from monitor import check_page, run_batch
+from monitoring import canonical_post_url, classify_snapshot, navigation_failure, validate_adapter, validate_manifest
+
+
+POST = {"publication_id": "11111111-1111-4111-8111-111111111111",
+        "profile_id": "22222222-2222-4222-8222-222222222222", "url": "https://nextdoor.com/p/example"}
+ADAPTER = {"version": 1, "post_root": "article", "post_link": "a[href]", "post_body": ".post-body", "comment": "[data-comment-id]",
+           "comment_id_attribute": "data-comment-id", "comment_body": ".body", "login": "#login",
+           "verification": "#verify", "removed": "#removed", "unavailable": "#unavailable"}
+
+
+class ContractTests(unittest.TestCase):
+    def test_canonicalizes_supported_links(self):
+        self.assertEqual(canonical_post_url("https://www.nextdoor.com/p/example/?track=x#frag"), POST["url"])
+
+    def test_disallows_arbitrary_targets(self):
+        for value in ("http://nextdoor.com/p/x", "https://nextdoor.com.attacker.test/p/x", "https://nextdoor.com/login",
+                      "https://user:pass@nextdoor.com/p/x", "https://127.0.0.1/p/x", "https://nextdoor.com:443/p/x"):
+            with self.assertRaises(ValueError):
+                canonical_post_url(value)
+
+    def test_manifest_validates_before_launch(self):
+        self.assertEqual(validate_manifest({"version": 1, "posts": [POST]}), [POST])
+        for posts in ([], [POST, POST], [{**POST, "password": "secret"}], [{**POST, "profile_id": "ambiguous name"}]):
+            with self.assertRaises((ValueError, TypeError)):
+                validate_manifest({"version": 1, "posts": posts})
+
+    def test_adapter_requires_explicit_configuration(self):
+        self.assertEqual(validate_adapter(ADAPTER), ADAPTER)
+        with self.assertRaises(ValueError):
+            validate_adapter({**ADAPTER, "removed": ""})
+
+    def test_alive_requires_exact_post(self):
+        self.assertEqual(classify_snapshot(POST, {"url": POST["url"], "exact_post": True})["outcome"], "alive")
+        for snapshot in ({"url": POST["url"]}, {"url": "https://nextdoor.com/p/other", "exact_post": True},
+                         {"url": POST["url"], "exact_post": True, "removed": True}):
+            self.assertEqual(classify_snapshot(POST, snapshot)["outcome"], "needs_review")
+
+    def test_access_failures_take_precedence(self):
+        for signal, outcome in (("login", "login_required"), ("verification", "verification_required")):
+            self.assertEqual(classify_snapshot(POST, {"url": POST["url"], "exact_post": True, signal: True})["outcome"], outcome)
+
+    def test_removal_like_notice_is_not_confirmed_deletion(self):
+        self.assertEqual(classify_snapshot(POST, {"url": POST["url"], "removed": True})["outcome"], "needs_review")
+
+    def test_comments_are_scoped_deduplicated_and_incomplete(self):
+        snapshot = {"url": POST["url"], "exact_post": True, "comments": [
+            {"external_id": "c1", "body": "Example"}, {"external_id": "c1", "body": "Example"},
+            {"external_id": None, "body": "No stable ID"}]}
+        value = classify_snapshot(POST, snapshot)
+        self.assertEqual(len(value["comments"]), 1)
+        self.assertIsNone(value["comments"][0]["created_at"])
+        self.assertIsNone(value["comments_total"])
+        self.assertFalse(value["comments_complete"])
+
+    def test_navigation_errors_do_not_imply_removal_or_leak_details(self):
+        value = navigation_failure(POST, "ERR_PROXY_CONNECTION_FAILED secret")
+        self.assertEqual(value["outcome"], "proxy_issue")
+        self.assertNotIn("secret", str(value))
+        self.assertEqual(navigation_failure(POST, "timeout")["outcome"], "network_error")
+
+    def test_debug_endpoint_is_loopback_only(self):
+        self.assertEqual(debug_endpoint({"data": {"puppeteerUrl": "ws://127.0.0.1:9222/devtools/browser/test"}}),
+                         "ws://127.0.0.1:9222/devtools/browser/test")
+        for value in ("ws://attacker.test:9222/x", "http://user:pass@localhost:9222/x", "file:///x"):
+            with self.assertRaises(ValueError):
+                debug_endpoint({"url": value})
+
+    def test_launch_fails_closed_for_unknown_or_running_status(self):
+        api = Incogniton()
+        for payload in ({}, {"state": "running"}, {"state": "stopped", "profile_status": "running"}):
+            api.request = Mock(return_value=payload)
+            with self.assertRaises(ValueError):
+                api.launch(POST["profile_id"])
+            self.assertEqual(api.request.call_count, 1)
+
+
+class RunnerTests(unittest.TestCase):
+    @patch("monitor.time.sleep")
+    def test_profiles_are_grouped_and_only_worker_page_is_closed(self, _sleep):
+        api, chromium, emit = Mock(), Mock(), Mock()
+        api.launch.return_value = {"url": "http://127.0.0.1:9222"}
+        page = Mock()
+        page.goto.return_value.status = 200
+        page.evaluate.return_value = {"url": POST["url"], "exact_post": True}
+        browser = chromium.connect_over_cdp.return_value
+        browser.contexts = [Mock()]
+        browser.contexts[0].new_page.return_value = page
+        second = {**POST, "publication_id": "33333333-3333-4333-8333-333333333333"}
+        run_batch([POST, second], ADAPTER, api, chromium, emit, float("inf"))
+        api.launch.assert_called_once_with(POST["profile_id"])
+        api.stop.assert_called_once_with(POST["profile_id"])
+        page.close.assert_called_once()
+        browser.close.assert_not_called()
+        self.assertEqual(emit.call_count, 2)
+
+    @patch("monitor.time.sleep")
+    def test_busy_profile_is_not_stopped_or_attached(self, _sleep):
+        api, chromium = Mock(), Mock()
+        api.launch.side_effect = ProfileUnavailable("busy")
+        results = []
+        run_batch([POST], ADAPTER, api, chromium, results.append, float("inf"))
+        self.assertEqual(results[0]["outcome"], "profile_error")
+        api.stop.assert_not_called()
+        chromium.connect_over_cdp.assert_not_called()
+
+    def test_unconfirmed_launch_aborts_instead_of_opening_more_profiles(self):
+        api, chromium = Mock(), Mock()
+        api.launch.side_effect = TimeoutError("launch request timed out")
+        second = {**POST, "profile_id": "44444444-4444-4444-8444-444444444444"}
+        with self.assertRaises(RuntimeError):
+            run_batch([POST, second], ADAPTER, api, chromium, lambda value: None, float("inf"))
+        self.assertEqual(api.launch.call_count, 1)
+        api.stop.assert_not_called()
+
+    def test_deadline_prevents_profile_launch(self):
+        api, chromium, results = Mock(), Mock(), []
+        run_batch([POST], ADAPTER, api, chromium, results.append, 0)
+        api.launch.assert_not_called()
+        self.assertEqual(results[0]["outcome"], "needs_review")
+
+    @patch("monitor.time.sleep")
+    def test_failed_cleanup_stops_batch(self, _sleep):
+        api, chromium = Mock(), Mock()
+        api.launch.return_value = {"url": "http://127.0.0.1:9222"}
+        chromium.connect_over_cdp.side_effect = RuntimeError("attach failed")
+        api.stop.side_effect = RuntimeError("stop failed")
+        with self.assertRaises(RuntimeError):
+            run_batch([POST], ADAPTER, api, chromium, lambda value: None, float("inf"))
+
+    def test_adapter_failure_is_not_a_network_or_removal_result(self):
+        page = Mock()
+        page.goto.return_value.status = 200
+        page.evaluate.side_effect = RuntimeError("bad selector")
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "needs_review")
+
+
+if __name__ == "__main__":
+    unittest.main()

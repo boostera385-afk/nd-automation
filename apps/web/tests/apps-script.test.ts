@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { sheetResponseSchema } from "@/lib/sheet-status";
+import { MASTER_TABS, masterResponseSchema } from "@/lib/workflow";
 
 const source = readFileSync(fileURLToPath(new URL("../../../integrations/sheets/reporting-sync.gs", import.meta.url)), "utf8");
 const TOKEN = "t".repeat(32);
@@ -47,6 +48,34 @@ function run(opts: { props?: Record<string, string>; body?: unknown; sheets?: Re
 }
 
 describe("reporting-sync.gs", () => {
+  it.each(MASTER_TABS)("previews safe metadata for %s without reading credential columns", (sheet) => {
+    const title = sheet === "Auto Posting" ? "Post Text" : "Title";
+    const taskHeaders = ["Profile Name", "Email", "Password", "Cookies", "Proxy", title, "Post link", "Status"];
+    const { post, rangeReads } = run({ sheets: { [sheet]: [taskHeaders, ["Exact profile", ...SECRET_VALUES, "private-proxy", "Safe short title", "https://nextdoor.com/p/task", ""]] } });
+    const result = post({ action: "getTaskRows", token: TOKEN, sheet });
+    expect(masterResponseSchema.safeParse(result).success).toBe(true);
+    const columns = rangeReads.filter((read) => read.row > 1).map((read) => taskHeaders[read.col - 1]);
+    expect(columns).not.toContain("Email"); expect(columns).not.toContain("Password"); expect(columns).not.toContain("Cookies"); expect(columns).not.toContain("Proxy");
+    for (const secret of SECRET_VALUES) expect(JSON.stringify(result)).not.toContain(secret);
+  });
+  it("supports the legacy cookie tab alias without renaming or writing it", () => {
+    const result = run({ sheets: { "Bulk proxy import": [["Profile Name", "Cookies", "Status"], ["Known profile", "private-cookie", "Imported"]] } }).post({ action: "getTaskRows", token: TOKEN, sheet: "Bulk cookies import" });
+    expect(result).toMatchObject({ ok: true, sheet: "Bulk cookies import" });
+    expect(JSON.stringify(result)).not.toContain("private-cookie");
+  });
+  it("excludes unheaded account-side data and refuses missing Profile Name headers", () => {
+    const result = run({ sheets: { "ND Acc Creation": [["Profile Name", "Password", "Status", ""], ["", "", "", "unmapped-private-material"]] } }).post({ action: "getTaskRows", token: TOKEN, sheet: "ND Acc Creation" });
+    expect(result).toMatchObject({ ok: true, rows: [] });
+    const missing = run({ sheets: { "ND Acc Creation": [["Password", "Status"], ["private", ""]] } });
+    expect(missing.post({ action: "getTaskRows", token: TOKEN, sheet: "ND Acc Creation" })).toEqual({ ok: false, error: "profile_column_missing" });
+    expect(missing.rangeReads.every((read) => read.row === 1)).toBe(true);
+  });
+  it("refuses master previews with invalid tabs or without a valid token", () => {
+    const { post, rangeReads } = run();
+    expect(post({ action: "getTaskRows", sheet: "Auto Posting", token: "bad" })).toMatchObject({ ok: false, error: "unauthorized" });
+    for (const sheet of ["__proto__", "constructor", "Private", "toString"]) expect(post({ action: "getTaskRows", token: TOKEN, sheet })).toMatchObject({ ok: false, error: "invalid_sheet" });
+    expect(rangeReads).toHaveLength(0);
+  });
   it("refuses a wrong or missing token without touching the sheet", () => {
     const { post, rangeReads } = run();
     expect(post({ action: "getPostRecords", token: "wrong" })).toEqual({ ok: false, error: "unauthorized" });

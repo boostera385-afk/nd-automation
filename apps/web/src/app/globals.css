@@ -139,6 +139,24 @@ code { font-size: 12.5px; overflow-wrap: anywhere; background: var(--surface-3);
 .inline-action .notice { position: absolute; z-index: 3; width: 280px; right: 0; top: 42px; font-size: 12px; padding: 10px 12px; box-shadow: var(--shadow-md); }
 
 /* ---------- Page structure ---------- */
+.connection-grid, .workflow-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.connection-card, .workflow-steps a { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
+.connection-card:hover, .workflow-steps a:hover { border-color: var(--accent-text); text-decoration: none; }
+.connection-card small, .workflow-steps small { color: var(--text-3); }
+.workflow-steps a > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.workflow-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+.workflow-tabs a { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2); font-size: 13px; }
+.workflow-tabs a[aria-current="page"] { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent-border); font-weight: 600; }
+.workflow-details { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 20px; background: var(--surface); }
+.workflow-details > summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.workflow-details[open] > summary { margin-bottom: 16px; }
+.workflow-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.workflow-links > a { border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-wrap: anywhere; }
+.workflow-links small { display: block; color: var(--text-3); margin-top: 5px; }
+.refresh-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.refresh-tools label { font-size: 12px; }
+.task-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 12px 0; }
+@media (max-width: 850px) { .connection-grid, .workflow-steps { grid-template-columns: minmax(0, 1fr); } .workflow-links { grid-template-columns: minmax(0, 1fr); } }
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .page-header .muted { margin: 0; max-width: 760px; font-size: 14px; }
 .page-header .eyebrow { margin-bottom: 8px; }
@@ -208,8 +226,8 @@ textarea { resize: vertical; }
 input::placeholder, textarea::placeholder { color: var(--text-3); opacity: .8; }
 input[type=file] { font-size: 13px; }
 .field-hint { color: var(--text-3); font-size: 12px; font-weight: 400; }
-.check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; }
-.check input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--btn); flex-shrink: 0; }
+.check, .check-label { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; }
+.check input, .check-label input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--btn); flex-shrink: 0; }
 .filter-bar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin: 0 0 20px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
 .filter-bar label { min-width: 170px; max-width: 240px; flex: 0 1 220px; }
 .filter-bar .search-field { flex: 1 1 280px; max-width: 420px; }
@@ -541,3 +559,8 @@ tr.is-selected { background: var(--accent-soft); }
   body { background: #fff; color: #000; }
   .panel, .stat-card { box-shadow: none; break-inside: avoid; }
 }
+.composer-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.composer-preview { position: sticky; top: 1rem; min-width: 0; }
+.content-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-block: 1rem; }
+.composer-layout code { overflow-wrap: anywhere; }
+@media (max-width: 850px) { .composer-layout { grid-template-columns: minmax(0, 1fr); } .composer-preview { position: static; } }
