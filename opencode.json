@@ -5,6 +5,7 @@
     { "action": "playwright_browser_run_code_unsafe", "resource": "*", "effect": "deny" },
     { "action": "shell", "resource": "git push *", "effect": "ask" },
     { "action": "supabase_apply_migration", "resource": "*", "effect": "ask" },
+    { "action": "supabase_deploy_edge_function", "resource": "*", "effect": "ask" },
     { "action": "supabase_execute_sql", "resource": "*", "effect": "ask" }
   ],
   "mcp": {
@@ -32,7 +33,7 @@
       },
       "supabase": {
         "type": "remote",
-        "url": "https://mcp.supabase.com/mcp?project_ref=xtefjnfdjnxwrpkoydaj&features=database,docs,development,debugging"
+        "url": "https://mcp.supabase.com/mcp?project_ref=xtefjnfdjnxwrpkoydaj&features=database,docs,development,debugging,functions"
       }
     }
   }

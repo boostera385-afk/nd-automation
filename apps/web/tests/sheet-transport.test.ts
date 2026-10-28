@@ -56,4 +56,10 @@ describe("workspace-scoped Sheet transport", () => {
     await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("desktop and Fudge scripts should not be replaced");
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
+  it("distinguishes a missing tab from invalid headers without treating either as empty success", async () => {
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: "sheet_not_found" })));
+    await expect(fetchMasterRows("Bulk proxies import")).rejects.toMatchObject({ code: "sheet_not_found" });
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: "status_column_missing" })));
+    await expect(fetchMasterRows("Bulk proxies import")).rejects.toMatchObject({ code: "sheet_unavailable" });
+  });
 });

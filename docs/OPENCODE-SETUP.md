@@ -6,8 +6,8 @@ This project uses OpenCode **V2** configuration. No global settings, provider/mo
 
 OpenCode loads project settings from the folder you start it in **and the folders above it**, never from folders below. This workspace therefore has the same MCP configuration in two places, so it works from either:
 
-- `ND Full Automated/opencode.json` (outer folder)
-- `ND Full Automated/ND Full Automated/opencode.json` (inner application folder, which also holds `AGENTS.md`, `apps/` and `docs/`)
+- `ND AUTOMATION DASHBOARD/opencode.json` (outer folder)
+- `ND AUTOMATION DASHBOARD/nd-automation/opencode.json` (application folder, which also holds `AGENTS.md`, `apps/` and `docs/`)
 
 **Keep the two `mcp` blocks identical.** Earlier the servers existed only in the inner file, so a session started in the outer folder silently had no Supabase, Context7 or Playwright tools; that is why sign-in appeared to do nothing. Check any folder with `opencode mcp list`.
 
@@ -17,11 +17,11 @@ OpenCode loads project settings from the folder you start it in **and the folder
 |---|---|---|
 | Context7 | Current framework/library documentation | `https://mcp.context7.com/mcp` |
 | Playwright | Local web-app UI inspection | Pinned `@playwright/mcp@0.0.83`; headless, isolated profile; local origins only; image responses omitted; unsafe run-code tool denied |
-| Supabase | Schema inspection and migrations for the staging project | Scoped to `xtefjnfdjnxwrpkoydaj` with tool groups `database,docs,development,debugging` (`auth` is not a valid group and was removed). **Write access is on**: the URL has no `read_only=true`. |
+| Supabase | User-authorized additive database setup and Edge Function work | Scoped to `xtefjnfdjnxwrpkoydaj` with tool groups `database,docs,development,debugging,functions`; read-only mode removed on 2026-10-28 following explicit authorization. Account, branching and Storage tools are excluded. Verify the runtime project URL and catalog after reconnection; saved configuration alone does not prove a live connection. |
 
 **Verified 2026-10-27:** `opencode mcp list` reports all three connected from both folders. Through the Supabase MCP the project URL, migration history and table list were read, `post_checks_and_notifications` was applied (version `20261026210947`), and the security advisor was run. No personal access token is stored anywhere; sign-in is OAuth through `/mcps`.
 
-**Safety on writes:** `supabase_apply_migration` and `supabase_execute_sql` are set to **ask** in `permissions`, so each database change needs your click even though write access is on. To return to read-only when you are not migrating, add `&read_only=true` to the Supabase URL in both files.
+**Safety on writes:** `supabase_apply_migration`, `supabase_execute_sql` and `supabase_deploy_edge_function` are set to **ask** in `permissions`. No `skip_elicitations` parameter is set; server confirmations are retained where available. To return to read-only when not migrating, add `&read_only=true` to the Supabase URL in both files. Deployment authorization does not release uploads, publishing or profile operations.
 
 The Playwright local-origin option is a guardrail, not a security boundary. Do not use it with customer browser profiles or production credentials. It may require its supported browser installation; report that as a setup step rather than claiming browser testing passed.
 

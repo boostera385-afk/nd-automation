@@ -2,6 +2,308 @@
 
 ## Current milestone
 
+**Authorized shared-database intake deployment (2026-10-28):** MCP target reverified
+as `xtefjnfdjnxwrpkoydaj`. Reviewed the six existing migrations, tables, grants and
+advisors. Promoted the intake draft to CLI-generated source
+`supabase/migrations/20261028203213_fudge_ingestion_v1.sql`; tests load that source.
+Applied through MCP as hosted **`20261028203642 fudge_ingestion_v1`**. All six
+existing migrations and existing data were preserved. The new two tables have
+RLS and staff SELECT only, with writes through the guarded authenticated RPC;
+public wrapper is SECURITY INVOKER. No service-role key or new extension needed.
+
+Validation: typecheck PASS; lint PASS; **521 tests / 30 files PASS**; production
+build PASS. Hosted metadata verifies seven migrations and 19 public RLS tables,
+direct-write/anon denial and exact source matches for all three new function
+bodies. The saved `supabase/tests/fudge_ingestion_hosted_smoke.sql` passed receipt
+replay, changed revision, original preservation, atomic rollback, cross-workspace,
+nonmember/anon and direct-write denials. All fixtures rolled back; final raw record
+and revision counts are zero. This is SQL-level claim/role testing, not real Auth,
+REST/browser or concurrent-connection acceptance. Post-deployment security advisor
+findings unchanged; unused-index INFOs 21 -> 23. See `DB-DEPLOYMENT-20261028.md`.
+
+MCP config now enables project-scoped database/Edge Function tools with write/deploy
+approval prompts retained; both workspace configs match. No Edge Function was
+needed for the existing authenticated RPC contract. The publishing migration
+remains undeployed pending its documented submit-adapter review; no live worker
+claim behavior was replaced. Fudge upload release remains false. No real source
+upload, Sheet write, publication/profile operation, user/membership change, reset,
+backup/restore claim, paid resource, commit or push. P2–P8 remain incomplete where
+acceptance/implementation is missing; earlier draft-only status below is history.
+Final checks: master-plan copies and workspace MCP blocks match; intake source
+hashes match hosted bodies; Fudge release remains false; `git diff --check` PASS
+(existing Windows line-ending warning only). Supabase CLI local cache/branch
+directories are ignored; no secret/export was staged.
+
+**P2 Fudge extension slice implemented in the Fudge repository (2026-10-28):**
+session moved there with user authorization. Added optional existing-account Auth,
+verified staff-workspace discovery, trusted session-only tokens, per-capture
+durable intents paired with collection saves, bounded retry/receipt processing,
+MV3 startup/alarms, pause/history consent and cancellation epochs that prevent
+late retired captures from resuming. The selected project is pinned by optional
+host permission; only the exact internal setup page can invoke privileged controls.
+New side-panel entry opens the setup/status page. Existing Sheets/collector keys
+and the legacy importScripts call are preserved. Clear dialogs disclose separate
+queue/backend deletion semantics. Fudge `docs/BACKEND-UPLOADER.md` and its own
+implementation-status record document details and unresolved gates.
+
+Validation in Fudge: **33 backend tests PASS; 127 existing smoke tests PASS**;
+six changed/new JS modules syntax-checked; manifest and master-plan parity checked.
+Offline extension/dashboard projections agree on seven fixtures. No dashboard
+application source changed in this slice, so its historical 521-test/build result
+was not rerun or promoted to a new result. Production Fudge `UPLOAD_RELEASED`
+remains false; real Chrome/Edge/Auth/worker-eviction and hosted intake acceptance
+remain pending. No real sign-in, source upload, historical migration, hosted DDL,
+Sheet write/import, customer browser/profile action, commit or push occurred.
+Receipt/storage retention and backend deletion remain review gates. **P2 remains
+in progress; no deployment/pilot or release enablement is implied.**
+
+**P2 local Fudge ingestion foundation implemented (2026-10-28):** added
+`supabase/drafts/fudge_ingestion_v1.sql` (not a deployment migration), typed
+collector projection/request/receipt validation in `lib/fudge-ingestion.ts`,
+and `docs/FUDGE-INGESTION-V1.md`. Workspace-scoped identities, client-append-only
+source revisions, SHA-256 content deduplication, original preservation, complete
+ordered receipts, bounded batches, first-observation provenance and atomic
+rollback are tested. Verified staff-only ingestion uses a public SECURITY INVOKER
+wrapper/private guarded implementation, RLS and explicit read-only client table
+grants. Raw data is not assigned to customers, approved or published at intake.
+No service-role key or new Postgres extension is used. CLI discovery confirmed
+Supabase CLI unavailable; draft promotion/deployment is deliberately pending.
+
+Validation: typecheck PASS; lint PASS; **521 tests / 30 files PASS**, including
+55 local intake tests covering tenant/customer/unverified/anon denial, membership
+revocation, direct-write rejection, atomic failures, JSON key/numeric equivalence,
+changed/old revisions, checksum-conflict refusal, byte/count limits, original-only
+projection and malformed/partial/reordered receipts. Initial local DDL test caught
+a non-immutable generated checksum expression; corrected to a hash computed solely
+by the restricted RPC without mislabeling STABLE functions as immutable. Final
+production build PASS; diff whitespace check PASS with existing line-ending
+warning; master-plan copies are identical. Single-runtime PGlite is not real
+multi-connection contention/advisor or hosted browser/Auth acceptance.
+
+Existing applied migration files and Fudge extension behavior are unchanged.
+The older per-user foundation is preserved and documented as unsuitable for direct
+shared-backend deployment. No hosted DDL, source upload, historical import, Sheet
+write, new user/membership, browser job, commit or push occurred. Only this project's
+verified preview was restarted after build. Next: review the intake contract,
+prepare an approved real migration/local staging workflow, then implement opt-in
+extension Auth/workspace selection and durable MV3 uploader with generation-aware
+acknowledgment. **P2 remains incomplete and live ingestion stays disabled.**
+
+**Internal staff frontend Sheet-setup wizard implemented (2026-10-28):** new
+`/dashboard/settings/sheet-setup` staff-gated route, linked from Settings and the
+unconfigured Master Sheet page. Six numbered steps provide generic Apps Script
+code copy, Sheet URL/ID extraction, Web Crypto private token generation, explicit
+replacement warning for configured organizations, hidden-by-default secret copy,
+workspace-filled environment block, deployment/authorization instructions and
+troubleshooting. Inputs are not persisted to browser storage or used as arbitrary
+server request destinations. Existing server tokens are never sent to the page.
+Admin environment save/restart remains explicit; no automatic credential-store or
+Vercel configuration feature is claimed. New staff reuse the org connection.
+
+Validation for this wizard: typecheck PASS; lint PASS; **466 tests / 29 files
+PASS** (27 new helper, source-parity, action and fixture-UI cases); production
+build PASS with the new setup route. `git diff --check` PASS with existing Windows
+line-ending warning. Restarted only this project's verified preview process;
+`/login` returns 200 and signed-out wizard access redirects 307 to login. Actual
+signed-in clipboard clicks, token generation and saved-connection test-button
+acceptance remain for the user; rendered fixture tests are not a live browser
+walkthrough. No commit/push, hosted migration or Sheet write was performed.
+
+The staff-only test action reads saved server configuration through the existing
+workspace-scoped transport and returns safe counts/errors only; it does not import
+rows, write Sheets or start browser jobs. Canonical connector source is bundled at
+development/build time for deployment portability; a parity test guards stale
+copies. Vercel monorepo build source must include the outside-root canonical file.
+No Google script update, Supabase migration or privileged secret was introduced.
+
+**Optional missing proxy-tab UX corrected (2026-10-28):** user screenshots confirm
+the Bulk cookies import safe preview renders; its historical Imported N cookies
+text is not evidence of a dashboard-run import. The separate absent Bulk proxies
+import tab now displays an informational optional-tab notice and a link to cookie
+metadata, rather than the generic red header/configuration error. Transport keeps
+sheet-not-found distinct from malformed-header failures. Only this exact optional
+tab/missing response is softened; required tabs, authorization, network and bad
+responses retain errors. No tabs are created/renamed and no credentials read.
+
+Validation: typecheck PASS; lint PASS; **439 tests / 26 files PASS**, including
+8 fixture-rendered Master Sheet cases and 1 new transport case; production build
+PASS; `git diff --check` PASS with existing line-ending warning. Stopped only the
+verified project preview process for rebuild and restarted it. Authenticated
+visual acceptance of the new notice remains pending; no customer browser session,
+Sheet/Supabase writes, live imports or worker operations were used for this fix.
+
+**User-confirmed signed-in Sheet preview (2026-10-28):** supplied screenshots
+show Auto Posting safe metadata rendering with a fetched timestamp. This accepts
+that preview path only, not imports, live visibility or all-tab UI acceptance.
+The Bulk proxies import screenshot shows the expected missing-tab error: the
+verified seven-tab workbook has no separate proxy-import tab; its similarly named
+Bulk proxy import tab contains Cookies and is mapped through Bulk cookies import.
+No tab rename/creation or alias to credential data was performed. The screenshot
+still shows a session older than ten hours; it must not be treated as dispatch
+authorization. Local ignored inventory records Auto Posting preview evidence.
+No application code, Sheet data or Supabase rows changed; no app tests rerun.
+
+**Authenticated development connector verified (2026-10-28):** user saved the
+private token locally. Offline readiness now passes all local configuration checks
+(exit 0; hosted gates remain separately unverified by that command). Actual
+token-authenticated `getTaskRows` requests returned strict safe metadata responses
+for all seven known tabs, including the cookie alias; no response rows, tokens or
+private settings were printed/saved to public files. Responses were not truncated
+at the connector limit. Metadata presence does not validate a row as executable.
+Only the verified project-specific preview process was stopped, then restarted
+with the saved environment. `/login` returns 200 and signed-out
+`/dashboard/master-sheet` redirects 307 to login. User's signed-in Sheet preview
+acceptance is pending; no user browser session was accessed. Local ignored setup
+inventory records connector configured/read verified; execution/write flags remain
+disabled. No Sheet writes, Supabase row imports, worker jobs or browser actions
+were run. No application code changed; application suites were not rerun.
+
+**Development connector partial setup (2026-10-28):** user deployed the separate
+connector and supplied its URL. Saved it only in ignored `apps/web/.env.local`,
+along with the screenshot workspace UUID after read-only verification that it
+has a verified owner in the selected project. Token remains blank pending private
+user entry of the same Script property value. Actual POST with an intentionally
+wrong token returned HTTP 200 and `{ok:false,error:unauthorized}`, with no rows.
+Offline preflight now passes target/client/app-origin/Sheet-endpoint/workspace
+shape; only token setup is locally blocked. Valid-token Sheet reads, dashboard
+preview and row imports remain unverified; server was not restarted yet. No
+Sheet write/import or application code change occurred; app suites not rerun.
+
+**Complete development Sheet connection guide saved (2026-10-28):** added
+`integrations/sheets/DEVELOPMENT-CONNECTION-GUIDE.md` with standalone connector
+creation, private properties/token, owner deployment, local environment/restart,
+unauthorized rejection and safe-preview checks, alias/missing-tab handling, later
+explicit mappings/import and rollback. The guide distinguishes read-only preview
+from Supabase import writes and unimplemented one-click refresh/writeback. No
+Google deployment, permission change, secret generation, local environment change,
+Sheet import/write or worker execution was performed. Documentation only;
+application suites were not rerun for this guide.
+
+**Seven-tab development schema verified and saved (2026-10-28):** named-tab
+A1:L1 requests confirm headers for all seven screenshot-listed ND Master tabs.
+Saved safe mappings in `docs/ND-MASTER-SCHEMA.md` and updated the ignored local
+dev-copy inventory. The screenshot exposes a posting-style second header/data
+region under Incog Profile Creation; executable interpretation must remain
+quarantined. Bulk proxy import is actually the Cookies tab; no separate proxy
+task tab was inferred. No data-row requests, Sheet/script/permission changes,
+Supabase imports or browser actions occurred. Connector setup and row-level
+validation remain pending. Documentation/local metadata only; no application
+tests run for this change.
+
+**ND Master development copy supplied (2026-10-28):** user designated a copied
+Google Sheet for development rather than the production master. Read-only access
+to the selected tab's A1:L1 headers confirms the Auto Posting-compatible layout;
+no data rows/credential values were fetched, no tabs were edited and no records
+were imported. Local Sheet ID/setup metadata is in ignored
+`integrations/sheets/config.development-sheet.json` (inactive, writes disabled).
+Other tab mappings, connector deployment and separate Source Sheet remain pending.
+Headers were readable without Google sign-in; owner review of sharing/sanitized
+dev credentials is advised. No application code changed or application suites ran
+for this metadata/documentation update.
+
+**User-provided signed-in UI evidence (2026-10-28):** screenshots show local Home
+and Settings / More rendering an Owner workspace after login. This supports basic
+login/workspace-render acceptance only; no agent-controlled authenticated walkthrough,
+tenant-isolation or execution acceptance is claimed. Home reports an unconfigured
+Sheet, waiting worker, zero saved profile mappings and no recent monitoring work.
+Its displayed work session exceeds ten hours; end it and start a fresh authorized
+session before later monitoring. Do not treat the Working label as dispatch
+eligibility. Sheet setup, exact profile binding and worker pilot remain pending.
+
+**Selected shared backend verified (2026-10-28; supersedes earlier target-change
+entries below):** the user chose `xtefjnfdjnxwrpkoydaj` for both Fudge and ND
+dashboard. Both saved MCP configurations are read-only and runtime project URL
+verification matches. Read-only inspection confirms six existing migrations,
+17 RLS-enabled public tables, matching body checksums for all 29 existing source
+functions, intended table/column grants and private credential-table restrictions.
+This is a targeted metadata comparison, not a full schema/permission or live Auth
+acceptance certification. Existing workspace/customer/worker state was preserved.
+The existing local URL and enabled modern publishable key were verified against
+the selected project's key; only the stale ignored local deployment pin changed.
+No key, user, membership, worker or hosted database setting was changed.
+
+Added `docs/P1-HOSTED-REVIEW.md` and metadata-only historical baseline fixture/tests
+to prevent silent edits to applied source function bodies. The publishing protocol
+is still absent from hosted history and deliberately undeployed; Fudge ingestion
+still needs a workspace/revision contract and reviewed additive implementation.
+Security advisors report 3 anon and 21 authenticated SECURITY DEFINER notices,
+disabled leaked-password protection and 1 private no-policy INFO; performance
+reports 21 unused-index INFOs. These findings are recorded for review, not silently
+dismissed or auto-remediated. No indexes were removed or privileges broadened.
+
+Current validation: typecheck PASS; lint PASS; **430 tests / 25 files PASS**,
+including 3 new historical-baseline tests; `git diff --check` PASS with existing
+Windows line-ending warning. Both master plans are identical and saved MCP scopes
+match the selected project. Production build **PASS** after its background
+completion notification. Offline readiness now passes pin/client/app-origin;
+Sheet endpoint/token/workspace remain blocked (exit 1). Hosted metadata inspection
+does not make that offline command a live verifier. Real signed-in access/isolation,
+backup/restore, mappings, pairing and live acceptance remain outstanding. No hosted
+migration/reset, live Sheet/browser action, commit or push was performed.
+
+**P0/P1 implementation started (2026-10-28):** switched work to this dashboard
+repository with user confirmation. Added `docs/IMPLEMENTATION-TRACKER.md` with
+individual F01–F36/N01–N08 acceptance entries and phase gates, plus
+`docs/P0-DISCOVERY.md` for mapping/ownership decisions and hosted-readiness handoff.
+Implemented the offline `npm.cmd run check:readiness` command, backed by a tested
+pure report function. It loads local development settings without printing their
+values, makes no network calls/writes, and never promotes local configuration
+checks to hosted readiness. It checks the requested target pin and validated
+client origin/config, canonical app origin and separate Sheet prerequisites.
+
+Validation: typecheck PASS; lint PASS; **427 tests / 24 files PASS** (23 new
+readiness tests); production build PASS; `git diff --check` PASS with the existing
+Windows line-ending warning. Tracker check confirms every F01–F36/N01–N08 exactly
+once. Actual offline preflight exits **1 (expected setup blockers)**: target pin
+and app origin pass, client configuration and Sheet endpoint/token/workspace are
+blocked. Hosted database/Auth/recovery/worker gates remain unverified. Supabase
+tool discovery returned no available Supabase tools in this session. No hosted
+inspection, migration, environment/credential change, account action, worker
+pairing, live browser action, Sheet write, commit or push was performed. Existing
+uncommitted changes were preserved. P0/P1 are **not complete**; source/master
+mapping confirmation, verified target access and hosted checks remain necessary.
+
+**One-click next-day cohort checks — planning update (2026-10-28):** both master
+plan copies now specify publishing 100 posts today and checking that exact dated
+cohort from the next business day with one **Refresh post statuses** action.
+Requirements include authorized session/profile gating, durable deduplicated jobs,
+progress, truthful outcomes, automatic result/Sheet check-field updates and explicit
+refresh-policy tests. Distinct from latest-100-per-profile monitoring. Documentation
+only; no button, planner change, browser check or Sheet writeback was implemented
+or live-tested. No application suites were run for this documentation update.
+
+**Shared master plan (2026-10-28):** added `docs/MASTER-AUTOMATION-PLAN.md`
+in this repository and the user's Fudge repository, with identical architecture,
+end-to-end task contracts, phased implementation/acceptance gates and minimal-human
+daily operation. Covers ingestion/revisions, approval, safe Sheet writeback,
+profile/onboarding operations, publishing recovery, per-profile previous-100
+monitoring, comments and controlled reposting. Planning/documentation only: no
+application code, database, worker, browser, Sheet or credential changes. No
+application test suite was run for these documentation-only changes. Prior
+uncommitted work was preserved; no commit/push or deployment was performed.
+
+**New Supabase target requested (2026-10-28):**
+`tyczcognqypqxrvkbmrk` replaces the old project as the user's requested target.
+The new project's schema/data/Auth have **not** been inspected, copied or migrated.
+Project and parent-workspace MCP configurations now point exclusively to the new
+project in initial read-only mode without embedded credentials. Supabase tools
+are unavailable in this active session; the CLI also reported no configured MCP
+servers, so a saved configuration is not claimed to be a working connection.
+The user must enable/authenticate the server through `/mcps` (and `/reload` if
+needed). A personal access token posted in chat was not saved or used; revocation
+was advised. The app now supports a deployment project pin; the ignored local
+environment pins the new ref while retaining the old URL/key untouched until a
+verified new pair is available. This intentionally disables access to the old
+backend rather than silently continuing against it. The target guard validates
+origins/key type and a legacy anon JWT's project hint, not opaque modern key
+ownership. All earlier hosted migration/access results below refer to the **old**
+project only. Safe setup order: `supabase/README.md`.
+
+Remote plan check: `git fetch origin` succeeded; `origin/main` remains at
+`e1389c4` and has no changes beyond local main. Only origin/main is listed as a
+remote branch. No newer plan was found; the user was asked for its file/branch or
+repository link. No new product scope was inferred from an unavailable plan.
+
 **Sheet-first implementation (2026-10-27):** staff navigation now has Home,
 Master Sheet, Run automation, Profiles and Results, with Settings / More holding
 all advanced and manual fallback routes. Home no longer asks for routine manual
@@ -74,6 +376,15 @@ The user has requested full desktop-to-dashboard parity and authorized updating 
 | GitHub Actions CI | PASSING on GitHub (run #1, 2026-10-27) | Clean Linux install from the lockfile on Node 24, then typecheck, lint, tests, production build and `npm audit --omit=dev`: all steps succeeded on commit `233eeb8` |
 
 ## Validation log
+
+Project-handover guard (2026-10-28): 17 new configuration tests cover expected
+host pinning, old-project rejection, management/secret/placeholder key rejection,
+legacy anon JWT ref mismatch, unsafe origins and unpinned local development.
+Typecheck PASS; lint PASS; **404 tests in 23 files PASS**; production build PASS.
+No database call, migration, customer operation, new app key, Auth change, worker
+pairing, commit or push was performed. The new project's API readiness and the
+updated plan remain blocked on verified MCP access and a plan link. Python code
+is unchanged and its previous unit/mock result was not rerun for this change.
 
 Sheet-first implementation validation (2026-10-27): typecheck PASS, lint PASS
 (zero warnings), full web/database suite **387 tests / 22 files PASS**, production
@@ -163,7 +474,7 @@ Local monitoring pilot runner (2026-10-27): added opt-in batch execution, fixed-
 |---|---|
 | `npm.cmd run typecheck` | PASS; current auth source also checked by production build |
 | `npm.cmd run lint` | PASS after auth UI changes |
-| `npm.cmd test` | PASS: 387 tests in 22 files after the sheet-first UI/connector milestone, 2026-10-27. Includes fixture-rendered UI, workflow actions, connector privacy/tenant isolation and existing PGlite suites. Not live browser/Incogniton acceptance. |
+| `npm.cmd test` | PASS: 404 tests in 23 files after the project-handover guard, 2026-10-28. Includes configuration safety, fixture-rendered UI, workflow actions, connector isolation and existing PGlite suites. Not new-project or live-browser acceptance. |
 | Typecheck / lint / build after all work to date | PASS / PASS (0 warnings) / PASS — 24 routes incl. `/auth/confirm`, `/dashboard/checks`, `/dashboard/notifications/feed`, `/dashboard/sheet-sync`, 2026-10-27 |
 | Preview checks after final build | PASS: `/login`, `/signup`, `/auth/confirm` render (200); an invalid link type shows the "link not valid" page; `/dashboard/*` and the notification feed redirect when signed out (307); no `SHEET_SYNC_TOKEN`, `service_role` or `sb_secret` text in the browser bundle. The real confirm page was viewed in headless Chrome. The signed-in Post checks page, bell, toast and sound were viewed only as a static mock built from the real stylesheet, never in a live signed-in session, and the sound has not been heard on a real device. |
 | Not verified | Live Supabase sign-up/sign-in/email delivery; the signed-in Post checks page, bell and sound against the real database; the Sheet sync against the real sheet; anything involving Incogniton or Nextdoor. |

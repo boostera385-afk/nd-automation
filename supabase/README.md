@@ -1,41 +1,88 @@
-# Supabase
+# Supabase project setup
 
-Project: `xtefjnfdjnxwrpkoydaj` (staging). Everything here is versioned and additive.
+## Current requested target
 
-| Path | What it is |
+Project: `xtefjnfdjnxwrpkoydaj` — selected as the single shared Fudge/dashboard backend on 2026-10-28.
+URL: `https://xtefjnfdjnxwrpkoydaj.supabase.co`.
+
+**Intake schema deployed; full acceptance remains pending.** Project-scoped OAuth MCP
+with approved database/Edge Function capabilities is configured in both `opencode.json` files. Verify
+`get_project_url` after reconnection; the previous runtime connection was scoped
+to the superseded project. Open `/mcps` if authentication is needed, or `/reload`
+if the catalog needs refreshing. No personal access token is stored in configuration.
+
+Latest read-only verification (2026-10-28): MCP URL matches this target; six existing
+migrations, 17 RLS-enabled public tables and 29 matching source function bodies
+were checked. Existing local URL/key pair was verified and only the stale local pin
+was corrected. See `docs/P1-HOSTED-REVIEW.md` for findings and remaining gates;
+this is not full Auth, recovery, worker or production acceptance.
+
+This supersedes the earlier target `tyczcognqypqxrvkbmrk`. Do not use a second
+project for Fudge ingestion or copy data between projects. Earlier applied-migration
+records for `xtefjnfdjnxwrpkoydaj` are historical evidence only; preserve and inspect
+its current state. Do not delete or repurpose the other project without approval.
+
+## Safe handover order
+
+1. Verify the connected MCP project URL is exactly the requested target.
+2. Inspect existing tables, migrations and security/performance advisors before
+   making changes. Preserve all pre-existing data and application schemas.
+3. Compare existing migration history with repository SQL; review and apply only
+   missing, approved migrations in dependency order. Do not reset a database or
+   blindly run `db push`: historical hosted versions differ from source filenames,
+   and the publishing protocol is still an undeployed implementation-stage slice.
+4. Obtain the selected project's **publishable key** through its verified project
+   connection. A personal access token is not a client key; service-role keys are
+   forbidden in the web app and worker.
+5. Update the ignored `apps/web/.env.local` URL and publishable key together, keeping
+    `SUPABASE_EXPECTED_PROJECT_REF=xtefjnfdjnxwrpkoydaj` only after verifying the pair.
+    Do not change the existing local pin just to bypass the current connection block.
+   Modern publishable keys are opaque: the guard does not prove which project a
+    key belongs to; retrieve the pair from the verified selected project.
+6. Inspect existing Auth site/redirect URLs and email delivery; validate a genuine
+    verified account. Preserve existing users and verify access rather than guessing IDs.
+7. Create or explicitly restore authorized workspace access according to the user's
+    decision. Configure `SHEET_SYNC_ORGANIZATION_ID` for the actual authorized workspace.
+8. Inspect existing worker assignments/leases and confirm customer/profile mappings.
+    Register or rotate credentials only when needed and authorized. Keep conflicting
+    workers stopped during cutover and avoid overlapping browser execution.
+9. Validate authenticated tenant isolation and a supervised read-only pilot before
+   enabling broader operations. Keep the desktop and Fudge workflows unchanged.
+
+## Source migrations
+
+P2 intake is **deployed**: source `20261028203213_fudge_ingestion_v1.sql`, hosted
+version `20261028203642`. There are now seven applied migrations and 19 public
+RLS-enabled tables. See `docs/DB-DEPLOYMENT-20261028.md` for verification and the
+remaining release/acceptance gates. Do not apply the older per-user Fudge SQL or
+deploy the publishing protocol as an intake shortcut. Extension uploads stay off.
+
+| Source file | Scope |
 |---|---|
-| `migrations/202610260001_reporting_foundation.sql` | Tables, Row Level Security and RPCs. **Already applied** to staging (2026-10-26). |
-| `migrations/202610270001_post_checks_and_notifications.sql` | Post check results (Alive / Removed from Nextdoor / Proxy issue / …) and notifications. **Applied** to staging on 2026-10-27 through the Supabase MCP (recorded as version `20261026210947`, name `post_checks_and_notifications`). |
-| `templates/` | Branded auth emails, see `templates/README.md`. |
+| `202610260001_reporting_foundation.sql` | Reporting ledger, auth-linked memberships, sessions, RLS |
+| `202610270001_post_checks_and_notifications.sql` | Sourced checks and notifications |
+| `202610270002_monitoring_worker_bridge.sql` | Credential-scoped monitoring protocol |
+| `202610270003_worker_bridge_indexes.sql` | Covering indexes and schema comments |
+| `202610270004_content_drafts.sql` | Drafts, immutable revisions, human approval |
+| `202610270005_profile_inventory.sql` | Staff-maintained UUID/name/group claims |
+| `202610270006_publish_jobs.sql` | Local-only publishing protocol; not a validated publisher |
+| `20261028203213_fudge_ingestion_v1.sql` | Applied workspace-scoped raw intake and immutable revisions (hosted `20261028203642`) |
 
-## Applying a migration (reference)
+Use MCP `apply_migration` for reviewed DDL, not raw SQL. Change the initial
+read-only MCP mode only after target/schema review and explicit deployment
+approval. Never copy migration history from another project as if it were applied.
 
-The migration above is already applied; this is how it was done and how to do the next one. Applying adds tables and functions and changes no existing data. If it is ever missing, the dashboard keeps working: **Post checks** and the notification bell show a short "database update needed" message instead of failing.
+## Validation
 
-Preferred (records migration history): use the Supabase MCP from a session started in this folder, with `apply_migration`, after checking `list_migrations` and `list_tables` first. The other options:
+Before hosted inspection, run `npm.cmd run check:readiness` from `apps/web`.
+This offline command prints only fixed redacted configuration findings and makes
+no network calls. Exit 1 identifies local prerequisites; exit 0 does not verify
+the key's project ownership, database/Auth, worker or production readiness. See
+`docs/P0-DISCOVERY.md` and `docs/IMPLEMENTATION-TRACKER.md` for the current gates.
 
-1. **Supabase MCP in OpenCode.** The project's MCP entry is read-only for safety. Reconnect it with write access for this one step (`/mcps`, sign in), ask OpenCode to apply `202610270001_post_checks_and_notifications.sql` as a migration named `post_checks_and_notifications`, then switch it back to read-only.
-2. **Dashboard SQL editor.** Open the file, paste its whole contents into *SQL Editor → New query* and run it once.
-3. **CLI.** `supabase link --project-ref xtefjnfdjnxwrpkoydaj` then `supabase db push` (needs your database password).
-
-## Verify
-
-```sql
-select table_name from information_schema.tables
-where table_schema = 'public' and table_name in ('reporting_post_checks','reporting_notifications','reporting_notification_state');
--- expect 3 rows
-
-select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public' and proname in ('reporting_record_checks','reporting_mark_notifications_seen');
--- expect 2 rows
-```
-
-Then run the Security Advisor. Expect one intentional notice per new function: the two RPCs are callable by signed-in users and check their own permissions inside.
-
-## Tested before you apply
-
-`apps/web/tests/checks.test.ts` loads both migrations into a real Postgres engine and checks: results and notifications are written together or not at all; a proxy/login/network problem never changes a post's visibility; removal needs written evidence; one bad item cancels a whole batch; organizations and customers cannot see each other's results; nobody can write the tables directly; the SQL outcome table equals the one in the app.
-
-## Undo (only if ever needed)
-
-The change is additive. To remove it: drop the three `reporting_*` tables above and the two functions, then `alter table public.reporting_publications drop column last_check_outcome, drop column last_checked_at;`. Results recorded since would be lost.
+Repository tests exercise migrations with local Postgres/PGlite. They do not prove
+new-project readiness. After each approved hosted migration verify RLS, table/RPC
+privileges, tenant boundaries, invalid-credential rejection and advisor notices.
+Record exact hosted versions and remaining acceptance gaps in
+`docs/IMPLEMENTATION-STATUS.md`. There is no destructive rollback script here;
+plan data-preserving recovery before applying schema changes.

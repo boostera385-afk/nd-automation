@@ -4,7 +4,7 @@ import { masterResponseSchema, type MasterTab } from "./workflow";
 import { requireWorkspace } from "./data";
 import { z } from "zod";
 
-export type SheetSyncErrorCode = "not_configured" | "unreachable" | "unauthorized" | "bad_response" | "sheet_unavailable";
+export type SheetSyncErrorCode = "not_configured" | "unreachable" | "unauthorized" | "bad_response" | "sheet_unavailable" | "sheet_not_found";
 
 export class SheetSyncError extends Error {
   constructor(readonly code: SheetSyncErrorCode, message: string) { super(message); }
@@ -70,7 +70,8 @@ async function fetchRows(sheet: MasterTab, action: "getTaskRows" | "getPostRecor
     const code = parsed.data.error;
     if (code === "unauthorized") throw new SheetSyncError("unauthorized", "The sheet connection rejected the secret token. Check that both sides use the same value.");
     if (code === "invalid_action") throw new SheetSyncError("sheet_unavailable", "Update the separate dashboard connector to enable master-tab previews. The desktop and Fudge scripts should not be replaced.");
-    if (["sheet_not_found", "status_column_missing", "profile_column_missing", "invalid_sheet"].includes(code)) throw new SheetSyncError("sheet_unavailable", "That tab is missing or its Profile Name / Status headers need checking. Nothing was changed.");
+    if (code === "sheet_not_found") throw new SheetSyncError("sheet_not_found", "That tab does not exist in the connected Sheet. Nothing was changed.");
+    if (["status_column_missing", "profile_column_missing", "invalid_sheet"].includes(code)) throw new SheetSyncError("sheet_unavailable", "That tab's Profile Name / Status headers or connector configuration need checking. Nothing was changed.");
     throw bad();
   }
   if (parsed.data.sheet !== sheet) throw bad();

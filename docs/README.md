@@ -2,6 +2,25 @@
 
 ## Start here
 
+[P2 Fudge ingestion v1](FUDGE-INGESTION-V1.md) — locally tested workspace-scoped
+source/revision SQL draft, exact collector projection, safe retry receipts and
+remaining deployment/uploader gates. No live ingestion enabled.
+
+**Frontend Sheet setup:** signed-in staff can use `/dashboard/settings/sheet-setup`
+(Settings / More → Connect Master Sheet — step-by-step) for code/settings copy,
+token generation and testing the saved organization connection. Server settings
+still require an administrator save/restart; no auto-credential persistence.
+
+[Connect the development Sheet](../integrations/sheets/DEVELOPMENT-CONNECTION-GUIDE.md) — complete owner-operated Apps Script deployment, private configuration, restart/verification and mapping walkthrough; no production Sheet changes or automation activation.
+
+[Verified ND Master development schema](ND-MASTER-SCHEMA.md) — seven named-tab header mappings, mixed-schema quarantine, credential exclusions and safe connection boundaries. No data rows or writes verified.
+
+[P1 hosted review](P1-HOSTED-REVIEW.md) — current shared-project identity, existing migration mapping/source-body baseline, grants/RLS/advisor findings and remaining acceptance/recovery gates. No hosted changes applied.
+
+[Implementation tracker](IMPLEMENTATION-TRACKER.md) — P0–P8 and individual F01–F36/N01–N08 acceptance backlog. [P0 discovery / P1 readiness](P0-DISCOVERY.md) — unresolved mappings, field ownership, secret-safe offline preflight and hosted inspection prerequisites.
+
+[Fudge + ND Master Automation Implementation Guide](MASTER-AUTOMATION-PLAN.md) — shared cross-repository master plan for collection through approved execution, profile operations, previous-100 monitoring, comments, Sheet writeback and controlled reposting. Includes phased gates, minimal-human operating model, security and recovery. Proposed implementation only; actual delivery remains in the implementation-status record.
+
 [Sheet-first dashboard](SHEET-FIRST-WORKFLOW.md) — five daily sections, one-time
 connections/profile mappings, and the exact desktop-versus-dashboard boundary.
 

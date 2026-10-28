@@ -1,5 +1,9 @@
 # Read-only sheet sync (setup guide)
 
+For the current user-designated development copy, use the full
+[development connection walkthrough](DEVELOPMENT-CONNECTION-GUIDE.md), including
+private configuration, verification, missing-tab expectations and execution limits.
+
 Lets the dashboard **read** the status of the posts your desktop tool already writes to the Google Sheet. It never writes to the sheet and never touches the script your desktop tool uses.
 
 ```

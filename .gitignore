@@ -37,6 +37,8 @@ out/
 coverage/
 playwright-report/
 .playwright-mcp/
+supabase/.temp/
+supabase/.branches/
 test-results/
 *.tsbuildinfo
 next-env.d.ts
