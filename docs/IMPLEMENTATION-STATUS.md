@@ -2,6 +2,39 @@
 
 ## Current milestone
 
+**Durable Sheet writeback outbox protocol (2026-10-29):** F33/N08 database
+slice. Bounded append/update_cells intents enqueue per organization with
+per-business ordering, replay-safe request and stable keys (idempotent
+re-enqueue, changed payload refused), lease-based bounded claim batches with
+persisted claim-replay results, lease-stamped acks (delivered/conflict/
+failed/retry) that stay idempotent on lost ack responses and never rewrite
+terminal history, retry exhaustion at 5 attempts, lease-expiry reclaim and
+pending-only cancel. Staff can read all three tables (RLS); anon is denied
+reads and every RPC. Two PL/pgSQL parameter/column name collisions
+(`stable_key`, `values`) found by the first local run were fixed
+(`p_stable_key`, `rows_`) before deployment. No Sheet is written: no
+connector/worker/Edge Function dispatches through these tables, and both
+Fudge release gates remain false. `apps/web/src/lib/sheet-writeback-contract.ts`
+mirrors the server validator for the future UI/deliverer slice.
+
+Authorized hosted deployment: source `20261029175611_sheet_writeback_v1.sql`
+applied as hosted `20261029180253`; the post-deployment advisor's one
+unindexed-FK finding (`created_by`) was fixed additively by source
+`20261029180506_sheet_writeback_fk_indexes.sql`, hosted `20261029180528`.
+Twelve hosted migrations; writeback outbox/claims/acks and catalog
+revisions/heads/activations all remain zero; no public table without RLS;
+anon denied, authenticated-only EXECUTE confirmed on all four public RPCs.
+Hosted rollback-only smoke passed enqueue/replay/stable-key/invalid-intent/
+cross-business/claim/wrong-lease/ack idempotency/terminal immutability/
+conflict/retry-exhaustion/cancel/direct-mutation/nonmember/anon denial.
+Lease-expiry timing covered locally (hosted time not shiftable). See
+`DB-DEPLOYMENT-20261029-WRITEBACK.md` for full evidence and remediation
+links. Full dashboard validation: typecheck PASS, lint PASS, 623 tests /
+41 files PASS (9 new PGlite writeback protocol cases), production build
+PASS. Real Sheet delivery, dashboard writeback UI, a deliverer worker and
+the separately approved rule-application path remain pending. Prior dated
+entries below are historical, not current status.
+
 **Exact revision review and owner/admin activation (2026-10-29):** new
 `/dashboard/settings/services/[id]` review page. Saved revisions (latest 20
 receipts) link from the staging page to a per-revision review that loads three
