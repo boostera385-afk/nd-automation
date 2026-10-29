@@ -2,6 +2,35 @@
 
 ## Current milestone
 
+**Authorized hosted catalog deployment and inactive staging (2026-10-29):** shared
+target/history/schema/advisors rechecked. Promoted local draft via CLI-generated
+source `20261029165237_service_catalog_v1.sql`; applied as hosted `20261029165416`.
+Post-deployment advisor's two FK-index findings fixed additively by source
+`20261029165727_service_catalog_fk_indexes.sql`, hosted `20261029165815`. No prior
+migration or worker/publisher function changed. Nine hosted migrations, 22 public
+RLS tables, zero public tables without RLS. Grants and all eight function-body hashes
+match the reviewed source. Hosted rollback-only smoke passed save/replay/stale
+versions/activation/rollback/original/RLS/nonmember/anon/direct-update denial;
+all fixture rows rolled back and catalog revisions/heads/activations remain zero.
+Security advisor counts unchanged; unused-index INFO 23→27; unindexed FK findings
+cleared. See `DB-DEPLOYMENT-20261029-CATALOG.md` and its remediation links.
+
+Dashboard now offers explicit inactive revision staging only after local contract
+validation and confirmation. Uses server-derived business/Auth context, a stable
+per-form request ID, expected version and a 15-second request abort. Failed/timeout
+writes are unconfirmed, never automatically retried with new IDs; receipt mismatch
+requires reconciliation. Bounded latest-20 metadata shows saved IDs. Input changes
+and clearing are disabled during the save; successful save removes the submit form.
+No actual business catalog saved or activated; no live account, Sheet, media,
+collection or publication changed. Activation/diff UI and Fudge rule application
+remain pending; both extension release gates are false. No Edge Function needed
+or deployed; existing guarded RPCs cover this contract.
+Targeted promoted-source database/contract tests: 20 PASS, index-loaded database
+tests: 17 PASS. Final full dashboard validation: typecheck PASS, lint PASS,
+596 tests / 38 files PASS, production build PASS. Real
+signed-in save/REST/concurrency/restore/UI acceptance remains pending. Prior dated
+draft-only entries below are historical, not current deployment status.
+
 **Versioned catalog local protocol (2026-10-29):** inspected the selected shared
 backend tables read-only; no existing catalog tables. Added local-only
 `supabase/drafts/service_catalog_v1.sql`, not a deployed migration. Immutable rule

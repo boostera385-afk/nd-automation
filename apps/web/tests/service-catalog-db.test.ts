@@ -26,7 +26,8 @@ beforeAll(async () => {
     grant usage on schema auth to authenticated,anon;
     insert into auth.users values ('${owner}',now()),('${other}',now()),('${operator}',now()),('${customer}',now()),('${unverified}',null);`);
   await db.exec(await readFile(new URL("../../../supabase/migrations/202610260001_reporting_foundation.sql", import.meta.url), "utf8"));
-  await db.exec(await readFile(new URL("../../../supabase/drafts/service_catalog_v1.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/20261029165237_service_catalog_v1.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/20261029165727_service_catalog_fk_indexes.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   org = String(await as(owner, () => scalar("select public.reporting_create_workspace('Catalog fixtures')")));
   foreign = String(await as(other, () => scalar("select public.reporting_create_workspace('Other catalog fixtures')")));
