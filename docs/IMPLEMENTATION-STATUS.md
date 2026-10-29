@@ -2,6 +2,68 @@
 
 ## Current milestone
 
+**Code-first follow-up (2026-10-29): durable date-cohort checks and worker
+preflight implemented locally; setup deliberately deferred.** New
+`/dashboard/run/cohorts` and `/dashboard/run/cohorts/[id]` provide one explicit
+customer/prior-business-date/post-vs-listing selection, confirmation, stable
+request ID, immutable receipt history, and read-only paginated progress. The
+server validates the rendered account/workspace before dispatch, bounds RPCs
+with 15-second abort signals, checks exact receipt scope/IDs/counts, never
+automatically retries an unconfirmed write, and locks form inputs after submit.
+The entry route disables refresh controls if protocol setup/history or the
+customer list cannot be verified. Merely opening/refreshing a page never queues
+checks. Existing per-session profile authorization must already exist.
+
+`supabase/drafts/check_cohort_v1.sql` is a **local, undeployed review draft**,
+not a change to any applied migration. It adds verified-staff RLS read-only
+cohort/header item tables and invoker public RPC wrappers around constrained
+private functions. Explicit refresh snapshots at most 500 exact known-dated
+tracked IDs/URLs/labels/timestamps; changes while acquiring locks abort instead
+of substituting targets. Session -> ordered workers -> bindings -> publication
+locking, existing open-job uniqueness, stable request replay, a six-new-request
+per-minute limit, and explicit 60–1440 minute freshness preserve bounded
+deduplication. Safe replay works after session end without creating jobs. Prior
+business date uses the selected customer's timezone and UTC interval boundaries,
+including DST. The original scheduled 24-hour suppression and worker claim/
+completion functions are unchanged. Profile authorization, worker revocation,
+pause/end and expired-lease reconciliation remain enforced; no profile/session
+is enabled by a cohort request.
+
+Unknown-date counts are separate snapshot metadata; unsupported worker URLs,
+unmapped/unauthorized profiles and disabled workers have explicit per-item
+reasons. Existing active jobs are reused, recent checks are labelled recent,
+and technical outcomes never become removal. Completed counts mean durable
+check completion, not proven visibility. Missing links outside the ledger
+cannot be counted and remain unknown. Progress reuses durable monitoring results;
+comments remain partial. **Mapped result-to-Sheet outbox hookup/delivery is not
+implemented by this slice; latest-100-per-profile is a separate pending policy.**
+
+Worker `preflight.py` now checks Python, exact pinned dependency versions, sync
+API import, private connection shape and selector completeness without network,
+installation, driver startup or profile operations. New pinned
+`requirements-monitoring.txt` is a candidate Python >=3.12 environment, not a
+claim of Incogniton/CDP compatibility. Agent dry-run reports local setup vs
+unverified live gates; actual execution requires the pinned runtime first. The
+existing three-RPC allowlist and authorization flags remain. Connection
+validation moved into a shared local module without broadening accepted input.
+
+Full dashboard validation: typecheck PASS, lint PASS, **782 tests / 55 files
+PASS** (70 new cases), production build PASS including both cohort routes.
+Thirty local cohort protocol database cases include the 100-publication fixture,
+DST 23/25-hour boundaries, replay/reuse, expired leases, fresh results, actor/
+tenant/role denials and atomic limits. Signed-out HTTP smoke on an owned local
+build server returned 307 to login for cohort list/detail/run routes; the server
+was stopped afterward. Worker **43 unittest cases PASS** (8 new).
+Actual `python preflight.py` exits **1 as expected** on this unconfigured
+machine: dependency/private-file checks blocked, live readiness false, zero
+network calls/profiles/jobs. No dependency was installed, file populated, hosted
+DDL/data changed, worker started, Sheet edited, or release gate enabled.
+Real PostgreSQL multi-connection/HTTP Auth, stale-page interaction, worker
+recovery, supervised DOM and 100-post live acceptance remain unrun. This is not
+completion of all F01–F36/P0–P8 code or configuration readiness; publishing,
+remaining desktop adapters, durable result recovery, Sheet delivery and catalog
+application still require further implementation.
+
 **Security implementation slice (2026-10-29): central verified identity and
 explicit workspace context.** The real data-access layer now checks the fresh
 Supabase `getUser()` result and `email_confirmed_at` before any membership or

@@ -21,6 +21,18 @@ Signed-out local HTTP route checks also passed. No hosted schema change or live 
 acceptance is implied. See the newest implementation-status entry; remaining
 SQL-level defense-in-depth, Sheet/publisher/worker/recovery/rights gates stay open.
 
+Code-first monitoring follow-up (2026-10-29): local date-cohort snapshot/queue,
+strict server action, history/detail/progress UI and a separate offline worker
+preflight/pinned dependency specification now exist. Protocol is a draft only,
+not a hosted migration; UI fails closed until it is configured/deployed. No
+configuration, live job or dependency install performed. The scheduled 24-hour
+policy remains unchanged; explicit refresh has its own bounded freshness policy.
+Full validation: 782 dashboard tests / 55 files, typecheck, lint and build PASS;
+43 worker tests PASS; signed-out cohort HTTP smoke PASS. Single-runtime fixtures
+do not establish real concurrent PostgreSQL/Auth/browser acceptance.
+Sheet completion-to-outbox mapping/delivery, latest-100 policy, durable worker
+result recovery and the remaining publishing/profile adapters still need code.
+
 ## Phase gates
 
 | Phase | State | Next deliverable / dependency |
@@ -29,7 +41,7 @@ SQL-level defense-in-depth, Sheet/publisher/worker/recovery/rights gates stay op
 | P1 | Read-only hosted baseline reverified (11 migrations/50 matching function bodies); central app verification/workspace selection implemented | Basic owner login accepted; negative live isolation and new selector/stale-tab browser acceptance, SQL defense-in-depth, recovery and operational Sheet setup remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
 | P3 | Intake receipts, deployed catalog/review/activation and queue UI implemented; owner guided 2-rule catalog pass recorded; cache gated and Sheet delivery unwired | Full business rule matching/approval, operator/cross-business/concurrent live acceptance, cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
-| P4 | Partial existing monitoring source; live acceptance pending | Pairing/selector validation, dated-cohort one-click refresh and latest-100 policies |
+| P4 | Monitoring source plus local date-cohort protocol/UI and offline worker preflight implemented; live acceptance pending | Protocol deployment/setup, durable worker result recovery, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
 | P5 | Local protocol only; browser publishing paused | Reviewed publisher, media, durable submit journal, explicit release and live pilot |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
 | P7 | Not started | Approved linked reposts and bounded batching after correctness gates |
@@ -78,12 +90,12 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | F35 | Theme/settings foundations; connections unverified | P1/P4 web + worker | Real target/machine checks without exposing secrets |
 | F36 | Desktop launchers preserved; worker operations incomplete | P4/P8 worker | Versioned install/update/drain/restart/rollback |
 | N01 | Publication ledger foundation | P3/P5 backend | Sourced time/customer/exact URL; unknown stays unknown |
-| N02 | Planner foundation; no accepted one-click cohort action | P4 web + backend | Publish 100 today, next-day click queues eligible exact links once |
+| N02 | Local one-click date-cohort snapshot/queue/history/progress code and tests; undeployed SQL draft | P4 web + backend | Real contention, setup, live exact-cohort/restart/pause acceptance and mapped result writeback; latest-100 remains separate |
 | N03 | Observation/check history foundation | P4 web + worker | Staleness, evidence, technical failure != removal |
 | N04 | Manual comments + partial worker collector | P4 worker + backend | Exact-post stable IDs, partial/completeness, unknown totals |
 | N05 | Reporting foundations | P4/P8 web | Date cohorts, DST, true coverage and partial-data indicators |
 | N06 | Auth/RLS source and current shared hosted metadata verified; central app email/selection/stale-form guards implemented | P1 backend | Genuine negative tenant/customer access, multi-business/stale-tab browser acceptance, SQL defense-in-depth and recovery |
-| N07 | Refresh/reconciliation partially prepared | P4 web + backend | Explicit refresh freshness, deduplicated active jobs, missing-link recovery |
+| N07 | Explicit bounded refresh freshness, frozen membership and active-job reuse implemented locally | P4 web + backend | Real concurrent scheduler/refresh, worker result recovery and missing-link reconciliation acceptance |
 | N08 | Writeback outbox deployed and smoke-tested; no Sheet write path yet | P3 deliverer + connector | Independent retry, version conflict and row-move tests on a real Sheet |
 
 For each completed item append: source change, exact test command/result, target environment, deployed migration/version if applicable, live pilot evidence if approved, operator acceptance, and remaining limits. Do not turn proposed ownership or a passing fixture into sign-off.

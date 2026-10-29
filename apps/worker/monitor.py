@@ -132,6 +132,8 @@ def main():
     if not args.confirm_authorized or not args.adapter or not args.output:
         parser.error("Execution requires --confirm-authorized, --adapter and --output")
     adapter = validate_adapter(load_json(args.adapter))
+    from preflight import require_runtime
+    require_runtime()
     from playwright.sync_api import sync_playwright
     # Exclusive creation prevents accidental overwriting; partial results survive interruption.
     lock = Path(__file__).resolve().parent / ".worker-state" / "monitor.lock"

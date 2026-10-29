@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
 it("keeps all form-based business action entrypoints on the stale-context guard", () => {
-  const modules = ["checks", "content", "profiles", "publishing", "reporting", "service-catalog", "sheet-sync", "sheet-writeback", "workers", "workflow"];
+  const modules = ["check-cohort", "checks", "content", "profiles", "publishing", "reporting", "service-catalog", "sheet-sync", "sheet-writeback", "workers", "workflow"];
   let guarded = 0;
   for (const name of modules) {
     const source = readFileSync(new URL(`../src/app/actions/${name}.ts`, import.meta.url), "utf8");
@@ -10,11 +10,11 @@ it("keeps all form-based business action entrypoints on the stale-context guard"
     for (const call of calls) expect(call[1], `${name} form action must validate rendered workspace context`).toBe("true, form");
     guarded += calls.length;
   }
-  expect(guarded).toBe(30);
+  expect(guarded).toBe(31);
 });
 
 it("keeps custom mutation forms on the same provider-rendered context as shared forms", () => {
-  const modules = ["action-form", "check-queue", "monitoring-batch", "profile-import", "reporting-forms", "service-catalog-review", "service-catalog-stage", "sheet-sync-panel", "sheet-writeback-queue", "worker-registration"];
+  const modules = ["action-form", "cohort-refresh", "check-queue", "monitoring-batch", "profile-import", "reporting-forms", "service-catalog-review", "service-catalog-stage", "sheet-sync-panel", "sheet-writeback-queue", "worker-registration"];
   for (const name of modules) {
     const source = readFileSync(new URL(`../src/components/${name}.tsx`, import.meta.url), "utf8");
     expect(source).toContain("<WorkspaceField />");

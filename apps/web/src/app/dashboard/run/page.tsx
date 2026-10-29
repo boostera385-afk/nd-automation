@@ -16,6 +16,7 @@ export default async function RunAutomation() {
   });
   return <>
     <PageHeader eyebrow="DAILY CONTROL" title="Run automation" description="Use your saved profiles and master-Sheet records. Select a batch once; review progress in Results." actions={<LiveRefresh />} />
+    <Panel title="One-click prior-day cohort"><p>Choose an exact customer/publication date and follow every tracked record, including skipped and blocked cases. Setup and session authorization are checked separately.</p><Link className="button secondary" href="/dashboard/run/cohorts">Refresh post statuses by date</Link></Panel>
     <Panel title="Post checks & comments" hint="Available with a paired monitoring agent">
       <p>After syncing reported links from Master Sheet, enable checks for selected profiles. Your local agent checks older or unknown-date posts due for review. One batch confirmation replaces repeated profile-by-profile setup.</p>
       {!operations.available || profiles.length === 0 ? <p>Connect your laptop and <Link href="/dashboard/profiles">assign profiles</Link> first. <Link href="/dashboard/settings#connections">Open one-time setup</Link>.</p> : <MonitoringBatch profiles={profiles} activeSession={Boolean(activeSession)} />}

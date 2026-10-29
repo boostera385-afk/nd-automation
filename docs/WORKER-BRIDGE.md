@@ -41,6 +41,18 @@ the browser shows the generated credential only in the registration response.
 
 ## Automatic monitoring policy
 
+Code-first extension (2026-10-29): `/dashboard/run/cohorts` adds explicit
+prior-business-date cohort requests in source, using the existing job/worker
+contract. Its separate `supabase/drafts/check_cohort_v1.sql` is not deployed.
+Snapshot membership and receipts are immutable; strict action/read/UI paths
+fail closed until setup. A configurable 60–1440 minute explicit-refresh window
+does not alter the scheduled 24-hour policy below. It never enables profiles,
+changes sessions, reclaims expired leases or writes Sheets. Unknown dates and
+unsupported/unmapped targets remain explicit, not replacement cohort members.
+The latest-100-per-profile policy and mapped result writeback remain separate
+unimplemented code. Offline `apps/worker/preflight.py` and pinned candidate
+requirements now expose local prerequisites without claiming live readiness.
+
 An operator starts a work session and explicitly enables each assigned profile.
 This authorization belongs to that exact session and is not carried into a new
 session. The connected agent plans up to 100 due jobs per poll, then claims one.

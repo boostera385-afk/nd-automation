@@ -39,6 +39,9 @@ it makes no network calls, does not import Playwright and does not open profiles
    Incogniton Chromium version in an isolated environment. The runner uses the
    existing Incogniton browser, not a newly downloaded browser. Compatibility
    has not been tested on this laptop.
+   The candidate exact pins and offline `preflight.py` are documented in
+   [README.md](README.md). Runtime checks now gate both execution entrypoints;
+   installing the pinned package set still does not prove browser compatibility.
 3. Create a local `.monitoring` directory, which is ignored by Git. Copy the
    example manifest there and replace all sample identifiers with real assigned
    publication/profile UUIDs and authorized post links. No profile-name guessing.

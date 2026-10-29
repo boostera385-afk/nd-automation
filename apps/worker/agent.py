@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, ProxyHandler
 from uuid import UUID
 
@@ -14,26 +13,11 @@ from local_incogniton import Incogniton, NoRedirect
 from monitor import load_json, run_batch
 from monitoring import validate_adapter, validate_manifest
 from worker_lock import monitoring_lock
+from worker_connection import validate_connection
 
 
 class BridgeError(RuntimeError):
     pass
-
-
-def validate_connection(value):
-    expected = {"version", "supabase_url", "publishable_key", "worker_token"}
-    if not isinstance(value, dict) or set(value) != expected or type(value["version"]) is not int or value["version"] != 1:
-        raise ValueError("Invalid worker connection configuration")
-    url = urlsplit(value["supabase_url"])
-    if (url.scheme != "https" or not url.hostname or not url.hostname.endswith(".supabase.co")
-            or url.netloc != url.hostname or url.path not in {"", "/"} or url.query or url.fragment):
-        raise ValueError("Worker connection must use a hosted Supabase HTTPS project origin")
-    key, token = value["publishable_key"], value["worker_token"]
-    if not isinstance(key, str) or not key.startswith("sb_publishable_"):
-        raise ValueError("A publishable key is required; secret/service-role keys are forbidden")
-    if not isinstance(token, str) or len(token) != 64 or any(char not in "0123456789abcdef" for char in token):
-        raise ValueError("Invalid worker credential format")
-    return {**value, "supabase_url": value["supabase_url"].rstrip("/")}
 
 
 class WorkerBridge:
@@ -115,13 +99,16 @@ def main():
     parser.add_argument("--confirm-authorized", action="store_true")
     parser.add_argument("--once", action="store_true", help="Poll at most one job, then exit")
     args = parser.parse_args()
+    from preflight import preflight, require_runtime
     connection = validate_connection(load_json(args.connection))
     adapter = validate_adapter(load_json(args.adapter))
     if not args.execute:
-        print(json.dumps({"mode": "dry_run", "configuration_valid": True, "network_calls": 0, "jobs_executed": 0}))
-        return
+        report = preflight(args.connection, args.adapter)
+        print(json.dumps({**report, "mode": "dry_run", "configuration_valid": True}))
+        return 0 if report["local_setup_ready"] else 1
     if not args.confirm_authorized:
         parser.error("Execution requires explicit --confirm-authorized")
+    require_runtime()
     from playwright.sync_api import sync_playwright
     bridge = WorkerBridge(connection)
     lock = Path(__file__).resolve().parent / ".worker-state" / "monitor.lock"
@@ -137,7 +124,7 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        raise SystemExit(main())
     except KeyboardInterrupt:
         raise SystemExit("Agent interrupted. Inspect outstanding leases and local profiles before resuming.")
     except Exception:
