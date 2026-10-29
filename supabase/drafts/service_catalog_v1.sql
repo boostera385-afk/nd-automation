@@ -1,0 +1,142 @@
+-- LOCAL REVIEW DRAFT ONLY. Not deployed; do not blindly db push or reset.
+-- Requires reporting_foundation. No publishing/worker claim changes.
+create function private_reporting.catalog_access(org uuid, publisher boolean default false)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists(select 1 from public.reporting_memberships m join auth.users u on u.id=m.user_id
+    where m.organization_id=org and m.user_id=auth.uid() and u.email_confirmed_at is not null
+      and (m.role in ('owner','admin') or (not publisher and m.role='operator')))
+$$;
+revoke all on function private_reporting.catalog_access(uuid,boolean) from public,anon;
+grant execute on function private_reporting.catalog_access(uuid,boolean) to authenticated;
+
+create function private_reporting.valid_service_rules(rules jsonb) returns boolean
+language plpgsql immutable set search_path = '' as $$
+declare item jsonb; field text; term jsonb; key text; seen text[] := '{}';
+begin
+  if rules is null or jsonb_typeof(rules)<>'array' or jsonb_array_length(rules) not between 1 and 500
+    or octet_length(rules::text)>524288 then return false; end if;
+  for item in select value from jsonb_array_elements(rules) loop
+    if jsonb_typeof(item)<>'object' then return false; end if;
+    if (select count(*) from jsonb_object_keys(item))<>13 or not (item ?& array['keyword','searchTerm','family','subcategory','businessSignals','reviewSignals','requiredSignals','topicSignals','excludeSignals','topicRequired','collectFamilyInventory','rewriteServicePhrase','equivalentServicePhrases']) then return false; end if;
+    foreach field in array array['keyword','searchTerm','family','subcategory','rewriteServicePhrase'] loop
+      if jsonb_typeof(item->field)<>'string' or char_length(item->>field)>500 or (item->>field) ~ '[[:cntrl:]]' then return false; end if;
+      if field<>'rewriteServicePhrase' and btrim(item->>field)='' then return false; end if;
+    end loop;
+    if char_length(item->>'keyword')>200 then return false; end if;
+    key := btrim(regexp_replace(lower(item->>'keyword'),'[^a-z0-9]+',' ','g'));
+    if key='' or key=any(seen) then return false; end if;
+    seen := array_append(seen,key);
+    if jsonb_typeof(item->'topicRequired')<>'boolean' or jsonb_typeof(item->'collectFamilyInventory')<>'boolean' then return false; end if;
+    foreach field in array array['businessSignals','reviewSignals','requiredSignals','topicSignals','excludeSignals','equivalentServicePhrases'] loop
+      if jsonb_typeof(item->field)<>'array' or jsonb_array_length(item->field)>100 then return false; end if;
+      for term in select value from jsonb_array_elements(item->field) loop
+        if jsonb_typeof(term)<>'string' or char_length(term#>>'{}') not between 1 and 300
+          or btrim(term#>>'{}')='' or (term#>>'{}') ~ '[[:cntrl:]]' then return false; end if;
+      end loop;
+    end loop;
+  end loop;
+  return true;
+end $$;
+revoke all on function private_reporting.valid_service_rules(jsonb) from public,anon,authenticated;
+
+create table public.reporting_service_catalog_revisions (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.reporting_organizations(id) on delete cascade,
+  revision integer not null check(revision>0), request_id uuid not null,
+  rules jsonb not null check(private_reporting.valid_service_rules(rules)),
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique(organization_id,id), unique(organization_id,revision), unique(organization_id,request_id)
+);
+create index reporting_catalog_revision_actor on public.reporting_service_catalog_revisions(created_by);
+create table public.reporting_service_catalog_heads (
+  organization_id uuid primary key references public.reporting_organizations(id) on delete cascade,
+  latest_revision integer not null default 0 check(latest_revision>=0),
+  active_revision_id uuid,
+  activation_version integer not null default 0 check(activation_version>=0),
+  foreign key(organization_id,active_revision_id) references public.reporting_service_catalog_revisions(organization_id,id)
+);
+create table public.reporting_service_catalog_activations (
+  organization_id uuid not null references public.reporting_organizations(id) on delete cascade,
+  request_id uuid not null, revision_id uuid not null,
+  base_version integer not null check(base_version>=0), version integer not null check(version>0),
+  activated_by uuid references auth.users(id) on delete set null,
+  activated_at timestamptz not null default now(),
+  primary key(organization_id,request_id), unique(organization_id,version),
+  foreign key(organization_id,revision_id) references public.reporting_service_catalog_revisions(organization_id,id)
+);
+create index reporting_catalog_activation_actor on public.reporting_service_catalog_activations(activated_by);
+alter table public.reporting_service_catalog_revisions enable row level security;
+alter table public.reporting_service_catalog_heads enable row level security;
+alter table public.reporting_service_catalog_activations enable row level security;
+create policy catalog_revisions_read on public.reporting_service_catalog_revisions for select to authenticated using(private_reporting.catalog_access(organization_id));
+create policy catalog_heads_read on public.reporting_service_catalog_heads for select to authenticated using(private_reporting.catalog_access(organization_id));
+create policy catalog_activations_read on public.reporting_service_catalog_activations for select to authenticated using(private_reporting.catalog_access(organization_id));
+revoke all on public.reporting_service_catalog_revisions,public.reporting_service_catalog_heads,public.reporting_service_catalog_activations from public,anon,authenticated;
+grant select on public.reporting_service_catalog_revisions,public.reporting_service_catalog_heads,public.reporting_service_catalog_activations to authenticated;
+
+create function private_reporting.save_service_catalog(org uuid,rules jsonb,expected_revision integer,request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare head public.reporting_service_catalog_heads; saved public.reporting_service_catalog_revisions;
+begin
+  if not private_reporting.catalog_access(org) then raise exception 'Verified staff required' using errcode='42501'; end if;
+  if expected_revision is null or expected_revision<0 or request_id is null or not private_reporting.valid_service_rules(rules) then raise exception 'Invalid catalog request'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(org::text,20261029));
+  if not private_reporting.catalog_access(org) then raise exception 'Verified staff required' using errcode='42501'; end if;
+  select * into saved from public.reporting_service_catalog_revisions r where r.organization_id=org and r.request_id=save_service_catalog.request_id;
+  if saved.id is not null then
+    if saved.rules<>rules or saved.revision<>expected_revision+1 or saved.created_by is distinct from auth.uid() then raise exception 'Catalog replay conflict'; end if;
+    return jsonb_build_object('revisionId',saved.id,'revision',saved.revision);
+  end if;
+  insert into public.reporting_service_catalog_heads(organization_id) values(org) on conflict do nothing;
+  select * into strict head from public.reporting_service_catalog_heads where organization_id=org for update;
+  if head.latest_revision<>expected_revision then raise exception 'Catalog version conflict'; end if;
+  insert into public.reporting_service_catalog_revisions(organization_id,revision,request_id,rules,created_by)
+    values(org,expected_revision+1,request_id,rules,auth.uid()) returning * into saved;
+  update public.reporting_service_catalog_heads set latest_revision=saved.revision where organization_id=org;
+  return jsonb_build_object('revisionId',saved.id,'revision',saved.revision);
+end $$;
+
+create function private_reporting.activate_service_catalog(org uuid,revision_id uuid,expected_version integer,request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare head public.reporting_service_catalog_heads; event public.reporting_service_catalog_activations;
+begin
+  if not private_reporting.catalog_access(org,true) then raise exception 'Verified owner or admin required' using errcode='42501'; end if;
+  if expected_version is null or expected_version<0 or request_id is null or revision_id is null then raise exception 'Invalid activation request'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(org::text,20261029));
+  if not private_reporting.catalog_access(org,true) then raise exception 'Verified owner or admin required' using errcode='42501'; end if;
+  select * into event from public.reporting_service_catalog_activations a where a.organization_id=org and a.request_id=activate_service_catalog.request_id;
+  if event.request_id is not null then
+    if event.revision_id<>revision_id or event.base_version<>expected_version or event.activated_by is distinct from auth.uid() then raise exception 'Activation replay conflict'; end if;
+    return jsonb_build_object('revisionId',event.revision_id,'generation',event.version);
+  end if;
+  select * into head from public.reporting_service_catalog_heads where organization_id=org for update;
+  if head.organization_id is null or head.activation_version<>expected_version then raise exception 'Activation version conflict'; end if;
+  if not exists(select 1 from public.reporting_service_catalog_revisions r where r.organization_id=org and r.id=revision_id) then raise exception 'Catalog revision not found'; end if;
+  insert into public.reporting_service_catalog_activations(organization_id,request_id,revision_id,base_version,version,activated_by)
+    values(org,request_id,revision_id,expected_version,expected_version+1,auth.uid());
+  update public.reporting_service_catalog_heads set active_revision_id=revision_id,activation_version=expected_version+1 where organization_id=org;
+  return jsonb_build_object('revisionId',revision_id,'generation',expected_version+1);
+end $$;
+
+create function private_reporting.read_service_catalog(org uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare result jsonb;
+begin
+  if not private_reporting.catalog_access(org) then raise exception 'Verified staff required' using errcode='42501'; end if;
+  select jsonb_build_object('version',1,'organizationId',org,'generation',h.activation_version,
+    'revisionId',r.id,'revision',r.revision,'rules',r.rules) into result
+    from public.reporting_service_catalog_heads h join public.reporting_service_catalog_revisions r
+      on r.organization_id=h.organization_id and r.id=h.active_revision_id where h.organization_id=org;
+  return result;
+end $$;
+revoke all on function private_reporting.save_service_catalog(uuid,jsonb,integer,uuid),private_reporting.activate_service_catalog(uuid,uuid,integer,uuid),private_reporting.read_service_catalog(uuid) from public,anon;
+grant execute on function private_reporting.save_service_catalog(uuid,jsonb,integer,uuid),private_reporting.activate_service_catalog(uuid,uuid,integer,uuid),private_reporting.read_service_catalog(uuid) to authenticated;
+create function public.reporting_save_service_catalog_v1(org uuid,rules jsonb,expected_revision integer,request_id uuid) returns jsonb
+language sql security invoker set search_path = '' as $$ select private_reporting.save_service_catalog(org,rules,expected_revision,request_id) $$;
+create function public.reporting_activate_service_catalog_v1(org uuid,revision_id uuid,expected_version integer,request_id uuid) returns jsonb
+language sql security invoker set search_path = '' as $$ select private_reporting.activate_service_catalog(org,revision_id,expected_version,request_id) $$;
+create function public.reporting_get_service_catalog_v1(org uuid) returns jsonb
+language sql stable security invoker set search_path = '' as $$ select private_reporting.read_service_catalog(org) $$;
+revoke all on function public.reporting_save_service_catalog_v1(uuid,jsonb,integer,uuid),public.reporting_activate_service_catalog_v1(uuid,uuid,integer,uuid),public.reporting_get_service_catalog_v1(uuid) from public,anon;
+grant execute on function public.reporting_save_service_catalog_v1(uuid,jsonb,integer,uuid),public.reporting_activate_service_catalog_v1(uuid,uuid,integer,uuid),public.reporting_get_service_catalog_v1(uuid) to authenticated;

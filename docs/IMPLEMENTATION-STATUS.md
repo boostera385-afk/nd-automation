@@ -2,6 +2,26 @@
 
 ## Current milestone
 
+**Versioned catalog local protocol (2026-10-29):** inspected the selected shared
+backend tables read-only; no existing catalog tables. Added local-only
+`supabase/drafts/service_catalog_v1.sql`, not a deployed migration. Immutable rule
+revisions, expected-version heads, replay IDs, owner/admin activation history and
+read snapshot RPC are tested. Operator can stage, not publish; anon/customer/
+unverified/cross-business access and direct mutations denied. Explicit rollback
+advances activation generation rather than overwriting history. Public wrappers
+are invoker, privileged implementations private/fixed-search-path with fresh access
+checks and per-business locking. No worker/publishing function altered.
+Added strict TypeScript request/snapshot contract and preview conversion. Validation:
+typecheck PASS, lint PASS, 586 tests / 37 files PASS, production build PASS; 17 new
+local PGlite cases and 3 contract cases. Not real concurrent PostgreSQL/REST/Auth
+acceptance. No migration or private catalog applied, no dashboard write controls yet.
+One-off offline parity check: dashboard/Fudge snapshot validators agree on seven
+valid/invalid fixtures; no network or private source catalog used.
+Fudge separately implements a gated last-good preview cache with download OFF and
+no application to Sheet/local rules; 67 backend and 127 smoke tests PASS there.
+Configuration ownership, freshness/retention, live acceptance and controlled cutover
+remain gates. See `SERVICE-CONFIGURATION.md` and Fudge `SERVICE-CATALOG-CACHE.md`.
+
 **Bounded-read/render hardening (2026-10-29):** intake metadata requests share a
 15-second application deadline and AbortSignal. A stalled/failed read remains
 unavailable, never zero; the deadline timer is cleared on completion. The deadline

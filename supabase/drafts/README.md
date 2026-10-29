@@ -1,5 +1,12 @@
 # Local SQL design drafts — not deployment migrations
 
+`service_catalog_v1.sql` is a local tested design for immutable service rules,
+version-checked staging/activation and a published snapshot RPC. It is **not
+deployed**, not part of migration history, and not authorization to apply it.
+See `docs/SERVICE-CONFIGURATION.md`; local PGlite tests do not prove hosted
+concurrency/Auth/REST acceptance. Do not enable Fudge catalog downloads against
+this draft until review, migration promotion and separate deployment acceptance.
+
 The former `fudge_ingestion_v1.sql` draft was promoted to
 `../migrations/20261028203213_fudge_ingestion_v1.sql` after explicit deployment
 approval, then applied through MCP as hosted version `20261028203642`. Tests now
