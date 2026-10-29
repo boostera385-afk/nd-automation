@@ -9,6 +9,7 @@ import { SHEET_TABS, statusKinds, type StatusKind, type SyncView, type Tone } fr
 import { MAX_UPLOAD_BYTES, rowsFromCsv, type TableImport } from "@/lib/sheet-table";
 import type { Customer } from "@/lib/types";
 import { visibilityLabels } from "./ui";
+import { WorkspaceField } from "./workspace-context";
 
 const toneClass: Record<Tone, string> = { ok: "live", warn: "unknown", bad: "unavailable", neutral: "" };
 const order: StatusKind[] = ["posted", "alive", "deleted", "proxy_issue", "posted_no_link", "posted_bad_link", "failed", "failed_retryable", "stopped", "claimed", "other", "pending"];
@@ -96,6 +97,7 @@ function ImportEditor({ view, customers }: { view: SyncView; customers: Customer
     <h4 className="sub-heading">Posts to be saved</h4>
     <div className="table-wrap"><table><thead><tr><th>Title (from sheet)</th><th>Profile</th><th>Link</th></tr></thead><tbody>{view.importable.map((row) => <tr key={row.url}><td>{row.title}</td><td>{row.account_label}</td><td><a href={row.url} target="_blank" rel="noopener noreferrer">Open</a></td></tr>)}</tbody></table></div>
     <form action={action} className="form-grid">
+      <WorkspaceField />
       <input type="hidden" name="records" value={JSON.stringify(view.importable)} />
       <input type="hidden" name="assignments" value={assignments} />
       <label className="check"><input name="authorized" type="checkbox" required />I reviewed this authorized customer data. Posts are saved as “not checked” with an unknown publication date until someone checks them.</label>
@@ -125,6 +127,7 @@ export function SheetSyncPanel({ customers, liveConfigured }: { customers: Custo
 
   return <div className="import-flow">
     <form action={action} className="sync-source">
+      <WorkspaceField />
       <fieldset className="source-picker">
         <legend className="sr-only">Where should the data come from?</legend>
         <label className={`source-card ${source === "live" ? "is-on" : ""} ${liveConfigured ? "" : "is-off"}`}><input type="radio" name="source" value="live" checked={source === "live"} disabled={!liveConfigured} onChange={() => setSource("live")} /><span><strong><PlugZap size={16} aria-hidden /> Connected sheet</strong><small>{liveConfigured ? "Reads your Google Sheet directly. Read-only." : "Not set up yet. Steps are in integrations/sheets/README.md."}</small></span></label>

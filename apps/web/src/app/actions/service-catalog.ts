@@ -7,7 +7,7 @@ import { serviceRulesSchema } from "@/lib/service-catalog-contract";
 import type { FormState } from "./auth";
 
 export async function stageServiceCatalog(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization, user } = await requireWorkspace(true);
+  const { db, organization, user } = await requireWorkspace(true, form);
   if (!user.email_confirmed_at) return { error: "Verify your email before staging service rules." };
   const input = z.object({ request: z.uuid(), expected: z.coerce.number().int().min(0).max(2147483646), confirmed: z.literal("on"), rules: z.string().min(2).max(262144) }).safeParse({ request: form.get("requestId"), expected: form.get("expectedRevision"), confirmed: form.get("confirmed"), rules: form.get("rules") });
   if (!input.success || new TextEncoder().encode(input.success ? input.data.rules : "").byteLength > 262144) return { error: "Review and confirm a valid bounded catalog before staging." };
@@ -29,7 +29,7 @@ export async function stageServiceCatalog(_previous: FormState, form: FormData):
 }
 
 export async function activateServiceCatalog(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization, user, membership } = await requireWorkspace(true);
+  const { db, organization, user, membership } = await requireWorkspace(true, form);
   if (!user.email_confirmed_at || !["owner", "admin"].includes(membership.role)) return { error: "A verified owner or admin must review and activate this revision." };
   const input = z.object({ revision: z.uuid(), request: z.uuid(), expected: z.coerce.number().int().min(0).max(2147483646), confirmed: z.literal("on") }).safeParse({ revision: form.get("revisionId"), request: form.get("requestId"), expected: form.get("expectedVersion"), confirmed: form.get("confirmed") });
   if (!input.success) return { error: "Review the exact revision and confirm publication before continuing." };

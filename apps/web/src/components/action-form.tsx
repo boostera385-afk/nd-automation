@@ -3,6 +3,7 @@
 import { useActionState, type ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
 import type { FormState } from "@/app/actions/auth";
+import { WorkspaceField } from "./workspace-context";
 
 export function ActionForm({ action, children, label, className = "form-grid", secondary = false }: {
   action: (previous: FormState, form: FormData) => Promise<FormState>;
@@ -10,6 +11,7 @@ export function ActionForm({ action, children, label, className = "form-grid", s
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   return <form action={formAction} className={className}>
+    <WorkspaceField />
     {children}
     {state.error && <p className="notice error" role="alert">{state.error}</p>}
     {state.success && <p className="notice success" role="status">{state.success}</p>}

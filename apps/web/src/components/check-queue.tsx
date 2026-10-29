@@ -7,6 +7,7 @@ import { recordChecks, type CheckState } from "@/app/actions/checks";
 import { CHECK_OUTCOMES, checkOutcomes, type CheckOutcome } from "@/lib/checks";
 import type { Visibility } from "@/lib/validation";
 import { Badge, OutcomeBadge } from "./ui";
+import { WorkspaceField } from "./workspace-context";
 
 export type QueueRow = { id: string; title: string; customer: string; account: string; visibility: Visibility; outcome: string | null; lastChecked: string; reason: string };
 
@@ -27,6 +28,7 @@ export function CheckQueue({ rows }: { rows: QueueRow[] }) {
   const toggle = (id: string) => setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
 
   return <form action={action} className="check-queue">
+    <WorkspaceField />
     <div className="queue-toolbar">
       <label className="check"><input type="checkbox" checked={all} onChange={() => setSelected(all ? [] : rows.map((row) => row.id))} aria-label="Select all posts that need a check" />Select all ({rows.length})</label>
       <span className="muted small">{chosen.length} selected</span>

@@ -25,7 +25,7 @@ export async function createWorkspace(_previous: FormState, form: FormData): Pro
 }
 
 export async function createCustomer(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const input = z.object({ name: z.string().trim().min(2).max(120), service: z.string().trim().max(160), time_zone: timeZoneSchema }).safeParse({ name: form.get("name"), service: form.get("service"), time_zone: form.get("time_zone") });
   if (!input.success) return { error: input.error.issues[0].message };
   const { error } = await db.from("reporting_customers").insert({ organization_id: organization.id, ...input.data });
@@ -35,7 +35,7 @@ export async function createCustomer(_previous: FormState, form: FormData): Prom
 }
 
 export async function addPublication(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const customerId = uuid.safeParse(form.get("customer_id"));
   if (!customerId.success) return { error: "Choose a customer." };
   const customer = await db.from("reporting_customers").select("time_zone").eq("organization_id", organization.id).eq("id", customerId.data).maybeSingle();
@@ -55,7 +55,7 @@ export async function addPublication(_previous: FormState, form: FormData): Prom
 }
 
 export async function recordObservation(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const input = z.object({ publication: uuid, new_visibility: visibilitySchema.exclude(["not_checked"]), total_comments: z.number().int().min(0).max(10000000).nullable(), review_notes: z.string().trim().max(2000) }).safeParse({
     publication: form.get("publication_id"), new_visibility: form.get("visibility"),
     total_comments: form.get("comments_total") === "" ? null : Number(form.get("comments_total")), review_notes: form.get("notes"),
@@ -63,6 +63,8 @@ export async function recordObservation(_previous: FormState, form: FormData): P
   if (!input.success) return { error: input.error.issues[0].message };
   if (form.get("reviewed") !== "on") return { error: "Confirm you reviewed the exact post in an authorized view." };
   if (input.data.new_visibility === "confirmed_removed" && input.data.review_notes.length < 10) return { error: "Describe the explicit platform removal evidence; an inaccessible post alone is not proof." };
+  const target = await db.from("reporting_publications").select("id").eq("organization_id", organization.id).eq("id", input.data.publication).maybeSingle();
+  if (target.error || !target.data) return { error: "That post is not available in the selected business. Nothing was saved." };
   const { error } = await db.rpc("reporting_record_observation", { ...input.data, collection_complete: form.get("complete") === "on" });
   if (error) return { error: "Observation could not be recorded. You may not have access to that post." };
   refresh();
@@ -70,7 +72,7 @@ export async function recordObservation(_previous: FormState, form: FormData): P
 }
 
 export async function addComment(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization, user } = await requireWorkspace(true);
+  const { db, organization, user } = await requireWorkspace(true, form);
   const input = z.object({ publication_id: uuid, author_label: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(5000), source_comment_id: z.string().trim().max(200) }).safeParse({ publication_id: form.get("publication_id"), author_label: form.get("author_label"), body: form.get("body"), source_comment_id: form.get("source_comment_id") });
   if (!input.success) return { error: input.error.issues[0].message };
   const { error } = await db.from("reporting_comments").insert({ ...input.data, source_comment_id: input.data.source_comment_id || null, organization_id: organization.id, created_by: user.id });
@@ -80,7 +82,7 @@ export async function addComment(_previous: FormState, form: FormData): Promise<
 }
 
 export async function sessionAction(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const action = z.enum(["start", "pause", "resume", "end"]).safeParse(form.get("action"));
   const zone = timeZoneSchema.safeParse(form.get("device_zone"));
   if (!action.success || !zone.success) return { error: "Could not validate the session action or device timezone." };
@@ -93,7 +95,7 @@ export async function sessionAction(_previous: FormState, form: FormData): Promi
 export type ImportState = FormState & { rows?: ImportedRow[]; errors?: string[]; customerId?: string };
 
 export async function previewImport(_previous: ImportState, form: FormData): Promise<ImportState> {
-  await requireWorkspace(true);
+  await requireWorkspace(true, form);
   const customer = uuid.safeParse(form.get("customer_id"));
   if (!customer.success) return { error: "Choose the customer for this import." };
   const file = form.get("file");
@@ -103,7 +105,7 @@ export async function previewImport(_previous: ImportState, form: FormData): Pro
 }
 
 export async function confirmImport(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   if (form.get("authorized") !== "on") return { error: "Confirm the data is authorized and the preview was reviewed." };
   const customer = uuid.safeParse(form.get("customer_id"));
   let records: unknown;

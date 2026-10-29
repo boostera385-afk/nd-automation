@@ -2,6 +2,156 @@
 
 ## Current milestone
 
+**Security implementation slice (2026-10-29): central verified identity and
+explicit workspace context.** The real data-access layer now checks the fresh
+Supabase `getUser()` result and `email_confirmed_at` before any membership or
+business data read; unconfirmed sessions go to `/verify-email`, with truthful
+internal-admin handoff and no claim that SMTP works. This protects direct
+Server Actions and route handlers, not only dashboard layouts or proxy checks.
+The notification feed no longer has a separate unordered first-membership path.
+
+Membership reads are ordered, strictly validated and bounded at 100 (101st row
+fails closed, never truncates into an arbitrary selection). A single membership
+auto-selects; multiple memberships require `/workspaces` and explicit confirmation.
+The HttpOnly/SameSite session preference is account-bound and verified against
+current memberships on every request; it grants no access. Revoked selection
+does not fall through into another business. Sign-out clears the preference.
+Selection changes no database row or worker/session authorization; the UI warns
+to finish/pause existing work and does not pretend that switching stops a worker.
+
+All 30 existing form-based business action entrypoints now verify the rendered
+user/business context before dispatch. A stale/missing/duplicate/foreign context
+redirects to explicit re-selection with a fixed notice rather than silently
+writing into the cookie's new business. Shared/custom forms carry that context;
+the dashboard provider remounts on account/business change to discard old local
+previews, request IDs and credentials. Notification polling/acknowledgment and
+local handled-ID storage are also scoped; stale-tab feed requests return 409.
+The legacy observation action additionally checks the target publication in the
+selected business before its org-less RPC. Membership/RLS/RPC authorization stays
+authoritative; a hidden field or selection cookie never supplies a role.
+
+Added real-DAL transport-boundary tests (the data module/guard are not mocked),
+direct mutation rejection, role/revocation/malformed/overflow/stale-tab cases,
+selection action/cookie, confirmation/selector UI, notification boundary and
+publication-target tests, plus guards for all 30 action entrypoints/custom forms.
+Full validation: typecheck PASS, lint PASS, **712 tests / 50 files PASS** (63 new
+cases), production build PASS including `/verify-email` and `/workspaces`.
+A temporary, owned local production server returned `/login` 200 and anonymous
+`/verify-email`, `/workspaces`, `/dashboard` and writeback 307 to `/login`; server
+was stopped afterward. These are signed-out HTTP checks, not signed-in acceptance.
+Fudge rerun: 67 backend + 127 smoke PASS; all tracked JS/CJS syntax checks PASS.
+No Supabase schema/RLS/worker RPC was changed by this application-layer slice.
+Legacy SQL verification defense-in-depth and real multi-account/browser acceptance
+remain separate follow-ups. No production deployment, user/membership write,
+automation or release-gate change was performed; remaining publishing, Sheet,
+keyword semantics, worker setup, recovery and desktop-parity gaps stay open.
+
+**Cross-repository readiness review (2026-10-29): NOT READY for end-to-end
+automation; not an error-free certification.** Reviewed the shared master plan,
+all 36 F-items and 8 N-items in the tracker, dashboard/Fudge integration paths,
+worker allowlist, hosted schema/history/grants, logs and advisors. Every tracker
+ID occurs exactly once; none is signed off as full desktop replacement. Both
+master-plan copies and both frozen pre-test checkpoints remain byte-identical.
+This entry supersedes stale counts/readiness wording in earlier milestones and
+the frozen checkpoint; it is not final live acceptance.
+
+Fresh validation actually run:
+- From `apps/web`: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS,
+  `npm.cmd test` **649 tests / 43 files PASS**, `npm.cmd run build` PASS.
+- `npm.cmd audit --omit=dev --json`: zero reported production-dependency
+  vulnerabilities. This is registry coverage, not a security guarantee.
+- From Fudge: `node --test tests/backend.test.js` **67 PASS**,
+  `node tests/smoke.test.js` **127 PASS**; all tracked `.js`/`.cjs` syntax checks
+  PASS. These use fixtures/mocks, not an installed-extension acceptance run.
+- From `apps/worker`: `python -m unittest discover -v` **35 PASS**.
+- `npm.cmd run check:readiness`: exit 0, local configuration ready, hosted
+  readiness explicitly unverified by that offline command.
+- Production `/login` returned 200 with frame denial/no-store; anonymous
+  dashboard, publishing, catalog, writeback and master-Sheet requests returned
+  307 to `/login`. No new authenticated browser walkthrough was performed.
+
+Read-only hosted verification: selected shared project confirmed; **11 applied
+migrations, not 12** (the checkpoint's table itself lists 11). Twelve local
+migration files include the intentionally undeployed publishing protocol; do not
+blindly push/reset either repository's migrations. All **50 deployed function
+bodies match the 11 applied source migrations**, normalized for CRLF and edge
+whitespace; sorted name/body aggregate MD5 `3a152185d42690fe6f4b8c9790039072`.
+This body comparison is not a full schema/constraint/index equivalence proof.
+All 25 public tables have RLS; anonymous SELECT and authenticated table-level
+INSERT/UPDATE/DELETE privileges are denied on the inspected tables. Private
+worker credentials remain client-inaccessible. Published ND Test configuration
+is revision/generation 1 with **2 test rules**, not the business catalog. Inventory,
+bindings, publications, check jobs, intake records and writeback intents are zero;
+the publish-job table is absent and no Edge Functions are deployed.
+
+The user-designated business/source workbook reference is saved identically as
+`backups/business-source/REFERENCE.private.json` in both repositories; Git ignore
+was verified. Its link and contents must not enter public Git. Anonymous bounded
+reads of Structure keyword cells and Services succeeded: **21 service rules,
+41 distinct request keywords, 27 without exact Services matches**, no normalized
+keyword collision, no blank required classification fields or invalid flags.
+Rule fields equal the existing private snapshot. Offline use of the actual
+dashboard preview/contract and extension snapshot validator accepts all 21 rules
+with 0 errors and 23 warnings; configured keyword identity lookup resolves 21/21.
+This does not prove semantic coverage of the 27 exact misses or matching accuracy
+on real reviews. No reviews, names, phone values or media were fetched in this
+review. Sharing is anonymously readable: the owner should review restriction of
+business data; no permission was changed. This workbook is the Source/Services
+reference, **not** the operational ND Master; do not rename it to force a passing
+Auto Posting connection test. The prior operational connector tab-mapping failure
+and hosted connector setup remain unresolved.
+
+Release-blocking findings / next work:
+1. Publisher/release action, durable submit journal, media/schedule adapters and
+   hosted publishing migration are missing; the actual agent accepts only three
+   monitoring RPCs. P5/P6/P7/P8 and desktop feature sign-offs are incomplete.
+2. No Sheet outbox deliverer exists; queue/cancel UI is not real Sheet delivery.
+   Keep delivery unwired and both Fudge release constants false. Backend catalog
+   cache still never applies to `serviceRules`; existing Services sync owns them.
+3. Monitoring cannot start from this reviewed setup: zero bindings/publications,
+   no documented `.monitoring/worker.json` or validated `adapter.json`, and no
+   Playwright package in the current Python 3.13.15 interpreter. Other installed
+   environments were not certified. Registration alone is not a successful pilot.
+4. Dated-cohort one-click refresh, latest-100-per-profile policy, full comments,
+   recovery/restore, real multi-connection contention and live end-to-end browser
+   acceptance remain missing/unverified. DST fixture tests pass; live reporting
+   acceptance is not established with zero publications.
+5. Central `src/lib/data.ts` `getContext`/`requireWorkspace` checks verified user
+   identity and membership but **does not check `email_confirmed_at`**. New catalog,
+   intake and writeback paths have explicit checks; older Sheet/monitoring/reporting
+   paths rely on upstream Auth confirmation configuration and membership-based
+   RLS. An unconfirmed user who already has a valid session and membership is not
+   explicitly rejected there. This is not evidence that a fresh unassigned signup
+   can access data. Add central defense-in-depth plus non-mocked denial tests in a
+   separately reviewed implementation change; do not call current mocked gates
+   proof of universal verified-email enforcement.
+6. `getContext` selects membership with unordered `limit(1)` and no workspace
+   selector. Multi-business dashboard selection is ambiguous; current staff has
+   one membership, so this is a future multi-business blocker, not observed leakage.
+7. Preserve but do not silently migrate Fudge's legacy identity/service-changing
+   first-person rewrites (`apps-script.gs`, writer prompt) or public-link Drive
+   sharing. Rights, truthful attribution, media access and retention need explicit
+   disposition before automated content/publishing cutover.
+
+Security advisor remains non-clean: 3 anon-executable worker SECURITY DEFINER
+notices (credential-gated paths), 21 authenticated SECURITY DEFINER notices,
+disabled leaked-password protection and 1 intentional private no-policy INFO.
+Performance advisor reports 27 unused-index INFOs, no unindexed-FK finding.
+See [worker RPC review](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
+[authenticated RPC review](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable),
+[password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+and [private RLS notice](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+Last-24-hour log aggregates include 4 PostgreSQL errors (42P01 x2, 42703 x1,
+42601 x1) and one Auth/API 400; no source-level cause is asserted from aggregate
+counts. No raw logs, credentials or customer payloads were copied into Git.
+Targeted tracked-file/path scans found no real secret/private-reference matches;
+one secret-key pattern hit is the intentionally fake rejection fixture in
+`tests/env.test.ts`. This is not a complete history/credential audit.
+
+No application code or applied migration changed, no production writes, Sheet
+edits, automation, release enablement, installs, commits or pushes performed by
+this review. SMTP remains deliberately deferred for the internal-staff workflow.
+
 **Decision — email verification deferred (2026-10-29, user-directed):** this is
 an internal organization tool, so custom SMTP (Resend or equivalent) is not
 being configured now; it becomes a requirement only if external signups,

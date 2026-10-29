@@ -10,7 +10,7 @@ export type ProfileImportState = FormState & { rows?: ProfileRow[]; errors?: str
 const refresh = () => revalidatePath("/dashboard/profiles");
 
 export async function previewProfiles(_previous: ProfileImportState, form: FormData): Promise<ProfileImportState> {
-  await requireWorkspace(true);
+  await requireWorkspace(true, form);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV inventory export to preview." };
   if (file.size > 1024 * 1024) return { error: "Import file must be smaller than 1 MB." };
@@ -20,7 +20,7 @@ export async function previewProfiles(_previous: ProfileImportState, form: FormD
 }
 
 export async function confirmProfileImport(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   if (form.get("confirmed") !== "on") return { error: "Confirm this inventory was exported from your authorized Incogniton installation." };
   const records = z.string().max(2_100_000).safeParse(form.get("records"));
   let rows: unknown;
@@ -38,7 +38,7 @@ export async function confirmProfileImport(_previous: FormState, form: FormData)
 }
 
 export async function setProfileArchived(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const profile = z.uuid().safeParse(form.get("profile"));
   const archived = form.get("archived") === "true";
   if (!profile.success || form.get("confirmed") !== "on") return { error: "Confirm this inventory status change." };

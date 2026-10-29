@@ -28,7 +28,7 @@ export async function proxy(request: NextRequest) {
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
   }
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !data?.claims) {
+  if ((request.nextUrl.pathname.startsWith("/dashboard") || ["/workspaces", "/verify-email"].includes(request.nextUrl.pathname)) && !data?.claims) {
     const target = request.nextUrl.clone();
     target.pathname = "/login";
     target.search = "";
@@ -40,4 +40,4 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/login", "/signup", "/forgot-password", "/reset-password"] };
+export const config = { matcher: ["/dashboard/:path*", "/workspaces", "/verify-email", "/login", "/signup", "/forgot-password", "/reset-password"] };

@@ -2,11 +2,13 @@
 
 import { useActionState, useState } from "react";
 import { registerWorker } from "@/app/actions/workers";
+import { WorkspaceField } from "./workspace-context";
 
 export function WorkerRegistration() {
   const [state, action, pending] = useActionState(registerWorker, {});
   const [copyMessage, setCopyMessage] = useState("");
   return <form action={action} className="form-grid">
+    <WorkspaceField />
     <label>Machine name<input name="name" required minLength={2} maxLength={100} placeholder="Office laptop" autoComplete="off" /></label>
     <label className="check-label"><input type="checkbox" name="authorized" required />I control this machine and authorize its registration. This does not enable browser jobs.</label>
     {state.error && <p className="notice error" role="alert">{state.error}</p>}

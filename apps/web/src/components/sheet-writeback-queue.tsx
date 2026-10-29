@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { cancelPendingSheetWriteback, enqueueSheetWriteback } from "@/app/actions/sheet-writeback";
 import { ActionForm } from "./action-form";
+import { WorkspaceField } from "./workspace-context";
 
 export type WritebackIntent = { action: "append" | "update_cells"; tab: string; rowRef: string | null; values: Array<Record<string, string | null>> };
 export type WritebackItem = {
@@ -19,6 +20,7 @@ function EnqueueForm() {
   const [state, action, pending] = useActionState(enqueueSheetWriteback, {});
   if (state.success) return <p role="status">{state.success}</p>;
   return <form action={action} className="form-grid">
+    <WorkspaceField />
     <h3>Queue one explicit write intent</h3>
     <label>Intent action
       <select name="action" defaultValue="append" disabled={pending}>

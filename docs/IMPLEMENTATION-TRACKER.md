@@ -2,14 +2,33 @@
 
 Updated: 2026-10-29. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
 
+Readiness review (2026-10-29): all 44 feature IDs are present exactly once; no
+full desktop replacement sign-off. Fresh dashboard 649 tests/build/typecheck/lint,
+Fudge 67 backend + 127 smoke, and worker 35 tests pass. Hosted history contains
+11 applied migrations; publishing remains intentionally undeployed. Source
+Services has 21 rules but ND Test's active catalog has only 2 test rules; 27
+request keywords lack exact Services matches and need semantic review. Central
+verified-email enforcement, explicit multi-business selection, live worker setup,
+Sheet mapping/delivery and recovery/rights gates remain; see the current status
+entry for evidence and precise limitations. Do not enable automation from this
+tracker or infer live readiness from test counts.
+
+Security follow-up (2026-10-29): central application-layer email confirmation,
+explicit authorized workspace selection, stale-account/business form rejection
+across all 30 business form actions, and matching notification scope are now
+implemented; full validation passed (712 tests / 50 files, typecheck, lint, build).
+Signed-out local HTTP route checks also passed. No hosted schema change or live browser
+acceptance is implied. See the newest implementation-status entry; remaining
+SQL-level defense-in-depth, Sheet/publisher/worker/recovery/rights gates stay open.
+
 ## Phase gates
 
 | Phase | State | Next deliverable / dependency |
 | --- | --- | --- |
 | P0 | In progress | Confirm Source/ND Master mapping and policy decisions in `P0-DISCOVERY.md`; feature inventory below |
-| P1 | Read-only hosted baseline verified; acceptance/recovery pending | See `P1-HOSTED-REVIEW.md`; six existing migrations preserved, target URL/key verified; real login/isolation, recovery and Sheet setup gates remain |
+| P1 | Read-only hosted baseline reverified (11 migrations/50 matching function bodies); central app verification/workspace selection implemented | Basic owner login accepted; negative live isolation and new selector/stale-tab browser acceptance, SQL defense-in-depth, recovery and operational Sheet setup remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
-| P3 | Intake receipts, deployed catalog protocol, explicit inactive staging, exact review/diff and owner/admin activation, gated cache, and deployed durable Sheet writeback outbox protocol with explicit queue UI implemented; Sheet delivery unwired | Signed-in staging/review/activation acceptance, live cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
+| P3 | Intake receipts, deployed catalog/review/activation and queue UI implemented; owner guided 2-rule catalog pass recorded; cache gated and Sheet delivery unwired | Full business rule matching/approval, operator/cross-business/concurrent live acceptance, cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
 | P4 | Partial existing monitoring source; live acceptance pending | Pairing/selector validation, dated-cohort one-click refresh and latest-100 policies |
 | P5 | Local protocol only; browser publishing paused | Reviewed publisher, media, durable submit journal, explicit release and live pilot |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
@@ -63,7 +82,7 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | N03 | Observation/check history foundation | P4 web + worker | Staleness, evidence, technical failure != removal |
 | N04 | Manual comments + partial worker collector | P4 worker + backend | Exact-post stable IDs, partial/completeness, unknown totals |
 | N05 | Reporting foundations | P4/P8 web | Date cohorts, DST, true coverage and partial-data indicators |
-| N06 | Auth/RLS source; new target unverified | P1 backend | Genuine login, tenant/customer negative access tests |
+| N06 | Auth/RLS source and current shared hosted metadata verified; central app email/selection/stale-form guards implemented | P1 backend | Genuine negative tenant/customer access, multi-business/stale-tab browser acceptance, SQL defense-in-depth and recovery |
 | N07 | Refresh/reconciliation partially prepared | P4 web + backend | Explicit refresh freshness, deduplicated active jobs, missing-link recovery |
 | N08 | Writeback outbox deployed and smoke-tested; no Sheet write path yet | P3 deliverer + connector | Independent retry, version conflict and row-move tests on a real Sheet |
 

@@ -21,7 +21,7 @@ beforeEach(() => {
 it("requires staff and current verified email before requesting a save", async () => {
   mocks.requireWorkspace.mockResolvedValue({ db: { rpc: mocks.rpc }, organization: { id: org }, user: {} });
   expect((await stageServiceCatalog({}, form())).error).toContain("Verify your email");
-  expect(mocks.requireWorkspace).toHaveBeenCalledWith(true); expect(mocks.rpc).not.toHaveBeenCalled();
+  expect(mocks.requireWorkspace).toHaveBeenCalledWith(true, expect.any(FormData)); expect(mocks.rpc).not.toHaveBeenCalled();
 });
 it("binds save to server-authorized business, replay ID and base version without activation", async () => {
   const data = form(); data.set("organizationId", "forged-business");

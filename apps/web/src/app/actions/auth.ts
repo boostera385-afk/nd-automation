@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { appUrl, publicConfig } from "@/lib/env";
 import { credentialsSchema } from "@/lib/validation";
+import { cookies } from "next/headers";
+import { WORKSPACE_COOKIE } from "@/lib/workspace-selection";
 import { CONFIRM_TYPES, confirmDestination, RESEND_NEUTRAL, resendFailure, SIGNUP_CHECK_EMAIL, signInFailure, signUpFailure } from "@/lib/auth-results";
 
 export type FormState = { error?: string; success?: string; needsVerification?: boolean };
@@ -66,6 +68,7 @@ export async function confirmEmailLink(_previous: FormState, form: FormData): Pr
 }
 
 export async function signOut() {
+  (await cookies()).delete(WORKSPACE_COOKIE);
   if (publicConfig()) { const db = await createClient(); await db.auth.signOut(); }
   revalidatePath("/", "layout");
   redirect("/login");

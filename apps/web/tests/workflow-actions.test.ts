@@ -27,7 +27,7 @@ describe("mapped Sheet synchronization", () => {
   it("requires staff and uses server-read rows / saved mappings, not submitted records or customers", async () => {
     const form = syncForm(); form.set("records", "forged"); form.set("customer", "forged-customer");
     expect((await syncMappedPosts({}, form)).success).toContain("1 new links");
-    expect(mocks.requireWorkspace).toHaveBeenCalledWith(true);
+    expect(mocks.requireWorkspace).toHaveBeenCalledWith(true, form);
     expect(mocks.rpc).toHaveBeenCalledWith("reporting_add_publications", { org: "org", customer: binding.customer_id, record_source: "sheet_import", records: [expect.objectContaining({ account_label: binding.account_label, published_at: null })] });
   });
   it("cannot publish, change the Sheet or call arbitrary RPCs", async () => {
@@ -72,7 +72,7 @@ describe("mapped Sheet synchronization", () => {
 describe("explicit batch monitoring", () => {
   it("uses one explicit confirmation for a saved, scoped group", async () => {
     expect((await setBatchMonitoring({}, batchForm([binding.id, other.id]))).success).toContain("2 profiles");
-    expect(mocks.requireWorkspace).toHaveBeenCalledWith(true);
+    expect(mocks.requireWorkspace).toHaveBeenCalledWith(true, expect.any(FormData));
     expect(mocks.rpc.mock.calls).toEqual([
       ["reporting_set_profile_monitoring", { org: "org", binding: binding.id, enabled: true }],
       ["reporting_set_profile_monitoring", { org: "org", binding: other.id, enabled: true }],

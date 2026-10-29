@@ -12,7 +12,7 @@ export type CheckState = FormState & { nonce?: number };
 // Records what a person found when they opened the post(s): one atomic call for one post or up to 100.
 // A check that could not be completed (proxy, login, ...) is stored as exactly that, never as a removal.
 export async function recordChecks(_previous: CheckState, form: FormData): Promise<CheckState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const input = z.object({
     ids: z.array(uuid).min(1, "Select at least one post.").max(100, "Select up to 100 posts at a time."),
     outcome: checkOutcomeSchema,

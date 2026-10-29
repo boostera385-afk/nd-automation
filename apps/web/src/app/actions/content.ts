@@ -10,7 +10,7 @@ import type { FormState } from "./auth";
 const identity = z.object({ draft: z.uuid(), expected_revision: z.coerce.number().int().min(0), binding: z.uuid() });
 
 export async function saveContentDraft(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const input = identity.safeParse({ draft: form.get("draft"), expected_revision: form.get("expected_revision"), binding: form.get("binding") });
   const content = contentFromForm(form);
   if (!input.success || !content.success) return { error: "Check the assigned profile, title, content, audience and listing fields. Price must be a nonnegative USD amount with at most two decimal places." };
@@ -22,7 +22,7 @@ export async function saveContentDraft(_previous: FormState, form: FormData): Pr
 }
 
 export async function reviewContentDraft(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const input = z.object({ draft: z.uuid(), expected_revision: z.coerce.number().int().positive(), decision: z.enum(["approve", "return", "archive"]) }).safeParse({ draft: form.get("draft"), expected_revision: form.get("expected_revision"), decision: form.get("decision") });
   if (!input.success || form.get("confirmed") !== "on") return { error: "Confirm your review of this exact revision and profile." };
   const { error } = await db.rpc("reporting_review_content_draft", { org: organization.id, ...input.data, confirmed: true });

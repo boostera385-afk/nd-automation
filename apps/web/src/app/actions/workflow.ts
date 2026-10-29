@@ -9,7 +9,7 @@ import { planMappedImport } from "@/lib/workflow";
 import type { FormState } from "./auth";
 
 export async function syncMappedPosts(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const sheet = z.enum(["Auto Posting", "Auto Listing"]).safeParse(form.get("sheet"));
   if (!sheet.success) return { error: "Choose the posting or listing tab." };
   const operations = await getOperationsData();
@@ -34,7 +34,7 @@ export async function syncMappedPosts(_previous: FormState, form: FormData): Pro
 }
 
 export async function setBatchMonitoring(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const selected = z.array(z.uuid()).min(1).max(100).safeParse(form.getAll("binding"));
   const mode = z.enum(["enable", "disable"]).safeParse(form.get("mode"));
   if (!selected.success || !mode.success || form.get("confirmed") !== "on") return { error: "Select up to 100 profiles and confirm this batch." };

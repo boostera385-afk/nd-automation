@@ -8,7 +8,7 @@ import type { FormState } from "./auth";
 // No enqueue action is exposed until the worker's submit/evidence adapter passes
 // supervised acceptance. These controls only manage pre-existing protocol jobs.
 export async function cancelPendingPublish(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const job = z.uuid().safeParse(form.get("job"));
   if (!job.success || form.get("confirmed") !== "on") return { error: "Confirm cancellation of this pending job." };
   const { error } = await db.rpc("reporting_cancel_pending_publish", { org: organization.id, job: job.data });
@@ -18,7 +18,7 @@ export async function cancelPendingPublish(_previous: FormState, form: FormData)
 }
 
 export async function reconcileExpiredPublish(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   const job = z.uuid().safeParse(form.get("job"));
   if (!job.success || form.get("confirmed") !== "on") return { error: "Confirm that the old worker is stopped and the profile has been inspected." };
   const { error } = await db.rpc("reporting_reconcile_expired_publish", { org: organization.id, job: job.data });

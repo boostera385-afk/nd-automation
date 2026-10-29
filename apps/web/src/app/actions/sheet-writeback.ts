@@ -20,7 +20,7 @@ const rowValues = z.array(z.record(z.string().min(1).max(100), z.union([z.string
 
 /** Stages an explicit durable write intent in the shared backend only. No Sheet is contacted. */
 export async function enqueueSheetWriteback(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization, user } = await requireWorkspace(true);
+  const { db, organization, user } = await requireWorkspace(true, form);
   if (!user.email_confirmed_at) return { error: "Verify your email before queueing a Sheet writeback intent." };
   const input = enqueueInput.safeParse({ request: form.get("requestId"), stable: form.get("stableKey"), action: form.get("action"), tab: form.get("tab"), rowRef: (form.get("rowRef") as string | null)?.trim() || undefined, rows: form.get("rows"), confirmed: form.get("confirmed") });
   if (!input.success) return { error: "Review the tab, row reference and row values and confirm before queueing." };
@@ -49,7 +49,7 @@ const cancelInput = z.object({ item: z.uuid(), request: z.uuid(), confirmed: z.l
 
 /** Cancels one still-pending intent only; terminal and in-flight states are never rewritten. */
 export async function cancelPendingSheetWriteback(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization, user } = await requireWorkspace(true);
+  const { db, organization, user } = await requireWorkspace(true, form);
   if (!user.email_confirmed_at) return { error: "Verify your email before cancelling a writeback intent." };
   const input = cancelInput.safeParse({ item: form.get("itemId"), request: form.get("requestId"), confirmed: form.get("confirmed") });
   if (!input.success) return { error: "Review the exact pending intent and confirm cancellation." };

@@ -15,7 +15,7 @@ export type SyncState = FormState & { view?: SyncView; health?: HealthReport; sh
 // Read-only analysis of sheet data from either source: the connected sheet, or rows the browser extracted from an
 // uploaded file (only four safe columns; credentials never leave the browser). Nothing is written here.
 export async function runSheetAnalysis(_previous: SyncState, form: FormData): Promise<SyncState> {
-  await requireWorkspace(true);
+  await requireWorkspace(true, form);
   const source = z.enum(["live", "upload"]).safeParse(form.get("source"));
   if (!source.success) return { error: "Choose where the sheet data comes from." };
 
@@ -73,7 +73,7 @@ const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(i
 // Saves the reviewed posts, each under the client chosen for its profile. New clients are created first. Posts are
 // recorded as "not checked" with an unknown publication date; duplicates are skipped by the database.
 export async function importSheetPosts(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization } = await requireWorkspace(true, form);
   if (form.get("authorized") !== "on") return { error: "Confirm the data is authorized and the preview was reviewed." };
   let rawRecords: unknown, rawAssignments: unknown;
   try { rawRecords = JSON.parse(String(form.get("records") ?? "")); rawAssignments = JSON.parse(String(form.get("assignments") ?? "")); }

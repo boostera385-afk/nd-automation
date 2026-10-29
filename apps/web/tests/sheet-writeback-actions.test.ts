@@ -22,7 +22,7 @@ it("requires staff and a verified email before any backend request", async () =>
   mocks.requireWorkspace.mockResolvedValue({ db: { rpc: mocks.rpc }, organization: { id: org }, user: {} });
   expect((await enqueueSheetWriteback({}, form())).error).toContain("Verify your email");
   expect((await cancelPendingSheetWriteback({}, cancelForm())).error).toContain("Verify your email");
-  expect(mocks.requireWorkspace).toHaveBeenCalledWith(true); expect(mocks.rpc).not.toHaveBeenCalled();
+  expect(mocks.requireWorkspace).toHaveBeenCalledWith(true, expect.any(FormData)); expect(mocks.rpc).not.toHaveBeenCalled();
 });
 it("binds the intent to the server-authorized business, stable key and request only", async () => {
   const data = form(); data.set("organizationId", "forged-business");

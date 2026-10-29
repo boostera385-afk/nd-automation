@@ -7,21 +7,21 @@ import { markNotificationsSeen } from "@/app/actions/notifications";
 import { playChime, readSoundEnabled, subscribeSound, unlockAudio, writeSoundEnabled } from "@/lib/chime";
 import { formatAgo, newlyArrived, notificationHref, strongestTone, unreadCount } from "@/lib/notifications";
 import type { NotificationItem } from "@/lib/types";
+import { useWorkspaceContext } from "./workspace-context";
 
 const POLL_MS = 20_000;
-const HANDLED_KEY = "nd-notif-handled";
 const icons = { positive: CircleCheck, negative: CircleX, attention: TriangleAlert } as const;
 
 type Feed = { available: boolean; items: NotificationItem[]; lastSeenAt: string | null };
 
-function loadHandled(): Set<string> | null {
+function loadHandled(key: string): Set<string> | null {
   try {
-    const raw = localStorage.getItem(HANDLED_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? new Set(JSON.parse(raw) as string[]) : null;
   } catch { return null; }
 }
-function saveHandled(ids: string[], previous: Set<string> | null) {
-  try { localStorage.setItem(HANDLED_KEY, JSON.stringify([...ids, ...(previous ?? [])].slice(0, 80))); } catch { /* Announcements may repeat after a reload. */ }
+function saveHandled(key: string, ids: string[], previous: Set<string> | null) {
+  try { localStorage.setItem(key, JSON.stringify([...ids, ...(previous ?? [])].slice(0, 80))); } catch { /* Announcements may repeat after a reload. */ }
 }
 
 function Toast({ item, onClose }: { item: NotificationItem; onClose: (id: string) => void }) {
@@ -35,6 +35,8 @@ function Toast({ item, onClose }: { item: NotificationItem; onClose: (id: string
 }
 
 export function NotificationCenter() {
+  const scope = useWorkspaceContext();
+  const handledKey = `nd-notif-handled:${scope}`;
   const [available, setAvailable] = useState(true);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [lastSeen, setLastSeen] = useState<number | null>(null);
@@ -48,18 +50,19 @@ export function NotificationCenter() {
 
   const poll = useCallback(async () => {
     try {
-      const response = await fetch("/dashboard/notifications/feed", { cache: "no-store", headers: { Accept: "application/json" } });
+      const response = await fetch(`/dashboard/notifications/feed?workspaceContext=${encodeURIComponent(scope)}`, { cache: "no-store", headers: { Accept: "application/json" } });
+      if (response.status === 409) { setAvailable(false); return; }
       if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return;
       const feed = (await response.json()) as Feed;
       if (!feed.available) { setAvailable(false); return; }
       setItems(feed.items);
       const seen = feed.lastSeenAt ? Date.parse(feed.lastSeenAt) : null;
       setLastSeen(seen);
-      if (seen === null) void markNotificationsSeen().then(() => setLastSeen(Date.now())).catch(() => undefined);
+      if (seen === null) void markNotificationsSeen(scope).then((result) => { if (result.ok) setLastSeen(Date.now()); }).catch(() => undefined);
 
-      const handled = loadHandled();
+      const handled = loadHandled(handledKey);
       const { fresh, announce } = newlyArrived(feed.items, handled);
-      if (fresh.length) saveHandled(fresh, handled);
+      if (fresh.length) saveHandled(handledKey, fresh, handled);
       if (announce) {
         const arrivals = feed.items.filter((item) => fresh.includes(item.id));
         setToasts((current) => [...arrivals.slice(0, 3), ...current].slice(0, 3));
@@ -67,7 +70,7 @@ export function NotificationCenter() {
         if (readSoundEnabled()) playChime(strongestTone(arrivals));
       }
     } catch { /* Offline or signed out: try again next time. */ }
-  }, []);
+  }, [scope, handledKey]);
 
   useEffect(() => {
     const first = setTimeout(() => void poll(), 0);
@@ -100,7 +103,7 @@ export function NotificationCenter() {
   function toggle() {
     const next = !open;
     setOpen(next);
-    if (next && unread > 0) { setLastSeen(Date.now()); void markNotificationsSeen().catch(() => undefined); }
+    if (next && unread > 0) { void markNotificationsSeen(scope).then((result) => { if (result.ok) setLastSeen(Date.now()); }).catch(() => undefined); }
   }
 
   return <div className="notify" ref={panel}>
