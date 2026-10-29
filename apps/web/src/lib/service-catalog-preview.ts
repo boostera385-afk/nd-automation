@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const CATALOG_MAX_BYTES = 1024 * 1024;
+export const CATALOG_PAGE_SIZE = 25;
+export function catalogPage<T>(items: readonly T[], requestedPage: number) {
+  const pages = Math.max(1, Math.ceil(items.length / CATALOG_PAGE_SIZE));
+  const page = Math.min(pages - 1, Math.max(0, Number.isSafeInteger(requestedPage) ? requestedPage : 0));
+  const offset = page * CATALOG_PAGE_SIZE;
+  return { page, pages, total: items.length, offset, items: items.slice(offset, offset + CATALOG_PAGE_SIZE) };
+}
 const cell = z.string().max(8000).refine((value) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value));
 const fields = ["Service Keyword", "Status", "Reviews Collected", "Notes", "Search Term", "Business Name Keywords", "Review Keywords", "Required Review Keywords", "Google Filter Keywords", "Exclude Keywords", "Service Family", "Subcategory", "Topic Filter Required", "Collect Family Reviews", "Rewrite Service Phrase", "Equivalent Service Phrases"] as const;
 const rowSchema = z.object(Object.fromEntries(fields.map((field) => [field, cell.optional()]))).extend({ _sheet_row: z.number().int().positive().optional() }).strict();

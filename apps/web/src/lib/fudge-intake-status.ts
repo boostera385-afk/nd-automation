@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+export const INTAKE_READ_TIMEOUT_MS = 15000;
+
 const revisionSchema = z.object({
   id: z.uuid(), organization_id: z.uuid(), record_id: z.uuid(),
   revision: z.number().int().positive(), payload_sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -17,15 +19,23 @@ export type IntakeStatus = {
 export async function fetchFudgeIntakeStatus(db: SupabaseClient, organizationId: string): Promise<IntakeStatus> {
   const failed = (): IntakeStatus => ({ available: false, records: null, revisions: null, recent: [], limited: false, loadedAt: new Date().toISOString() });
   if (!z.uuid().safeParse(organizationId).success) return failed();
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Intake read deadline exceeded"));
+    }, INTAKE_READ_TIMEOUT_MS);
+  });
   try {
-    const [records, revisions, recent] = await Promise.all([
-      db.from("reporting_fudge_records").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
-      db.from("reporting_fudge_revisions").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+    const [records, revisions, recent] = await Promise.race([Promise.all([
+      db.from("reporting_fudge_records").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).abortSignal(controller.signal),
+      db.from("reporting_fudge_revisions").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).abortSignal(controller.signal),
       db.from("reporting_fudge_revisions")
         .select("id,organization_id,record_id,revision,payload_sha256,observed_at,received_at")
         .eq("organization_id", organizationId)
-        .order("received_at", { ascending: false }).order("id", { ascending: false }).limit(51),
-    ]);
+        .order("received_at", { ascending: false }).order("id", { ascending: false }).limit(51).abortSignal(controller.signal),
+    ]), deadline]);
     if (records.error || revisions.error || recent.error) return failed();
     const counts = z.array(z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)).length(2).safeParse([records.count, revisions.count]);
     const rows = z.array(revisionSchema).max(51).safeParse(recent.data);
@@ -35,5 +45,8 @@ export async function fetchFudgeIntakeStatus(db: SupabaseClient, organizationId:
   } catch {
     // Never surface server error bodies or treat failed reads as an empty library.
     return failed();
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
   }
 }

@@ -2,6 +2,22 @@
 
 ## Current milestone
 
+**Bounded-read/render hardening (2026-10-29):** intake metadata requests share a
+15-second application deadline and AbortSignal. A stalled/failed read remains
+unavailable, never zero; the deadline timer is cleared on completion. The deadline
+also bounds the page wait if a transport ignores cancellation; it does not prove
+database-side cancellation. Catalog rules, errors, warnings and unmatched keywords
+are paginated at 25 items per section, with explicit totals and local preview clear.
+Source file size and rule limits remain. Validation: typecheck PASS, lint PASS,
+566 tests / 35 files PASS, production build PASS, including fake-timer hung-read
+and timer-cleanup cases plus 500-rule paging bounds. Actual file-selection/paging
+interaction and simultaneous real-browser workload acceptance remain pending.
+Fudge's owning repo separately reduces redundant queue reads, preserves retired
+epoch sweeping and tests overlapping drains/1,000 queued intents: 55 backend and
+127 smoke tests PASS. No guarantee of zero busy states or production load capacity
+is made; exact database counts and full local queue enumeration still need capacity
+measurement. Rule storage/activation/cache remain unimplemented; uploads stay off.
+
 **P3 service-catalog preview (2026-10-29):** new verified-staff-only
 `/dashboard/settings/services`, linked from Settings. File analysis is browser-local
 and ephemeral; no network upload, storage, import or activation operation exists.

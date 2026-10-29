@@ -14,6 +14,12 @@ written to the database or stored in browser storage. Refresh clears the preview
 Other browser extensions and anyone with access to the device are outside this
 protection; use a trusted device. No save/import/activate action exists in this slice.
 
+Rules and each message list render at most 25 items per page; totals and navigation
+keep remaining rows accessible. Clear local preview releases the displayed model
+and selected file reference. JSON parsing/validation is still synchronous within the
+1 MiB/500-rule input ceiling; real browser interaction/load measurement remains
+pending. Pagination is not evidence of unlimited catalog capacity.
+
 ## Validation contract
 
 - UTF-8 input <= 1 MiB; 1–500 service rows; bounded text and supported row columns.

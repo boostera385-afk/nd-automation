@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { previewServiceCatalog, CATALOG_MAX_BYTES } from "@/lib/service-catalog-preview";
+import { previewServiceCatalog, CATALOG_MAX_BYTES, catalogPage } from "@/lib/service-catalog-preview";
 
 const row = { "Service Keyword": "Fixture repair", "Search Term": "fixture repair", "Service Family": "Fixtures", Subcategory: "Fixture repair", "Topic Filter Required": "YES", "Collect Family Reviews": "false", "Business Name Keywords": "fixture;repair|fixture", "Review Keywords": "repair\nfixed", "Google Filter Keywords": "fixture", "Exclude Keywords": "", "Required Review Keywords": "", _sheet_row: 2 };
 const preview = (services: unknown[], extra = {}) => previewServiceCatalog(JSON.stringify({ services, ...extra }));
 describe("local service catalog validation", () => {
+  it("bounds rendering and clamps stale or invalid page numbers", () => {
+    const rows = Array.from({ length: 500 }, (_, i) => i);
+    expect(catalogPage(rows, 0).items).toEqual(rows.slice(0, 25));
+    expect(catalogPage(rows, 19)).toMatchObject({ pages: 20, page: 19, offset: 475 });
+    expect(catalogPage(rows, 999).items).toHaveLength(25);
+    for (const page of [-1, NaN, Infinity, 0.5]) expect(catalogPage(rows, page).page).toBe(0);
+    expect(catalogPage([], 999)).toMatchObject({ page: 0, pages: 1, items: [] });
+  });
   it("preserves original keyword and classification, and parses flags and existing signal delimiters", () => {
     const result = preview([row]);
     expect(result.valid).toBe(true);
