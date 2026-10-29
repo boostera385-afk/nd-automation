@@ -2,6 +2,22 @@
 
 ## Current milestone
 
+**P3 service-catalog preview (2026-10-29):** new verified-staff-only
+`/dashboard/settings/services`, linked from Settings. File analysis is browser-local
+and ephemeral; no network upload, storage, import or activation operation exists.
+Validates bounded JSON service rows, explicit flags/classification, collector-key
+collisions and list delimiters; warns on uncertain matching and historical status.
+Notes/collection counts are not echoed in the preview model. The user's private
+snapshot was processed locally: 21 rules structurally valid, 23 warnings, 27 listed
+exact keyword mappings unresolved. This is not semantic matching acceptance. No
+business data or private workbook/report is included in Git. See
+`SERVICE-CONFIGURATION.md` for implemented boundaries and storage/activation contract.
+Initial typecheck caught dynamic-schema inference and a table-driven test shape;
+both corrected. Final validation: typecheck PASS, lint PASS, 563 tests / 35 files
+PASS, production build PASS. Live signed-in file selection/visual acceptance remains
+pending. No new database
+schema, backend write, Fudge rule replacement, Sheet write or upload release.
+
 **P3 read-only intake visibility (2026-10-29):** added staff/verified-email-gated
 `/dashboard/fudge`, linked from Settings. Uses the authenticated user's client,
 explicit business filters and existing RLS; reads exact HEAD counts and at most 51
