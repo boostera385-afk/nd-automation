@@ -1,6 +1,6 @@
 # Service configuration: staged implementation
 
-Updated: 2026-10-29. **Catalog protocol deployed; local preview and explicit inactive staging implemented. Activation/diff UI and Fudge rule application remain incomplete.**
+Updated: 2026-10-29. **Catalog protocol deployed; local preview, explicit inactive staging and exact revision review/owner-admin activation implemented. Fudge rule application and signed-in acceptance remain incomplete.**
 
 ## Current entry point
 
@@ -15,7 +15,30 @@ confirmed **Save inactive revision** action sends only contract-validated servic
 rules to the backend. Notes, counters and workbook contents are excluded. Refresh
 clears the local preview; saved backend revisions remain.
 Other browser extensions and anyone with access to the device are outside this
-protection; use a trusted device. No activation/apply action exists in this slice.
+protection; use a trusted device. Activation exists only behind the separate
+exact-revision review page and its owner/admin confirmation.
+
+## Exact revision review and activation
+
+Saved revisions are listed with their IDs and UTC timestamps on the staging page
+(latest 20 receipts only). Each links to `/dashboard/settings/services/[id]`,
+which loads three independent bounded reads — the revision itself, the business
+head and the published snapshot RPC. If those reads disagree or fail, the page
+returns an explicit "review unavailable" notice and requests nothing.
+
+The review shows per-rule added/removed/changed/unchanged counts against the
+currently published rules and the full before/after JSON for every rule. Rules
+pair under the same collector-key normalization as staging, but no edit is
+inferred equivalent: raw keyword-text changes and signal-order changes are listed
+as changed with their exact fields. Operators see review-only mode. Verifying
+owners/admins can confirm publication with the revision ID and base generation
+embedded in the page; a later concurrent activation makes the shown base stale
+and the server's expected-version check rejects it. Activating an older revision
+is an explicit rollback recorded as a newer generation.
+
+Publication changes business configuration only. It does not start collection,
+replace current Fudge/Sheet rules while their gates stay false, or approve any
+third-party content.
 
 Rules and each message list render at most 25 items per page; totals and navigation
 keep remaining rows accessible. Clear local preview releases the displayed model
@@ -81,8 +104,8 @@ false and no cached rules are applied to collection/Sheets.
 ## Remaining deployment/activation work
 
 1. Inspect the live schema and reuse the selected shared project; no duplicate backend.
-2. Accept the explicit inactive-staging UI, then build exact revision diff/activation
-   UI with explicit owner/admin publication confirmation. No automatic activation.
+2. Live signed-in acceptance of the explicit inactive-staging and exact
+   review/activation UI with owner/admin confirmation. No automatic activation.
 3. Require an expected version on save/activation, reject stale concurrent edits,
    preserve immutable history and audit publication/retirement. No client-supplied
    approval boolean may grant activation.

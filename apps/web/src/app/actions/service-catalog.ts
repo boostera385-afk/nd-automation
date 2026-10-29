@@ -27,3 +27,21 @@ export async function stageServiceCatalog(_previous: FormState, form: FormData):
     return { success: `Staged revision ${receipt.data.revision}. Nothing was activated or applied to Fudge.` };
   } catch { return { error: "Save outcome is unconfirmed. Retry the same form or reconcile saved revisions; no automatic retry was started." }; }
 }
+
+export async function activateServiceCatalog(_previous: FormState, form: FormData): Promise<FormState> {
+  const { db, organization, user, membership } = await requireWorkspace(true);
+  if (!user.email_confirmed_at || !["owner", "admin"].includes(membership.role)) return { error: "A verified owner or admin must review and activate this revision." };
+  const input = z.object({ revision: z.uuid(), request: z.uuid(), expected: z.coerce.number().int().min(0).max(2147483646), confirmed: z.literal("on") }).safeParse({ revision: form.get("revisionId"), request: form.get("requestId"), expected: form.get("expectedVersion"), confirmed: form.get("confirmed") });
+  if (!input.success) return { error: "Review the exact revision and confirm publication before continuing." };
+  try {
+    const result = await db.rpc("reporting_activate_service_catalog_v1", { org: organization.id, revision_id: input.data.revision, expected_version: input.data.expected, request_id: input.data.request }).abortSignal(AbortSignal.timeout(15000));
+    if (result.error) {
+      if (/Activation (version|replay) conflict/.test(result.error.message)) return { error: "Published configuration changed. Reload the comparison and review it again; no automatic activation retry was started." };
+      return { error: "Activation is unconfirmed. Retry this same request or reconcile the published generation before issuing another request." };
+    }
+    const receipt = z.object({ revisionId: z.uuid(), generation: z.number().int().positive() }).strict().safeParse(result.data);
+    if (!receipt.success || receipt.data.revisionId !== input.data.revision || receipt.data.generation !== input.data.expected + 1) return { error: "Activation receipt could not be verified. Reconcile published configuration before another request." };
+    revalidatePath("/dashboard/settings/services", "layout");
+    return { success: `Published configuration generation ${receipt.data.generation}. Fudge download/application and intake upload gates remain separate; no collection or publishing job started.` };
+  } catch { return { error: "Activation outcome is unconfirmed. Retry the same form or reconcile the published generation; do not assume it failed." }; }
+}

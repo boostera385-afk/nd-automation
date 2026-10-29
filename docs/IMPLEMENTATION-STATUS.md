@@ -2,6 +2,31 @@
 
 ## Current milestone
 
+**Exact revision review and owner/admin activation (2026-10-29):** new
+`/dashboard/settings/services/[id]` review page. Saved revisions (latest 20
+receipts) link from the staging page to a per-revision review that loads three
+independent bounded reads — revision, business head and published snapshot RPC —
+and fails closed to an explicit "review unavailable" notice when any read or parse
+fails or the reads disagree; no activation is requested. The review shows per-rule
+added/removed/changed/unchanged counts against currently published rules plus full
+before/after JSON; rules pair under collector-key normalization without inferring
+equivalence (raw keyword-text and signal-order changes list their exact fields).
+Operators get review-only mode; verified owners/admins can confirm publication with
+the revision ID and base generation embedded server-side, a stable per-form replay
+ID and a 15-second abort. Endpoint work is a server action gated on verified
+owner/admin membership; feature rollout is not client-supplied. Timeout/lost
+responses are unconfirmed, never automatically retried with new IDs. Researched
+react-hooks lint finding (JSX inside try/catch) fixed by structure, not suppression.
+
+No production catalog or rules saved/activated; activation changes business
+configuration only — no collection, Fudge/Sheet application or third-party
+content approval. Full validation: typecheck PASS, lint PASS, 614 tests /
+40 files PASS (18 new: 7 activation-action, 3 diff, 5 review-page UI, 1 staging
+links, 2 expectation corrections after first run), production build PASS with the
+new route. Real signed-in save/review/activation, concurrency, restore and
+ownership acceptance remain pending; both Fudge release gates remain false.
+Prior dated entries below are historical, not current status.
+
 **Authorized hosted catalog deployment and inactive staging (2026-10-29):** shared
 target/history/schema/advisors rechecked. Promoted local draft via CLI-generated
 source `20261029165237_service_catalog_v1.sql`; applied as hosted `20261029165416`.
