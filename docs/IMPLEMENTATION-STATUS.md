@@ -2,6 +2,23 @@
 
 ## Current milestone
 
+**Decision — email verification deferred (2026-10-29, user-directed):** this is
+an internal organization tool, so custom SMTP (Resend or equivalent) is not
+being configured now; it becomes a requirement only if external signups,
+self-service password recovery or reliable confirmation delivery is needed.
+Consequences recorded honestly: the Supabase "Confirm email" setting stays on,
+so any self-service signup remains gated by the app's `email_confirmed_at`
+checks and can see nothing; staff accounts are provisioned by an administrator
+in the Supabase dashboard using "Add user" with "Auto Confirm User", which sets
+`email_confirmed_at` without sending mail; and there is still no in-app
+membership/invite flow, so a new staff user also needs a `reporting_memberships`
+row (organization + role) added administratively. Forgot-password is therefore
+not self-service — without SMTP the message may not arrive, and recovery is an
+administrator-side password reset. The Auth Site URL and `/auth/callback`
+redirect allowlist should still be set to the production domain so links are
+correct the moment a sender exists. No release gate, Sheet delivery or worker
+dispatch changes because of this decision.
+
 **Hosted Vercel deployment (2026-10-29):** the dashboard is deployed as a
 public HTTPS site at `https://nd-automation-dashboard.vercel.app` (Vercel
 project `jelly-bean2/nd-automation-dashboard`, root directory `apps/web`,
