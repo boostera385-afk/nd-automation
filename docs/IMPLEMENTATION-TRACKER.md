@@ -9,7 +9,7 @@ Updated: 2026-10-29. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a r
 | P0 | In progress | Confirm Source/ND Master mapping and policy decisions in `P0-DISCOVERY.md`; feature inventory below |
 | P1 | Read-only hosted baseline verified; acceptance/recovery pending | See `P1-HOSTED-REVIEW.md`; six existing migrations preserved, target URL/key verified; real login/isolation, recovery and Sheet setup gates remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
-| P3 | Intake receipts, deployed catalog protocol, explicit inactive staging, exact review/diff and owner/admin activation, gated cache, and deployed durable Sheet writeback outbox protocol implemented; Sheet delivery unwired | Signed-in staging/review/activation acceptance, live cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
+| P3 | Intake receipts, deployed catalog protocol, explicit inactive staging, exact review/diff and owner/admin activation, gated cache, and deployed durable Sheet writeback outbox protocol with explicit queue UI implemented; Sheet delivery unwired | Signed-in staging/review/activation acceptance, live cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
 | P4 | Partial existing monitoring source; live acceptance pending | Pairing/selector validation, dated-cohort one-click refresh and latest-100 policies |
 | P5 | Local protocol only; browser publishing paused | Reviewed publisher, media, durable submit journal, explicit release and live pilot |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
@@ -54,7 +54,7 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | F30 | Monitoring queue/session foundations only | P4–P7 backend + worker | Real contention, cross-type profile exclusion, pause/revoke recovery |
 | F31 | Partial job/check events and results | P4/P5 web + worker | Real counters, accurate skipped/failed states, redacted diagnostics |
 | F32 | Protected operational evidence not complete | P5 backend + worker | Access control, scoped capture, retention/deletion |
-| F33 | Deployed durable writeback outbox protocol (hosted `20261029180253` + `20261029180528`); delivery to any real Sheet unwired | P3 deliverer + connector | Stable IDs, conflicts, durable outbox and replay |
+| F33 | Deployed durable writeback outbox protocol + explicit dashboard queue/cancel UI (hosted `20261029180253` + `20261029180528`); delivery to any real Sheet unwired | P3 deliverer + connector | Stable IDs, conflicts, durable outbox and replay |
 | F34 | Setup guides/assets exist; acceptance pending | P3 connector | Non-destructive versioned setup; legacy aliases preserved |
 | F35 | Theme/settings foundations; connections unverified | P1/P4 web + worker | Real target/machine checks without exposing secrets |
 | F36 | Desktop launchers preserved; worker operations incomplete | P4/P8 worker | Versioned install/update/drain/restart/rollback |

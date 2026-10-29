@@ -16,6 +16,7 @@ export default async function Settings() {
         <Link href="/dashboard/customers"><strong>Customers</strong><small>Customer setup and business timezones.</small></Link>
         <Link href="/dashboard/fudge"><strong>Fudge intake receipts</strong><small>Read-only backend counts and revision receipts; local queue status remains in Fudge.</small></Link>
         <Link href="/dashboard/settings/services"><strong>Service keyword import preview</strong><small>Validate your private catalog locally before backend storage or rule activation.</small></Link>
+        <Link href="/dashboard/settings/sheet-writeback"><strong>Sheet writeback queue</strong><small>Queue and review explicit, replay-safe write intents. Delivery stays inactive until acceptance.</small></Link>
       </div>
       <details className="workflow-details"><summary>Sheet connection instructions</summary><p><Link href="/dashboard/settings/sheet-setup">Open the numbered setup wizard with copy buttons and connection testing.</Link></p><p>Configure the dashboard server with SHEET_SYNC_URL, SHEET_SYNC_TOKEN and SHEET_SYNC_ORGANIZATION_ID, and deploy the separate connector in integrations/sheets/README.md. Your workspace ID is <code>{organization.id}</code>. The new Master Sheet tab preview requires the updated connector. Do not replace the desktop or Fudge Apps Script.</p><p>Keep connection tokens private. No credentials are requested in ordinary Sheet previews. Sheet writeback and live task execution beyond monitoring remain pending.</p></details>
     </Panel></section>}

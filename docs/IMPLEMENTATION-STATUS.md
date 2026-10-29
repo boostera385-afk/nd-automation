@@ -2,6 +2,29 @@
 
 ## Current milestone
 
+**Sheet writeback queue UI (2026-10-29):** new `/dashboard/settings/sheet-writeback`
+page (staff + verified email only, fails closed to an explicit notice when the
+bounded queue read cannot be verified). It shows the newest 25 intents of the
+exact total per business with per-status counts, attempts, lease expiry, last
+error and creation time (UTC), and states plainly that delivery is not active:
+no connector, worker or Edge Function writes any Sheet through this queue.
+Queueing one intent is explicit: bounded action/tab/row-reference/rows form,
+client-stable per-form request ID and stable key, explicit confirmation
+(append must not pin a row; update_cells requires an exact row reference),
+15-second abort, strict receipt verification (pending only) and
+unconfirmed-timeout wording that never auto-retries with new IDs. Cancelling is
+pending-only, confirmed, receipt-checked and honest about state changes. Both
+actions bind to the server-authorized business; forged organization fields are
+ignored. Typecheck caught a Zod issue-access bug the runtime tests had not
+reached (`issues` vs `error.issues`) before anything was committed. Full
+validation: typecheck PASS, lint PASS, 646 tests / 43 files PASS (18 new
+action tests reject forged/invalid/replay paths and 5 new page tests verify
+fail-closed, empty, pending-only-cancel and inactive-delivery rendering),
+production build PASS with the new route. All writeback/catalog row counts
+remain zero; no migration was needed for this slice. Real signed-in queueing
+against the hosted backend and any Sheet delivery remain pending; both Fudge
+release gates remain false.
+
 **Durable Sheet writeback outbox protocol (2026-10-29):** F33/N08 database
 slice. Bounded append/update_cells intents enqueue per organization with
 per-business ordering, replay-safe request and stable keys (idempotent
