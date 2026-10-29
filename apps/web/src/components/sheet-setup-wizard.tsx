@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { testSavedSheetConnection, type SheetConnectionTestState } from "@/app/actions/sheet-setup";
-import { extractSpreadsheetId, generateSetupToken, sheetEnvironmentSnippet, validSetupToken } from "@/lib/sheet-setup";
+import { extractSpreadsheetId, generateSetupToken, sheetEnvironmentSnippet, sheetEnvironmentTemplate, sheetSetupGaps, validSetupToken } from "@/lib/sheet-setup";
 import { Panel } from "./ui";
 
 function CopyBlock({ label, value, sensitive = false, rows = 3 }: { label: string; value: string; sensitive?: boolean; rows?: number }) {
@@ -31,6 +31,7 @@ export function SheetSetupWizard({ workspaceId, configured, connectorSource }: {
   const [state, testAction, testing] = useActionState<SheetConnectionTestState, FormData>(async () => testSavedSheetConnection(), {});
   const sheetId = extractSpreadsheetId(sheetInput);
   const envSnippet = sheetEnvironmentSnippet(endpoint, token, workspaceId);
+  const gaps = sheetSetupGaps(endpoint, token);
   return <div className="form-grid">
     <div className="notice"><strong>{configured ? "A server connection is already configured" : "First-time organization connection"}</strong>
       <p>This is read-only Sheet preview setup. It does not activate posting, profile creation, live-post checking or Sheet writeback. New staff can reuse the existing organization connection.</p>
@@ -66,7 +67,10 @@ export function SheetSetupWizard({ workspaceId, configured, connectorSource }: {
     <Panel title="5. Copy the dashboard settings">
       <CopyBlock label="workspace ID" value={workspaceId} rows={2} />
       <p>For a local install, open <code>apps/web/.env.local</code>. Replace the three existing SHEET_SYNC entries with the block below; do not duplicate them. Leave Supabase settings unchanged.</p>
-      {envSnippet ? <CopyBlock label="environment settings" value={envSnippet} sensitive rows={4} /> : <p className="notice">Enter a valid token and /exec URL above to generate the complete settings block. Your current workspace ID is inserted automatically.</p>}
+      {envSnippet ? <CopyBlock label="environment settings" value={envSnippet} sensitive rows={4} /> : <>
+        <p className="notice">Complete {gaps.join(" and ")} to unlock the copy-ready block. The three-line shape is shown below now, with the workspace ID already filled in.</p>
+        <CopyBlock label="environment settings template" value={sheetEnvironmentTemplate(endpoint, token, workspaceId)} sensitive={validSetupToken(token)} rows={4} />
+      </>}
       <p>An administrator must save these settings and restart this project’s local server. On Vercel, add them in project Environment Variables for the intended environment and redeploy. This page does not write server files or change Vercel settings.</p>
     </Panel>
     <Panel title="6. Test the saved connection and open your Sheet">

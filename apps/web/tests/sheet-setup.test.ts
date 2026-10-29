@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { extractSpreadsheetId, generateSetupToken, sheetEnvironmentSnippet, validSetupToken } from "@/lib/sheet-setup";
+import { extractSpreadsheetId, generateSetupToken, sheetEnvironmentSnippet, sheetEnvironmentTemplate, sheetSetupGaps, validSetupToken } from "@/lib/sheet-setup";
 import { SHEET_CONNECTOR_SOURCE } from "@/generated/sheet-connector";
 
 const id = "fixture_spreadsheet_id_123456789";
@@ -36,6 +36,32 @@ describe("internal Sheet setup helpers", () => {
   });
   it("requires an actual workspace UUID shape", () => {
     expect(sheetEnvironmentSnippet(endpoint, token, "not-a-workspace")).toBeNull();
+  });
+  it("names exactly which inputs are still missing", () => {
+    expect(sheetSetupGaps(endpoint, token)).toEqual([]);
+    expect(sheetSetupGaps("", token)).toEqual(["the connector Web app URL ending in /exec (step 4)"]);
+    expect(sheetSetupGaps(endpoint, "")).toEqual(["the 24–256 character SYNC_TOKEN value (step 3)"]);
+    expect(sheetSetupGaps("", "")).toHaveLength(2);
+    expect(sheetSetupGaps("https://attacker.test/macros/s/fixture/exec", "short")).toHaveLength(2);
+    expect(sheetSetupGaps(endpoint + "?token=hidden", token)).toEqual([]);
+  });
+  it("always renders the complete three-line block with visible placeholders", () => {
+    expect(sheetEnvironmentTemplate("", "", workspace)).toBe("SHEET_SYNC_URL=<paste the /exec Web app URL from step 4>\nSHEET_SYNC_TOKEN=<paste the SYNC_TOKEN value from step 3>\nSHEET_SYNC_ORGANIZATION_ID=" + workspace);
+    expect(sheetEnvironmentTemplate(endpoint, "", workspace)).toBe(`SHEET_SYNC_URL=${endpoint}\nSHEET_SYNC_TOKEN=<paste the SYNC_TOKEN value from step 3>\nSHEET_SYNC_ORGANIZATION_ID=${workspace}`);
+    expect(sheetEnvironmentTemplate(endpoint, token, workspace)).toBe(sheetEnvironmentSnippet(endpoint, token, workspace));
+  });
+  it("never embeds an invalid or injectable value in the template", () => {
+    for (const bad of ["short", "a".repeat(257), token + "\nOTHER=value", token + " "]) {
+      const block = sheetEnvironmentTemplate(endpoint, bad, workspace);
+      expect(block).not.toContain(bad);
+      expect(block.split("\n")).toHaveLength(3);
+    }
+    for (const bad of [endpoint + "?token=hidden", "https://attacker.test/macros/s/fixture/exec"]) {
+      const block = sheetEnvironmentTemplate(bad, token, workspace);
+      expect(block).not.toContain("attacker");
+      expect(block).not.toContain("hidden");
+      expect(block.split("\n")).toHaveLength(3);
+    }
   });
   it("bundles the exact canonical connector, not a separately maintained copy", async () => {
     const canonical = await readFile(new URL("../../../integrations/sheets/reporting-sync.gs", import.meta.url), "utf8");
