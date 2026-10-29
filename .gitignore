@@ -1,4 +1,4 @@
-# Secrets, local settings and customer data — this repository is public.
+# Secrets, local settings and customer data â€” this repository is public.
 .env
 .env.*
 !.env.example
@@ -68,3 +68,6 @@ Thumbs.db
 /rebuild*.py
 /remove_stray.py
 /rewrite_setup.py
+
+# Vercel project link metadata (local only)
+.vercel

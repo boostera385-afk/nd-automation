@@ -2,6 +2,31 @@
 
 ## Current milestone
 
+**Hosted Vercel deployment (2026-10-29):** the dashboard is deployed as a
+public HTTPS site at `https://nd-automation-dashboard.vercel.app` (Vercel
+project `jelly-bean2/nd-automation-dashboard`, root directory `apps/web`,
+region `iad1`). Production environment carries only the public browser
+configuration — `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_EXPECTED_PROJECT_REF` and
+`APP_URL`; the publishable key is the only Supabase key deployed and
+`publicConfig()` still refuses `sb_secret_*`, so no service-role credential is
+present in the deployment. Sheet-sync connector secrets were deliberately not
+added, so the hosted master-Sheet preview reports "not configured" until an
+explicit decision is made; the local desktop and Fudge flows are unchanged.
+Vercel Authentication (deployment protection) was enabled by default and was
+turned off for this project so the owner and staff can sign in; the app's own
+Supabase auth plus RLS remains the only access control. The first hosted build
+failed on `scripts/bundle-sheet-connector.mjs` because it resolved the Apps
+Script source three directories above `apps/web`, which escapes the Vercel
+build root; the script now falls back to the committed generated connector
+artifact when the monorepo source is outside the build root and still fails
+loudly when neither exists. Re-validated after the fix: typecheck PASS, lint
+PASS, 646 tests / 43 files PASS, production build PASS. Hosted email
+verification and password reset remain non-functional until the Supabase Auth
+Site URL / redirect allowlist includes this domain and a sender is chosen;
+`npm run dev` on `127.0.0.1:3000` remains the pristine local acceptance
+target.
+
 **Sheet writeback queue UI (2026-10-29):** new `/dashboard/settings/sheet-writeback`
 page (staff + verified email only, fails closed to an explicit notice when the
 bounded queue read cannot be verified). It shows the newest 25 intents of the
