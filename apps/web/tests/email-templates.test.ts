@@ -8,6 +8,15 @@ const linked = { "confirm-signup": "email", "reset-password": "recovery", "magic
 const all = [...Object.keys(linked), "reauthentication"];
 
 describe("Supabase email templates", () => {
+  it("explains shared credentials, separate extension sign-in and no automatic execution", () => {
+    const text = html("confirm-signup");
+    expect(text).toContain("Fudge + ND Automations");
+    expect(text).toContain("no second signup is needed");
+    expect(text).toContain("sign in separately");
+    expect(text).toContain("does not start collection, uploads or publishing");
+    expect(text).toContain("Do not share this link");
+    expect(html("reset-password")).toContain("both Fudge and the ND dashboard");
+  });
   it.each(Object.entries(linked))("%s links to the one-click confirm page with a token hash and type %s", (name, type) => {
     const text = html(name);
     expect(text).toContain(`href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=${type}"`);

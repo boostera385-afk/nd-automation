@@ -7,8 +7,8 @@ Six professional HTML emails (light and dark mode, Outlook/Gmail-safe tables, a 
 
 | File | Supabase template | Subject (see `subjects.json`) |
 |---|---|---|
-| `confirm-signup.html` | Confirm sign up | Confirm your email for ND Automations |
-| `reset-password.html` | Reset password | Reset your ND Automations password |
+| `confirm-signup.html` | Confirm sign up | Verify your Fudge + ND account |
+| `reset-password.html` | Reset password | Reset your Fudge + ND password |
 | `magic-link.html` | Magic link | Your ND Automations sign-in link |
 | `invite-user.html` | Invite user | You’re invited to ND Automations |
 | `change-email.html` | Change email address | Confirm your new email address |
@@ -20,12 +20,33 @@ Edit the wording in `apps/web/scripts/build-email-templates.mjs`, then regenerat
 
 1. **URL Configuration**
    - *Site URL*: your app address, e.g. `http://127.0.0.1:3100` for local use or your `https://` domain in production. The templates build their links from it (`{{ .SiteURL }}`).
-   - *Redirect URLs*: add `<your address>/**` (for example `http://127.0.0.1:3100/**`).
+   - Set dashboard `APP_URL` to the same canonical origin. Add only the exact needed
+     redirect URLs: `<your address>/auth/callback` and
+     `<your address>/auth/callback?next=/reset-password`. Keep local development
+     entries separate; do not use a production wildcard or a Chrome-extension URL.
 2. **Emails → Templates**: open each template, paste the matching HTML file, and set the subject from the table.
 3. **Sign In / Providers → Email**: keep **Confirm email** turned on.
 4. **Emails → SMTP Settings (recommended before real customers)**: Supabase's built-in sender is only for testing, is heavily rate-limited and often lands in spam. Connect a transactional provider (Resend, Postmark, Amazon SES, ...) and use a sender such as `no-reply@yourdomain.com` after setting up SPF, DKIM and DMARC for your domain.
 5. **Rate limits**: leave Supabase's defaults on. The app already shows a clear "wait a few minutes" message when they are hit.
 6. Optional on paid plans: turn on leaked-password protection.
+
+## Shared-project deployment status — 2026-10-29
+
+These files are prepared locally, **not applied to hosted Auth settings**. The
+connected database MCP cannot change Auth email templates, SMTP or Site URL; these
+are Auth service settings, not SQL migrations. Use the authenticated Supabase
+dashboard for project `xtefjnfdjnxwrpkoydaj`. Do not store SMTP passwords or management
+tokens in SQL, the extension, public docs or the repository. Keep confirmation
+enabled. A real public HTTPS dashboard origin and verified sending domain must be
+chosen before production setup; do not invent these or use localhost for customers.
+
+Both Fudge signup (which uses the project Site URL) and dashboard signup must be
+tested after applying the template. The `/auth/confirm` page requires a deliberate
+button click before consuming the token hash. Check delivery, valid/expired/used
+links, resend and password reset with authorized test addresses. Confirm that
+verification grants no other team's membership and starts no browser or upload job.
+Do not send verification emails to unrelated addresses as a test. Updating files
+or passing tests does not prove delivery or SPF/DKIM/DMARC configuration.
 
 ## Check it worked
 

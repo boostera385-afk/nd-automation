@@ -6,25 +6,25 @@ import { fileURLToPath } from "node:url";
 
 const outDir = fileURLToPath(new URL("../../../supabase/templates/", import.meta.url));
 
-const BRAND = "ND Automations";
+const BRAND = "Fudge + ND Automations";
 const confirmLink = (type) => `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=${type}`;
 
 const templates = {
   "confirm-signup": {
-    subject: "Confirm your email for ND Automations",
-    preheader: "One click to verify your address and open your private workspace.",
+    subject: "Verify your Fudge + ND account",
+    preheader: "Verify once. Use the same account in Fudge and the ND dashboard.",
     heading: "Confirm your email",
-    intro: "Welcome to ND Automations. Please confirm that <strong>{{ .Email }}</strong> is your address so we can open your private workspace.",
+    intro: "Welcome to Fudge + ND Automations. Please verify that <strong>{{ .Email }}</strong> is your address. Your verified email and password work in both apps; no second signup is needed.",
     button: "Confirm my email",
     href: confirmLink("email"),
-    note: "This link works once and expires after a short time. New accounts cannot see anyone else’s customer records.",
-    ignore: "If you didn’t create an account, you can safely ignore this email. No account will be activated.",
+    note: "This link is single-use and expires. The button opens a secure confirmation page. After confirming, return to Fudge and sign in separately. Verification does not start collection, uploads or publishing.",
+    ignore: "If you didn’t request this account, ignore this email. Do not share this link, your password or verification codes with anyone.",
   },
   "reset-password": {
-    subject: "Reset your ND Automations password",
-    preheader: "Use this link to choose a new password.",
+    subject: "Reset your Fudge + ND password",
+    preheader: "Choose a new password for your shared Fudge and ND account.",
     heading: "Reset your password",
-    intro: "We received a request to reset the password for <strong>{{ .Email }}</strong>. Press the button to choose a new one.",
+    intro: "We received a request to reset the password for <strong>{{ .Email }}</strong>. This changes the password used by both Fudge and the ND dashboard. Press the button to choose a new one.",
     button: "Choose a new password",
     href: confirmLink("recovery"),
     note: "For your security the link works once and expires soon. Your current password stays valid until you set a new one.",

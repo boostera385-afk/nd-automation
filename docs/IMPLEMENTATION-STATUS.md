@@ -2,6 +2,56 @@
 
 ## Current milestone
 
+**P3 read-only intake visibility (2026-10-29):** added staff/verified-email-gated
+`/dashboard/fudge`, linked from Settings. Uses the authenticated user's client,
+explicit business filters and existing RLS; reads exact HEAD counts and at most 51
+metadata-only revision rows, showing at most 50 with a truncation notice. Validates
+response schemas, business IDs, unique receipt IDs and counts; malformed/failed reads
+remain unavailable, never zero. No raw content, author IDs or remote media is loaded.
+Separate query times are not an atomic reconciliation snapshot; the UI explicitly
+cannot see local pending queues or prove full delivery. Fudge now displays up to 20
+saved target-specific acknowledgment IDs for manual comparison. This is a visibility
+slice, not automated reconciliation, review/approval or keyword configuration.
+No schema change, hosted write, Sheet write or browser operation performed.
+Validation: initial lint found unescaped JSX apostrophes; wording corrected. Full
+dashboard rerun: typecheck PASS, lint PASS, 548 tests / 33 files PASS, production
+build PASS. Live signed-in page/receipt comparison acceptance remains pending.
+Fudge validation in its repo: 51 backend tests and 127 smoke tests PASS.
+
+**Shared-account branded verification email preparation (2026-10-29):** updated
+the canonical email generator and regenerated all six self-contained templates
+with Fudge + ND branding. Verification explains shared credentials, separate
+extension sign-in and no automatic collection/upload/publishing. Password reset
+explains that both apps share the changed password. Existing scanner-resistant
+token-hash confirmation flow is preserved. Setup guidance now names exact callback
+allowlist entries and distinguishes hosted Auth settings from SQL migrations.
+No hosted template/Site URL/SMTP update or verification email was sent: the connected
+database MCP exposes no Auth-configuration write tool, and a public dashboard
+origin/verified sender are not established for this change. Local preparation is
+not live delivery acceptance. Validation after generation: typecheck PASS, lint
+PASS, **524 tests / 31 files PASS**, production build PASS. Next development target
+remains backend-managed service configuration and intake reconciliation, with intake
+release off pending the existing acceptance/policy/pilot gates.
+
+**Simplified shared email account UI (2026-10-29):** Signup explains that Fudge and
+the dashboard share the same email/password. The dashboard first-account screen
+replaces the workspace-name form with an explicit **Set up my private business
+account** action using the existing guarded `reporting_create_workspace` RPC and
+default `My business` name. Existing team users are directed to request access,
+not create duplicates. Organization isolation, existing memberships and RLS remain;
+no migration, live account creation, credential transfer or upload release occurred.
+Fudge now bundles only the matching public identity from this repo's ignored
+environment file and offers signup plus auto-selection of a single authorized
+business; multiple-business access remains advanced. Sessions are separate.
+Read-only hosted Auth settings confirm email signup enabled and confirmation
+required. Real email delivery/confirmation URLs and browser acceptance remain
+pending. Typecheck and lint PASS (rerun after the test change). The first combined
+command timed out during tests; the subsequent run passed the 521 existing tests
+but the new UI suite failed to import because it lacked a server-only Sheet-module
+mock. Added that mock; the corrected full rerun passed **523 tests / 31 files**
+and the production build PASS. Two new fixture UI tests added. These results do
+not establish live email/browser acceptance.
+
 **Authorized shared-database intake deployment (2026-10-28):** MCP target reverified
 as `xtefjnfdjnxwrpkoydaj`. Reviewed the six existing migrations, tables, grants and
 advisors. Promoted the intake draft to CLI-generated source
