@@ -154,6 +154,24 @@ ignored the `status` key (`{"status":"Ready"}`), so every idle profile looked
 busy; and the first identity draft accepted a wrong target URL because the title
 branch was not gated on the page address.
 
+**Comment capture is not possible without interaction.** The pilot post and four
+other tracked links were scanned at the profile's default window and at 1440×900
+emulation: no `.comment-list-container` ever contained text, no control
+mentioning "comment" was present, and at desktop width the list was not rendered
+at all. Comments require opening a post's detail view, which the contract forbids.
+So the comment selectors stay non-matching, `comments_total` stays `null` and
+`comments_complete` stays `false`; enabling capture is a separate, explicitly
+approved read-only expansion feature.
+
+**Reporting chain checked at the data layer** (the UI needs the operator's own
+session). `/dashboard/checks` reads `reporting_post_checks` and shows the single
+`alive` row. `/dashboard/reports` derives its cohort from `published_at`, so this
+post — imported without a date — is deliberately excluded from day cohorts and
+counted in `unknownDates` (1) with the existing coverage notice; it is not
+silently dropped and no date was invented. A proxy failure observed on an
+unrelated profile during probing (`ERR_SOCKS_CONNECTION_FAILED`) maps to
+`proxy_issue`, never to a dead-post outcome.
+
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
 side as a fully ready flow, keeping publishing/cohort SQL and live

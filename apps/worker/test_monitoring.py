@@ -76,6 +76,8 @@ class ContractTests(unittest.TestCase):
         value = navigation_failure(POST, "ERR_PROXY_CONNECTION_FAILED secret")
         self.assertEqual(value["outcome"], "proxy_issue")
         self.assertNotIn("secret", str(value))
+        self.assertEqual(navigation_failure(POST, "ERR_SOCKS_CONNECTION_FAILED")["outcome"], "proxy_issue")
+        self.assertEqual(navigation_failure(POST, "ERR_TUNNEL_CONNECTION_FAILED")["outcome"], "proxy_issue")
         self.assertEqual(navigation_failure(POST, "timeout")["outcome"], "network_error")
 
     def test_debug_endpoint_is_loopback_only(self):

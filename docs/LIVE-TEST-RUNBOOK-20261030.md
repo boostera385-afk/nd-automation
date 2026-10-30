@@ -118,6 +118,33 @@ Execution rejects empty or structurally invalid selectors. Do not invent
 selectors or copy page content into the repository. Re-derive these values before
 relying on a new Incogniton/Nextdoor build.
 
+### Why comment capture stays empty (verified 2026-10-30)
+
+The pilot post and four other tracked post links were scanned at both the
+profile's default window and at 1440×900 desktop emulation. In every case
+`.comment-list-container` contained **no text**, no `button`, `role="button"` or
+link containing the word "comment" was present, and at desktop width the list
+container was not rendered at all. Comments only appear after opening a post's
+detail view, which the read-only contract forbids (no click, no expansion).
+
+Consequences, by design:
+
+- the `comment`, `comment_body` and `comment_id_attribute` values stay
+  non-matching;
+- checks store `comments_total = null` and `comments_complete = false`;
+- enabling comment capture needs an explicit, separately approved read-only
+  expansion step, not an inferred selector.
+
+### Where an undated post appears
+
+Publications imported without a Sheet date are excluded from every dated cohort:
+`/dashboard/reports` counts them in **`unknownDates`** with the coverage notice
+"… post records have unknown publication dates and are excluded from day
+cohorts", and `/dashboard/yesterday` will not list them. Their checks are still
+visible on `/dashboard/checks` and in the post ledger. Never invent a date to
+make a post appear in a report — import the date from the source or accept the
+`unknownDates` accounting.
+
 ### 6. Create one work session and authorize monitoring
 
 1. In the dashboard press **Start work** (an 8–10 hour human session).
