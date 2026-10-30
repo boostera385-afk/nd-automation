@@ -77,8 +77,11 @@ worker call or profile launch.
 transitive runtime dependencies: Playwright 1.64.1, pyee 14.0.0, greenlet 3.5.6
 and typing-extensions 4.16.0. PyPI metadata was checked on 2026-10-29; Python
 >=3.12 is required by this set. Pins are reproducibility, not a vulnerability or
-live Incogniton compatibility certification. No package/browser was installed by
-the implementation. For the **later authorized setup**, use an isolated venv:
+live Incogniton compatibility certification. The runtime was installed on
+2026-10-30 in `apps/worker/.venv` (Python 3.13) with these exact pins; `pip check`
+is clean, `preflight.py` passes the dependency and Playwright-import checks, and
+the worker unit tests pass under it. That install does not prove browser
+compatibility. For a fresh authorized setup, use an isolated venv:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -86,6 +89,10 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe preflight.py
 ```
+
+If the PyPI CDN is unreachable, a mirror is acceptable **only** when the wheel
+hash is verified against the digest published by PyPI (`pypi.org/pypi/<name>/<version>/json`)
+before install; never install an unverified build.
 
 Do not run `playwright install` to substitute a new browser: this worker attaches
 only to its explicitly authorized Incogniton profile. Candidate pins must be
@@ -95,8 +102,9 @@ preflight accepts alternate explicit local paths without printing their contents
 The example's empty selectors deliberately fail, never invent a successful check.
 
 Date-cohort dashboard code now queues existing monitoring job types only; its
-new SQL is an undeployed draft. It never adds publisher/profile-mutation RPCs to
-the agent and never enables monitoring bindings itself.
+protocol is applied as hosted `20261030164030 check_cohort_v1`. It never adds
+publisher/profile-mutation RPCs to the agent and never enables monitoring
+bindings itself.
 
 This is an initial local-only readiness probe, not a connected automation worker.
 It does not register with Supabase, receive jobs, enumerate profiles, launch a

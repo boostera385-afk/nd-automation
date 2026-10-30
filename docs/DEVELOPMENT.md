@@ -170,6 +170,20 @@ It does not deploy, submit Auth forms, verify a signed-in flow, or prove that a
 dashboard page exists behind its authentication redirect. The local production
 build manifest and later authenticated acceptance are separate checks.
 
+For setup and live testing, run the offline configuration gate and the read-only
+connector gate separately:
+
+```powershell
+npm.cmd run check:readiness
+npm.cmd run check:sheet
+```
+
+`check:readiness` makes no network call. `check:sheet` sends the configured token
+to the connector for bounded reads, refuses to print row content, and also verifies
+that a wrong token is rejected. Neither check writes any Sheet cell or starts a
+worker. The ordered browser-test procedure is
+[`LIVE-TEST-RUNBOOK-20261030.md`](LIVE-TEST-RUNBOOK-20261030.md).
+
 ## Deploying the web app (approved releases only)
 
 The Vercel project `jelly-bean2/nd-automation-dashboard` has **no Root

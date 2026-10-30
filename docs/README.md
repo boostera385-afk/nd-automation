@@ -19,6 +19,8 @@ still require an administrator save/restart; no auto-credential persistence.
 
 [Protocol deployment — cohort and publish jobs](DB-DEPLOYMENT-20261030-COHORT.md) — hosted versions, additive guards, zero-row state and the still-gated adapters/delivery.
 
+[Live test runbook — 2026-10-30](LIVE-TEST-RUNBOOK-20261030.md) — verified setup, ordered operator steps for read-only monitoring, expected evidence and stop/rollback.
+
 [Implementation tracker](IMPLEMENTATION-TRACKER.md) — P0–P8 and individual F01–F36/N01–N08 acceptance backlog. [P0 discovery / P1 readiness](P0-DISCOVERY.md) — unresolved mappings, field ownership, secret-safe offline preflight and hosted inspection prerequisites.
 
 [Fudge + ND Master Automation Implementation Guide](MASTER-AUTOMATION-PLAN.md) — shared cross-repository master plan for collection through approved execution, profile operations, previous-100 monitoring, comments, Sheet writeback and controlled reposting. Includes phased gates, minimal-human operating model, security and recovery. Proposed implementation only; actual delivery remains in the implementation-status record.

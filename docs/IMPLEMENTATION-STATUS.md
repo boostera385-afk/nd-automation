@@ -39,6 +39,42 @@ they need an authenticated session, a paired worker and real tracked publication
 See `docs/DB-DEPLOYMENT-20261030-COHORT.md`; the drafts README and test path now
 point at the promoted migration.
 
+## Live-test setup (2026-10-30)
+
+Added a repeatable read-only connector gate,
+`apps/web/scripts/check-sheet-live.ts` (`npm.cmd run check:sheet`), and ran it
+against the configured connector. `Auto Posting` returned **69 rows** and
+`Auto Listing` **111 rows**, both with `truncated: false`, and a deliberately
+wrong token was refused as `unauthorized`. The gate prints counts and statuses
+only — never row content, the endpoint URL or the token — and writes no Sheet
+cell. `SHEET_SYNC_ORGANIZATION_ID` resolves to the **ND Test** workspace
+(`b59489ca-c7c3-4e1a-b2ae-ec9da429f415`), which has one membership, two
+customers, one worker, and still **0** profile bindings, publications and active
+work sessions.
+
+The worker runtime is now installed and verified locally: a Python 3.13 virtual
+environment at `apps/worker/.venv` holds the exact pins from
+`requirements-monitoring.txt` (Playwright 1.64.1, pyee 14.0.0, greenlet 3.5.6,
+typing-extensions 4.16.0), `pip check` reports no broken requirements,
+`preflight.py` passes python plus all four dependency checks and the Playwright
+sync-API import, and the 65 worker unit tests pass under that interpreter. The
+Playwright wheel was downloaded from a mirror and its SHA-256 verified against
+PyPI's published digest before install. The gitignored `.monitoring/` directory
+holds a copy of the empty adapter example. `preflight.py` still blocks the
+connection and adapter checks, and `worker.py health` still reports Incogniton
+`unavailable` (the desk app is not installed on this machine — no install path,
+process, uninstall entry or listener on `127.0.0.1:35000`), so no profile can be
+opened. No worker credential exists in plaintext to recover; a new registration
+is required.
+
+`docs/LIVE-TEST-RUNBOOK-20261030.md` records this verified state and the ordered
+operator procedure: runtime check, profile-inventory import, worker registration
+and pairing, explicit per-profile bindings, adapter validation from an authorized
+DOM inspection, one human work session, a foreground agent run, then the first
+bounded 500-publication cohort. It also lists the evidence to collect and the
+stop/rollback steps. Nothing in the runbook enables Fudge uploads, publishing,
+profile mutation or Sheet writeback delivery.
+
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
 side as a fully ready flow, keeping publishing/cohort SQL and live
@@ -1131,6 +1167,25 @@ The user has requested full desktop-to-dashboard parity and authorized updating 
 | GitHub Actions CI | PASSING on GitHub (run #1, 2026-10-27) | Clean Linux install from the lockfile on Node 24, then typecheck, lint, tests, production build and `npm audit --omit=dev`: all steps succeeded on commit `233eeb8` |
 
 ## Validation log
+
+Live-test setup (2026-10-30): added the read-only connector gate
+`scripts/check-sheet-live.ts` (`npm run check:sheet`) and ran it against the
+configured live connector. `Auto Posting` returned **69 rows**, `Auto Listing`
+**111 rows**, both `truncated: false`, and a deliberately wrong token was refused
+as `unauthorized`. The gate prints counts/statuses only and never row content,
+the endpoint or the token. Added `docs/LIVE-TEST-RUNBOOK-20261030.md` and
+documented which adapter selectors are proven by the shipped desktop flows
+(`[data-testid="post-body"]`, `[data-testid="signin_button"]`) versus which have
+no implementation at all (comments, removal, verification, unavailable notices),
+so nothing is invented. Re-ran the full web gates on the final tree: typecheck
+PASS, lint PASS (**0 warnings**), **805 tests / 57 files** PASS, production build
+PASS. Worker unit tests: **65 PASS** on both the system interpreter and the
+prepared `apps/worker/.venv`. In that environment `pip check` reports no broken
+requirements and `preflight.py` passes python, all four pinned dependencies and
+the Playwright sync-API import; the connection/adapter checks stay blocked until
+a real pairing exists. The Playwright wheel's SHA-256 was verified against PyPI
+before install. No Sheet cell was written, no profile was opened, no worker was
+paired, no session was started and no migration was applied in this tranche.
 
 Project-handover guard (2026-10-28): 17 new configuration tests cover expected
 host pinning, old-project rejection, management/secret/placeholder key rejection,

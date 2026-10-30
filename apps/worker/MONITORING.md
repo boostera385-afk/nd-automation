@@ -55,6 +55,30 @@ it makes no network calls, does not import Playwright and does not open profiles
 5. Start Incogniton, then run an authorized small pilot using the command below.
    Neither this documentation nor the example config confirms live DOM signals.
 
+### Selector candidates from the existing desktop automation
+
+These strings already exist in the shipped `core/automation` flows. They are a
+**starting point for live inspection, not a validated adapter**. Confirm each one
+on an authorized post page before writing it into `.monitoring/adapter.json`;
+several are feed-item or share-dialog selectors and may not match the individual
+post page at all.
+
+| Adapter field | Candidate in existing code | Caveat |
+| --- | --- | --- |
+| `post_body` | `[data-testid="post-body"]` (fallback `span.Linkify`) | Used on an expanded post in `auto_poster.py`; confirm it identifies one body. |
+| `post_root` | `.js-media-post`, `.post`, `#expanded-post-wrapper` | Feed-item and expanded-modal roots; a standalone permalink page may use neither. |
+| `login` | `[data-testid="signin_button"]` | Proven sign-in prompt selector. |
+| `verification` | — | No existing selector; must be authored from the real challenge UI. |
+| `removed` | — | No existing selector; deletion notices were never parsed by the desktop tool. |
+| `unavailable` | — | No existing selector. |
+| `post_link` | no page element | The desktop tool copies the permalink from the share dialog (`share_app_button_COPY_LINK`), so no visible-link selector is proven. |
+| `comment`, `comment_id_attribute`, `comment_body` | — | The desktop automation never reads comments; no selector or stable-ID attribute exists anywhere in the repository. |
+
+Because comments and every negative signal have no existing implementation, the
+adapter cannot be derived from the codebase. Guessing them would produce a
+configuration that passes structure checks while silently mis-reporting posts, so
+they stay empty until inspected.
+
 ```powershell
 python monitor.py --manifest .monitoring/manifest.json --adapter .monitoring/adapter.json --execute --confirm-authorized --output .monitoring/results.jsonl
 ```

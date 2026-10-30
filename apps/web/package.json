@@ -8,6 +8,7 @@
     "predev": "npm run bundle:connector",
     "prebuild": "npm run bundle:connector",
     "check:readiness": "node --experimental-strip-types scripts/check-readiness.ts",
+    "check:sheet": "node --experimental-strip-types scripts/check-sheet-live.ts",
     "check:deployment": "node --experimental-strip-types scripts/check-deployment.ts",
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build --webpack",
