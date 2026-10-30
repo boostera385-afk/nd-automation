@@ -294,6 +294,19 @@ use, Auth form submission and authenticated acceptance remain unverified
 must never be staged); `apps/web/.vercel` was removed after deployment — see
 `docs/DEVELOPMENT.md` for the relink/redeploy procedure.
 
+**Manual production refresh (2026-10-30, later):** fixed the `reporting` GitHub
+check, which had failed on a Windows/Linux CRLF mismatch in the generated Sheet
+connector. The bundler now normalizes to LF and `.gitattributes` forces `*.gs`
+to LF; CI passed on `7f86e3e` (814 tests). Redeployed the reviewed tree from
+`apps/web` as `dpl_5VaMzwcSAubgdR8TsEcYHBKBpqz4`, aliased to
+https://nd-automation-dashboard.vercel.app. `check:deployment` passes on all
+anonymous routes (`/login` 200; `/workspaces`, `/verify-email`, `/dashboard`,
+`/dashboard/run/cohorts` 307 to `/login`), and the new
+`/dashboard/settings/guide` route returns the same auth redirect instead of
+404. Signed-in acceptance remains unverified. The project still has **no Git
+connection**: pushing to `main` does not deploy; production changes require the
+manual CLI procedure above.
+
 Remaining ND gaps unchanged: publishing/cohort protocol deployment (excluded
 from all approvals), mapped Sheet delivery, supervised worker runtime, live
 Auth acceptance and F01–F36 desktop parity. User directed Fudge as the next
