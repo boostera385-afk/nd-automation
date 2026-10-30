@@ -56,28 +56,52 @@ def validate_completion(value):
 
 
 def validate_result(value):
-    if not isinstance(value, dict) or set(value) != {"outcome", "reason", "observed_at", "adapter_sha256", "comments"}:
+    keys = {"outcome", "reason", "observed_at", "adapter_sha256", "comments",
+            "comments_total", "comments_complete"}
+    if not isinstance(value, dict) or set(value) != keys:
         raise ValueError("Unexpected monitoring result contract")
     if value["outcome"] not in OUTCOMES or not isinstance(value["reason"], str) or not 1 <= len(value["reason"].strip()) <= 2000:
         raise ValueError("Invalid monitoring outcome or reason")
     timestamp(value["observed_at"])
     if not isinstance(value["adapter_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", value["adapter_sha256"]):
         raise ValueError("Invalid monitoring adapter fingerprint")
+    total = value["comments_total"]
+    if total is not None and (not isinstance(total, int) or isinstance(total, bool) or not 0 <= total <= 10_000_000):
+        raise ValueError("Invalid comment total")
+    if not isinstance(value["comments_complete"], bool):
+        raise ValueError("Invalid comment completion flag")
     comments = value["comments"]
     if not isinstance(comments, list) or len(comments) > 200 or (value["outcome"] != "alive" and comments):
         raise ValueError("Invalid monitoring comments")
+    if value["comments_complete"] and (total is None or len(comments) != total):
+        raise ValueError("A complete collection must match the reported total")
     for comment in comments:
-        if not isinstance(comment, dict) or set(comment) != {"external_id", "body"}:
+        if not isinstance(comment, dict) or set(comment) != {"external_id", "body", "author"}:
             raise ValueError("Invalid monitoring comment fields")
-        for key, limit in (("external_id", 200), ("body", 5000)):
-            if not isinstance(comment[key], str) or not 1 <= len(comment[key].strip()) <= limit or "\0" in comment[key]:
+        for key, limit in (("external_id", 200), ("body", 5000), ("author", 200)):
+            text = comment[key]
+            if text is None and key == "author":
+                continue
+            if not isinstance(text, str) or not 1 <= len(text.strip()) <= limit or "\0" in text:
                 raise ValueError("Invalid monitoring comment bounds")
     return value
 
 
 def completion_payload(value, fingerprint):
-    comments = [{"external_id": item["external_id"], "body": item["body"]} for item in value["comments"]
-                if isinstance(item, dict) and isinstance(item.get("external_id"), str) and isinstance(item.get("body"), str)
-                and 1 <= len(item["external_id"].strip()) <= 200 and 1 <= len(item["body"].strip()) <= 5000]
+    comments = []
+    for item in value["comments"]:
+        if not isinstance(item, dict) or not isinstance(item.get("external_id"), str) or not isinstance(item.get("body"), str):
+            continue
+        if not 1 <= len(item["external_id"].strip()) <= 200 or not 1 <= len(item["body"].strip()) <= 5000:
+            continue
+        author = item.get("author")
+        if not isinstance(author, str) or not author.strip() or len(author) > 200:
+            author = None
+        comments.append({"external_id": item["external_id"], "body": item["body"], "author": author})
+    total = value.get("comments_total")
+    if not isinstance(total, int) or isinstance(total, bool) or not 0 <= total <= 10_000_000:
+        total = None
+    complete = bool(value.get("comments_complete")) and total is not None and len(comments) == total
     return validate_result({"outcome": value["outcome"], "reason": value["reason"], "observed_at": value["observed_at"],
-                            "adapter_sha256": fingerprint, "comments": comments})
+                            "adapter_sha256": fingerprint, "comments": comments,
+                            "comments_total": total, "comments_complete": complete})

@@ -95,63 +95,102 @@ on tracked publications. Unknown or ambiguous mappings stay unbound.
 ### 5. Validate the monitoring adapter
 
 Fill `.monitoring/adapter.json` only from an authorized DOM inspection of a real
-post page opened with the pilot profile. The values verified on 2026-10-30 are:
+post page opened with the pilot profile. **Adapter version is 2**: the fields
+below are required, and `comment_id_selector`, `comment_id_prefix`,
+`comment_author`, `comment_expand` and `comment_total` are optional — an empty
+string means "this layout does not offer it". Values verified on 2026-10-30:
 
 | Field | Verified value | Evidence |
 | --- | --- | --- |
 | `post_root` | `[data-testid="feed-item-card"]` | 11 cards on the post page, 5 with a body |
 | `post_body` | `[data-testid="post-body"]` | 5 visible bodies |
 | `post_link` | `a[href*="/p/"]` | never matches the post itself (see identity note) |
+| `comment` | `.js-media-comment` | one item per comment, stable across expansion |
+| `comment_id_selector` | `[data-testid^="dwell-tracker"]` | per-item holder of the platform id |
+| `comment_id_attribute` | `data-testid` | e.g. `dwell-tracker-feedItem:1735634352` |
+| `comment_id_prefix` | `dwell-tracker-feedItem:` | stripped to the numeric id |
+| `comment_body` | `[data-testid="comment-detail-body"]` | 22/22 non-empty bodies |
+| `comment_author` | `[data-testid="comment-detail"] a[href*="/profile/"]` | 22/22 authors |
+| `comment_expand` | `[data-testid="seeMoreButton"]` | "See previous comments"; gone at 22/22 |
+| `comment_total` | `[data-testid="post-reply-button"]` | the post's own count (scoped to the root) |
 | `login` | `[data-testid="email-address-input"]` | absent/not visible while signed in |
 
-`comment`, `comment_id_attribute`, `comment_body`, `removed`, `verification` and
-`unavailable` are **deliberately non-matching placeholders**. The current build
-exposes no per-comment identity attribute, and the `comment-avatar-container`
-inside a post card belongs to the comment *composer*, not to a comment, so
-guessing would misattribute text. Consequences, by design:
+`removed`, `verification` and `unavailable` remain deliberately non-matching
+placeholders: removal, verification and unavailable notices are never
+auto-confirmed, and an unrecognized layout yields `needs_review`.
 
-- comment capture stays empty and is stored as `comments_complete = false`;
-- removal, verification and unavailable notices are never auto-confirmed — an
-  unrecognized layout yields `needs_review`.
+**Two independent gates protect comment expansion.** A read-only "show more
+comments" click happens only when the adapter configures `comment_expand` **and**
+the operator passes `--allow-comment-expansion` (on `agent.py` or `monitor.py`).
+Without both, the thread is read exactly as rendered and stored as incomplete.
+
+`comments_total` is read from the post's own reply control inside the identified
+root. `comments_complete` becomes true only when the total was read, the number
+of collected items equals it, the adapter can expand at all, and no expand
+control remained — so a collapsed thread can never look complete.
 
 Execution rejects empty or structurally invalid selectors. Do not invent
 selectors or copy page content into the repository. Re-derive these values before
 relying on a new Incogniton/Nextdoor build.
 
-### Why comment capture stays empty (verified 2026-10-30)
+### How comment capture works (verified 2026-10-30)
 
-The pilot post and four other tracked post links were scanned at the profile's
-default window and at 1440×900 desktop emulation. In every case the target
-post's own `.comment-list-container` contained **no text**, and no `button`,
-`role="button"` or link containing the word "comment" was present. At desktop
-width the list container was not rendered at all.
+A hard page load mounts an **empty** `[aria-label="Comment list"]`; waiting and
+scrolling do not populate it. Activating the post's own comment control
+(`[data-testid="post-reply-button"]`, `aria-label="Comment"`) opens the thread as a
+reader would: one item plus a "See previous comments" control
+(`[data-testid="seeMoreButton"]`). Each press of that control loads the next page
+of the thread; when it disappears and the item count equals the post's own count,
+collection is complete.
 
-**The pilot post itself has no comments to collect.** A later scan scoped
-strictly to the target card found `own_chars = 0` both before and after a
-programmatic click on `post-body` (the click opens the detail view without
-mutating anything). The list that grew to 117–118 characters during that run
-belonged to a **neighbouring feed card**, not to the pilot post — an earlier note
-misattributed it, and that attribution is withdrawn here.
+On a real 22-comment post this produced 22 items, 22 unique numeric ids, 22
+authors and 22 bodies, with `comments_total = 22` and `comments_complete = true`.
+Nothing is typed, submitted, liked or shared; the composer that gains focus is
+never written to, and the profile is closed when the batch ends.
 
-Two things therefore remain true and must not be conflated:
+Both interactions are gated: the adapter must configure `comment_expand` **and**
+the operator must pass `--allow-comment-expansion`. Without both, the page is read
+exactly as rendered and the result is stored as partial.
 
-- zero rendered comment characters is **not** proof of zero comments. The card
-  shows a comment composer avatar, so a rendered "no text" list says nothing
-  about the real comment count. `comments_total` stays `null`.
-- enabling capture still needs an explicit, separately approved expansion step
-  **and** a post that actually has comments, so a selector can be validated
-  against real items before it ships.
+`comments_complete` is true only when the total was read, the item count equals
+it, the adapter can expand at all, and no expand control remained. A rendered
+empty list is never treated as zero comments, and `comments_total` stays `null`
+when the count cannot be read.
 
-Consequences, by design:
+The dashboard already renders stored comment detail (author, body, first-observed
+time, platform creation time when known) on `/dashboard/comments`,
+`/dashboard/posts/<id>` and `/dashboard/results?view=comments`; the post ledger
+shows the per-post count.
 
-- the `comment`, `comment_body` and `comment_id_attribute` values stay
-  non-matching;
-- checks store `comments_total = null` and `comments_complete = false`;
-- the dashboard already renders stored comment detail (author, body,
-  first-observed time, platform creation time when known) on
-  `/dashboard/comments`, `/dashboard/posts/<id>` and
-  `/dashboard/results?view=comments`. It is empty because no comment has been
-  recorded — not because the view is missing.
+### STOP: the pilot account is suspended (2026-10-30)
+
+Do not run further live checks with profile `6d98db87` / account
+`Thomas Gutierrez` until a person resolves it. Every navigation now lands on
+`https://nextdoor.com/account_disabled/`, which reads:
+
+> Your account has been indefinitely suspended by Nextdoor for breaking community
+> guidelines.
+
+This is a platform action on the account — not a proxy failure, a selector drift or
+a post removal. The worker now recognises that address and records `needs_review`
+with "Nextdoor redirected to its Account Disabled page; a person must review the
+account." It stores no comments and makes no claim about the post.
+
+Most recent stored state for the pilot post: 21 of 22 comments (real authors),
+observation `comments_total = 22`, `comments_complete = false`, notification
+"partial". That is the true state, not a bug to retry away.
+
+To continue, one of these is required — each is an operator decision:
+
+1. Appeal or resolve the suspension with Nextdoor, then re-check the account in a
+   normal browser before rebinding it;
+2. bind an authorized replacement account/profile to the publication and re-run
+   one check with `--allow-comment-expansion`;
+3. leave monitoring paused and treat the 21 stored comments as the pilot's final
+   evidence.
+
+Never attempt to evade a suspension (new account, different proxy, altered
+fingerprint) — that is outside this system's authorized scope.
 
 ### Transient failures and the 24-hour window
 
@@ -202,8 +241,12 @@ make a post appear in a report — import the date from the source or accept the
 
 ```powershell
 .\.venv\Scripts\python.exe agent.py --connection .monitoring/worker.json --adapter .monitoring/adapter.json
-.\.venv\Scripts\python.exe agent.py --connection .monitoring/worker.json --adapter .monitoring/adapter.json --execute --confirm-authorized --once
+.\.venv\Scripts\python.exe agent.py --connection .monitoring/worker.json --adapter .monitoring/adapter.json --execute --confirm-authorized --once --allow-comment-expansion
 ```
+
+`--allow-comment-expansion` is optional and only meaningful when the adapter
+configures `comment_expand`; without it the agent reads the thread exactly as
+rendered and records the collection as partial.
 
 Run the first poll with `--once` and watch it; drop `--once` only after that poll
 returns `completed` or `idle`. The agent must claim only jobs for its bound

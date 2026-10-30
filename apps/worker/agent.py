@@ -88,7 +88,7 @@ def recover_result(bridge, journal):
     return "recovered" if saved["state"] == "result_ready" else "settled"
 
 
-def poll_once(bridge, adapter, api, chromium, journal):
+def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False):
     recover_result(bridge, journal)  # Never claim another job while a result is unresolved.
     bridge.rpc("reporting_worker_heartbeat")
     job = bridge.rpc("reporting_claim_check")
@@ -104,7 +104,8 @@ def poll_once(bridge, adapter, api, chromium, journal):
         results.append(value)
     try:
         budget = min(480, remaining_lease(job) - COMPLETION_RESERVE_SECONDS)
-        run_batch([post], adapter, api, chromium, emit, time.monotonic() + budget)
+        run_batch([post], adapter, api, chromium, emit, time.monotonic() + budget,
+                  allow_expansion=allow_expansion)
     except Exception as error:
         failure = error
     if len(results) != 1:
@@ -126,6 +127,8 @@ def main():
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm-authorized", action="store_true")
     parser.add_argument("--once", action="store_true", help="Poll at most one job, then exit")
+    parser.add_argument("--allow-comment-expansion", action="store_true",
+                        help="Permit the read-only 'show more comments' clicks the adapter names")
     parser.add_argument("--recover-results", action="store_true", help="Replay a saved result only; never import Playwright or touch a profile")
     parser.add_argument("--confirm-profile-cleanup", metavar="JOB_UUID", help="Attest operator-inspected cleanup for one already-acknowledged job; no dispatch")
     parser.add_argument("--confirm-lease-reconciled", metavar="JOB_UUID", help="Attest the exact claim-without-result lease was reconciled in the dashboard and its profile inspected; no dispatch")
@@ -169,7 +172,8 @@ def main():
         with sync_playwright() as playwright:
             deadline = time.monotonic() + 8 * 3600
             while time.monotonic() < deadline:
-                status = poll_once(bridge, adapter, Incogniton(), playwright.chromium, journal)
+                status = poll_once(bridge, adapter, Incogniton(), playwright.chromium, journal,
+                                   args.allow_comment_expansion)
                 print(json.dumps({"state": status}), flush=True)
                 if args.once:
                     break

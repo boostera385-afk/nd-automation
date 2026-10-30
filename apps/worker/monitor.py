@@ -43,17 +43,77 @@ SNAPSHOT_JS = """({adapter, target, title}) => {
     return linked || (onTarget && matchesTitle(norm(bodies.map(body => body.innerText).join(' '))));
   });
   const root = roots.length === 1 ? roots[0] : null;
+  // Comment identity, author and total are read only inside the identified post root.
+  const commentId = el => {
+    const holder = adapter.comment_id_selector
+      ? (el.matches(adapter.comment_id_selector) ? el : el.querySelector(adapter.comment_id_selector))
+      : el;
+    let value = holder ? holder.getAttribute(adapter.comment_id_attribute) : null;
+    if (value && adapter.comment_id_prefix && value.indexOf(adapter.comment_id_prefix) === 0) {
+      value = value.slice(adapter.comment_id_prefix.length);
+    }
+    return value;
+  };
+  let total = null;
+  if (root && adapter.comment_total) {
+    const label = root.querySelector(adapter.comment_total);
+    const digits = label ? (label.innerText || '').match(/\\d[\\d,]*/) : null;
+    if (digits) total = parseInt(digits[0].replace(/,/g, ''), 10);
+  }
   return {url: location.href, exact_post: !!root,
     login: has(adapter.login), verification: has(adapter.verification),
     removed: has(adapter.removed), unavailable: has(adapter.unavailable),
+    comments_total: Number.isInteger(total) ? total : null,
+    comments_expandable: !!adapter.comment_expand,
+    comments_expand_left: root && adapter.comment_expand
+      ? [...root.querySelectorAll(adapter.comment_expand)].filter(visible).length : 0,
     comments: root ? [...root.querySelectorAll(adapter.comment)].filter(visible).slice(0, 200).map(el => ({
-      external_id: el.getAttribute(adapter.comment_id_attribute),
-      body: el.querySelector(adapter.comment_body)?.innerText || ''
+      external_id: commentId(el),
+      body: el.querySelector(adapter.comment_body)?.innerText || '',
+      author: adapter.comment_author ? (el.querySelector(adapter.comment_author)?.innerText || '') : ''
     })) : []};
 }"""
 
+# One read-only expansion per call: it presses the thread's own "show more" control.
+# Disabled unless the adapter names the control AND the operator passes --allow-comment-expansion.
+EXPAND_JS = """({adapter}) => {
+  const visible = el => el && !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+  const root = [...document.querySelectorAll(adapter.post_root)].filter(visible)[0];
+  if (!root || !adapter.comment_expand) return false;
+  const control = [...root.querySelectorAll(adapter.comment_expand)].filter(visible)[0];
+  if (!control) return false;
+  try { control.scrollIntoView({ block: 'center' }); } catch (e) {}
+  control.click();
+  return true;
+}"""
 
-def check_page(page, post, adapter):
+# A hard page load mounts an empty "Comment list". Activating the post's own comment
+# control opens the thread the way a reader does. Nothing is typed or submitted; the
+# composer that gains focus is never written to.
+MOUNT_JS = """({adapter}) => {
+  const visible = el => el && !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+  const root = [...document.querySelectorAll(adapter.post_root)].filter(visible)[0];
+  if (!root || !adapter.comment_total) return false;
+  if (root.querySelector(adapter.comment)) return false;
+  const control = [...root.querySelectorAll(adapter.comment_total)].filter(visible)[0];
+  if (!control) return false;
+  try { control.scrollIntoView({ block: 'center' }); } catch (e) {}
+  control.click();
+  return true;
+}
+"""
+
+MOUNT_WAIT_MS = 12000
+MOUNT_POLL_MS = 1500
+THREAD_SETTLE_MS = 1800
+MAX_EXPANSION_ROUNDS = 12
+EXPANSION_SETTLE_MS = 2600
+# The next "show more" control can re-render a few seconds after a batch lands, so a
+# missing control is only conclusive after several spaced observations.
+EXPANSION_MISS_LIMIT = 4
+
+
+def check_page(page, post, adapter, allow_expansion=False):
     try:
         response = page.goto(post["url"], wait_until="domcontentloaded", timeout=45000)
         if response and response.status >= 500:
@@ -64,13 +124,58 @@ def check_page(page, post, adapter):
         expect = {"adapter": adapter, "target": post["url"], "title": post.get("title", "")}
         try:
             page.wait_for_function(
-                "args => { const s = (" + SNAPSHOT_JS + ")(args); return s.exact_post || s.login || s.verification || s.removed || s.unavailable; }",
+                "args => { const s = (" + SNAPSHOT_JS + ")(args); return s.exact_post || s.login || s.verification || s.removed || s.unavailable || /account_disabled/.test(location.pathname); }",
                 arg=expect, timeout=15000)
         except Exception:
             # Still inspect the final page conservatively; an unknown layout is not a network failure.
             pass
-        # Read only DOM state: no click, fill, engagement, expansion or API scraping.
+        # Read-only DOM state. The only interaction is the optional, explicitly enabled
+        # expansion of the post's own comment thread; no like, reply, share or form input.
         snapshot = page.evaluate(SNAPSHOT_JS, expect)
+        if (allow_expansion and adapter.get("comment_expand") and snapshot.get("exact_post")
+                and not (snapshot.get("login") or snapshot.get("verification")
+                         or snapshot.get("removed") or snapshot.get("unavailable"))):
+            # A freshly loaded page mounts an empty thread that rendering alone never fills.
+            # Open it once (twice at most) and wait for items; each press is a read-only
+            # activation of the post's own comment control, never a typed reply.
+            if not snapshot.get("comments") and (snapshot.get("comments_total") or 0) > 0:
+                for _ in range(2):
+                    if not page.evaluate(MOUNT_JS, {"adapter": adapter}):
+                        break
+                    waited = 0
+                    while waited < MOUNT_WAIT_MS:
+                        page.wait_for_timeout(MOUNT_POLL_MS)
+                        waited += MOUNT_POLL_MS
+                        snapshot = page.evaluate(SNAPSHOT_JS, expect)
+                        if snapshot.get("comments"):
+                            break
+                    if snapshot.get("comments"):
+                        break
+            # The thread renders its own expand control a moment after its first items.
+            page.wait_for_timeout(THREAD_SETTLE_MS)
+            snapshot = page.evaluate(SNAPSHOT_JS, expect)
+            stagnant = 0
+            misses = 0
+            previous = len(snapshot.get("comments") or [])
+            for _ in range(MAX_EXPANSION_ROUNDS):
+                if not page.evaluate(EXPAND_JS, {"adapter": adapter}):
+                    misses += 1
+                    if misses >= EXPANSION_MISS_LIMIT:
+                        break
+                    page.wait_for_timeout(EXPANSION_SETTLE_MS // 2)
+                    snapshot = page.evaluate(SNAPSHOT_JS, expect)
+                    continue
+                misses = 0
+                page.wait_for_timeout(EXPANSION_SETTLE_MS)
+                snapshot = page.evaluate(SNAPSHOT_JS, expect)
+                count = len(snapshot.get("comments") or [])
+                total = snapshot.get("comments_total")
+                if total is not None and count >= total and not snapshot.get("comments_expand_left"):
+                    break
+                stagnant = stagnant + 1 if count <= previous else 0
+                previous = max(previous, count)
+                if stagnant >= 3:
+                    break
         if response and response.status >= 400 and not snapshot.get("login") and not snapshot.get("verification"):
             return result(post, "needs_review", "The post returned an HTTP access error; removal is not established.")
         return classify_snapshot(post, snapshot)
@@ -78,7 +183,7 @@ def check_page(page, post, adapter):
         return result(post, "needs_review", "The configured page adapter could not interpret this page.")
 
 
-def run_batch(posts, adapter, api, chromium, emit, deadline):
+def run_batch(posts, adapter, api, chromium, emit, deadline, allow_expansion=False):
     groups = defaultdict(list)
     for post in posts:
         groups[post["profile_id"]].append(post)
@@ -115,7 +220,7 @@ def run_batch(posts, adapter, api, chromium, emit, deadline):
                 if time.monotonic() >= deadline:
                     emit(result(post, "needs_review", "Batch time limit reached before this post was checked."))
                 else:
-                    emit(check_page(page, post, adapter))
+                    emit(check_page(page, post, adapter, allow_expansion))
         finally:
             if page is not None:
                 try:
@@ -146,6 +251,8 @@ def main():
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm-authorized", action="store_true")
     parser.add_argument("--output", help="New local JSONL results file (never overwritten)")
+    parser.add_argument("--allow-comment-expansion", action="store_true",
+                        help="Permit the read-only 'show more comments' clicks the adapter names")
     args = parser.parse_args()
     posts = validate_manifest(load_json(args.manifest))
     if not args.execute:
@@ -166,7 +273,8 @@ def main():
             output.write(json.dumps(item, ensure_ascii=False) + "\n")
             output.flush()
         with sync_playwright() as playwright:
-            run_batch(posts, adapter, Incogniton(), playwright.chromium, emit, time.monotonic() + 3600)
+            run_batch(posts, adapter, Incogniton(), playwright.chromium, emit,
+                      time.monotonic() + 3600, args.allow_comment_expansion)
 
 
 if __name__ == "__main__":

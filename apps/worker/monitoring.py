@@ -62,24 +62,44 @@ def validate_manifest(payload):
     return validated
 
 
+ADAPTER_REQUIRED = {"version", "post_root", "post_link", "post_body", "comment",
+                    "comment_id_attribute", "comment_body", "login", "verification", "removed", "unavailable"}
+# Empty means "this build does not offer it". A comment ID selector/prefix and the author and
+# count lookups are genuinely absent on some layouts; expansion stays off unless configured.
+ADAPTER_OPTIONAL = {"comment_id_selector", "comment_id_prefix", "comment_author",
+                    "comment_expand", "comment_total"}
+
+
 def validate_adapter(value):
-    fields = {"version", "post_root", "post_link", "post_body", "comment", "comment_id_attribute",
-              "comment_body", "login", "verification", "removed", "unavailable"}
-    if not isinstance(value, dict) or set(value) != fields or value["version"] != 1:
+    fields = ADAPTER_REQUIRED | ADAPTER_OPTIONAL
+    if not isinstance(value, dict) or set(value) != fields or value["version"] != 2:
         raise ValueError("Unsupported monitoring adapter")
-    for name in fields - {"version"}:
+    for name in ADAPTER_REQUIRED - {"version"}:
         if not isinstance(value[name], str) or not value[name].strip() or len(value[name]) > 500:
             raise ValueError("Every adapter selector/attribute must be explicitly configured")
+    for name in ADAPTER_OPTIONAL:
+        if not isinstance(value[name], str) or len(value[name]) > 500:
+            raise ValueError("Optional adapter selectors must be text when present")
     if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]*", value["comment_id_attribute"]):
         raise ValueError("Invalid comment ID attribute")
     return value
 
 
-def result(post, outcome, reason, comments=None):
+def result(post, outcome, reason, comments=None, comments_total=None, comments_complete=False):
     return {"publication_id": post["publication_id"], "profile_id": post["profile_id"],
             "url": post["url"], "outcome": outcome, "reason": reason,
             "observed_at": datetime.now(timezone.utc).isoformat(), "source": "auto_check",
-            "comments": comments or [], "comments_total": None, "comments_complete": False}
+            "comments": comments or [], "comments_total": comments_total,
+            "comments_complete": comments_complete}
+
+
+def is_account_disabled(url):
+    """True only for Nextdoor's own terminal Account Disabled address."""
+    try:
+        path = urlsplit(url).path.rstrip("/").lower()
+    except (TypeError, ValueError):
+        return False
+    return path == "/account_disabled"
 
 
 def classify_snapshot(post, snapshot):
@@ -88,6 +108,9 @@ def classify_snapshot(post, snapshot):
         return result(post, "verification_required", "A visible verification prompt needs a person.")
     if snapshot.get("login"):
         return result(post, "login_required", "A visible sign-in prompt prevented checking.")
+    if is_account_disabled(snapshot.get("url")):
+        return result(post, "needs_review",
+                      "Nextdoor redirected to its Account Disabled page; a person must review the account.")
     try:
         same_url = canonical_post_url(snapshot.get("url")) == post["url"]
     except (ValueError, TypeError):
@@ -106,6 +129,7 @@ def classify_snapshot(post, snapshot):
     for comment in snapshot.get("comments", [])[:200]:
         external_id = comment.get("external_id")
         body = comment.get("body")
+        author = comment.get("author")
         if not isinstance(external_id, str) or not external_id.strip() or len(external_id) > 300:
             continue
         if not isinstance(body, str) or not body.strip() or len(body) > 10000:
@@ -113,8 +137,22 @@ def classify_snapshot(post, snapshot):
         if external_id in seen:
             continue
         seen.add(external_id)
-        comments.append({"external_id": external_id, "body": body, "created_at": None})
-    return result(post, "alive", "The exact post was identified on its canonical page address (post link or stored title match).", comments)
+        if not isinstance(author, str) or not author.strip() or len(author) > 200:
+            author = None
+        comments.append({"external_id": external_id, "body": body, "author": author, "created_at": None})
+    # A total is only usable when it parses as a non-negative integer. Collection is complete
+    # only when the page's own total was read, every item was captured, and no load-more
+    # control remained. Anything else stays explicitly incomplete.
+    total = snapshot.get("comments_total")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        total = None
+    # Complete only when the page's own total was read, every item was captured, the
+    # adapter knows how to open a collapsed thread, and nothing remained to open.
+    complete = bool(total is not None and len(comments) == total
+                    and snapshot.get("comments_expandable") is True
+                    and not snapshot.get("comments_expand_left"))
+    return result(post, "alive", "The exact post was identified on its canonical page address (post link or stored title match).",
+                  comments, total, complete)
 
 
 def navigation_failure(post, error):

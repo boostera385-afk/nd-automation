@@ -26,18 +26,24 @@ or browser adapter.
 Nothing irreversible was switched on: `UPLOAD_RELEASED` and
 `CATALOG_DOWNLOAD_RELEASED` remain false; the bundled agent allowlists monitoring
 RPCs only and claims no publish jobs; the Sheet connector is still read-only with
-no delivery worker; the single worker has never heartbeated and no work session is
-active; no publication, check, cohort, publish-job or writeback row was created.
-Leaked-password protection and signed-in production acceptance remain open.
+no delivery worker; no publish job or Sheet writeback row has ever been created.
+The pilot worker `Kashif PC` is paired and has run five read-only check jobs on two
+tracked publications, storing 21 real comments with authors; nothing was posted,
+liked, replied to or published. One work session from the live test is still open
+and will expire on its own. Leaked-password protection and signed-in production
+acceptance remain open. On 2026-10-30 the pilot Nextdoor account was found
+indefinitely suspended, so live monitoring is paused until a person resolves it.
 
-Validation on the final tree: typecheck PASS, lint PASS (**0 warnings**), **805
-tests / 57 files** PASS, production build PASS. Hosted post-deploy checks confirmed
+Validation on the final tree: typecheck PASS, lint PASS (**0 warnings**), **809
+tests / 58 files** PASS, production build PASS. Hosted post-deploy checks confirmed
 table/function/policy presence, the publication-source and notification-kind
 constraints, the timestamp regex in `reporting_complete_publish`, and read-only
 grants. Real signed-in cohort execution and publish claim/completion were not run;
 they need an authenticated session, a paired worker and real tracked publications.
 See `docs/DB-DEPLOYMENT-20261030-COHORT.md`; the drafts README and test path now
-point at the promoted migration.
+point at the promoted migration. Worker side: **88 unittest cases PASS**, covering
+adapter v2 validation, the two comment gates, mount/expansion behaviour, completion
+honesty and the account-disabled redirect.
 
 ## Live-test setup (2026-10-30)
 
@@ -129,15 +135,21 @@ authorization and the 24-hour rule are unchanged, and the worker still rejects
 unknown job fields. Verified live against the pilot: the stored title matched the
 target card with 100% word overlap while every other card scored 0.
 
-**Selectors taken from the live DOM:** `post_root` `[data-testid="feed-item-card"]`,
-`post_body` `[data-testid="post-body"]`, `post_link` `a[href*="/p/"]`, `login`
-`[data-testid="email-address-input"]` (absent when signed in). The `comment`,
-`comment_id_attribute`, `comment_body`, `removed`, `verification` and
-`unavailable` values are deliberately non-matching placeholders: the current
-build exposes **no** per-comment identity attribute, and a post card's
-`comment-avatar-container` is the comment *composer*, not a comment. Comment
-capture therefore stays empty and is recorded as incomplete — never as zero
-verified comments.
+**Selectors taken from the live DOM (adapter version 2).** `post_root`
+`[data-testid="feed-item-card"]`, `post_body` `[data-testid="post-body"]`,
+`post_link` `a[href*="/p/"]`, `login` `[data-testid="email-address-input"]`
+(absent when signed in). Comment fields derived from a real 22-comment thread:
+`comment` `.js-media-comment`, `comment_id_selector`
+`[data-testid^="dwell-tracker"]` with `comment_id_attribute` `data-testid` and
+`comment_id_prefix` `dwell-tracker-feedItem:` (leaving the numeric platform id),
+`comment_body` `[data-testid="comment-detail-body"]`, `comment_author`
+`[data-testid="comment-detail"] a[href*="/profile/"]`, `comment_expand`
+`[data-testid="seeMoreButton"]` and `comment_total`
+`[data-testid="post-reply-button"]` scoped to the identified root. Those five are
+optional in version 2 (an empty string means the layout does not offer them), and
+expansion only happens when the adapter names the control **and** the operator
+passes `--allow-comment-expansion`. `removed`, `verification` and `unavailable`
+stay non-matching placeholders, so an unrecognized layout yields `needs_review`.
 
 **Live result.** One auto-planned job, claimed and completed
 `ca03a6b3…50e5`: outcome `alive`, adapter fingerprint recorded, publication
@@ -154,27 +166,58 @@ ignored the `status` key (`{"status":"Ready"}`), so every idle profile looked
 busy; and the first identity draft accepted a wrong target URL because the title
 branch was not gated on the page address.
 
-**Comment capture is not possible without interaction, and the pilot post has
-no comments to collect.** The pilot post and four other tracked links were
-scanned at the profile's default window and at 1440×900 emulation: the target
-post's own `.comment-list-container` never contained text, no control mentioning
-"comment" was present, and at desktop width the list was not rendered at all.
+**Comment capture is possible and was validated at 22 of 22 (2026-10-30).** A hard
+navigation mounts an empty `[aria-label="Comment list"]`; neither waiting nor
+scrolling populates it. Activating the post's own comment control
+(`[data-testid="post-reply-button"]`, `aria-label="Comment"`) opens the thread the
+way a reader does — one item plus "See previous comments" — and each
+`[data-testid="seeMoreButton"]` press loads the rest. Nothing is typed, submitted,
+liked or shared, and the composer that gains focus is never written to.
 
-A later scan scoped strictly to the target card measured `own_chars = 0` both
-before and after a programmatic `post-body` click (which opens the detail view
-without mutating anything). The 117–118 character list seen in that run belonged
-to a **neighbouring feed card**; the earlier "comments appear after a click"
-attribution was wrong and is withdrawn. A rendered empty list is also *not* proof
-of zero comments, because the card carries a composer avatar — so `comments_total`
-stays `null` and `comments_complete` stays `false`.
+On a real 22-comment post the production snapshot collected 22 items with 22
+unique numeric ids, 22 authors and 22 bodies; the post's own count read 22, the
+expand control was gone, and `comments_complete` came out true. Both interactions
+sit behind **two independent gates** — the adapter must configure `comment_expand`
+and the operator must pass `--allow-comment-expansion` — so the default run still
+reads the thread exactly as rendered.
+
+`comments_complete` is true only when the page's total was read, the number of
+collected items equals it, the adapter can expand at all, and nothing remained to
+expand. A collapsed, unopened or partially loaded thread therefore always stores
+`comments_complete = false`, and the notification says which of the two happened.
+
+The 117–118 character list from an earlier probe belonged to a **neighbouring
+feed card**; that attribution was withdrawn and is not part of this result.
 
 The dashboard side is already complete: `/dashboard/comments`,
 `/dashboard/posts/<id>` and `/dashboard/results?view=comments` all render stored
 comment detail (author, body, first-observed time, platform creation time when
-known), and the post ledger shows the per-post count. Those views are empty only
-because `reporting_comments` holds no rows. Enabling automatic capture still
-needs an explicit approval for the detail-opening step **and** a post that
-actually has comments, so a selector can be validated against real items.
+known), and the post ledger shows the per-post count.
+
+**Live acceptance paused: the pilot account is suspended (2026-10-30).** After the
+first live collections, every navigation with profile `6d98db87` began landing on
+`https://nextdoor.com/account_disabled/`, whose page reads "Your account has been
+indefinitely suspended by Nextdoor for breaking community guidelines." This is a
+platform action against the account, not a proxy failure, a selector problem or a
+post removal. Ten consecutive observations across two runs and a dedicated trace
+showed the same redirect, with nine restored tabs on that address.
+
+Consequences, recorded rather than papered over:
+
+- the pilot post holds **21 of 22** stored comments with real authors; the 22nd is
+  unreachable while the account stays suspended, so the observation stays
+  `comments_complete = false` and the notification stays "partial";
+- the run attempted after the suspension stored `needs_review` with the reason
+  "Navigation did not remain on the exact post" — honest, but too vague for an
+  operator, so the classifier now recognises `/account_disabled/` and returns
+  "Nextdoor redirected to its Account Disabled page; a person must review the
+  account." No comment is stored from that page and no other outcome is claimed;
+- no further live checks should run against this account until a person resolves
+  it with Nextdoor or an authorized replacement account/profile is bound.
+
+The 22-of-22 capture result above came from the production read path and was
+reproduced immediately before the suspension; it describes the collector, not a
+claim that the account is usable now.
 
 **Reporting chain checked at the data layer** (the UI needs the operator's own
 session). `/dashboard/checks` reads `reporting_post_checks` and shows the single
@@ -1264,7 +1307,7 @@ earlier statements below about "no publishing RPC" describe earlier milestones.
 
 For the latest monitoring implementation, see `WORKER-BRIDGE.md`. `AUTOMATION-READINESS-AUDIT.md` records the earlier audit snapshot. Full desktop automation is not complete. Earlier test rows are historical records, not live connection or feature-parity guarantees.
 
-Reporting foundation plus an initial read-only dashboard-to-worker bridge implemented in source, with staging database setup applied on 2026-10-27. The original desktop code is unchanged; its posting, onboarding, cookie/proxy and other write workflows remain unconnected. Actual worker pairing and live acceptance are pending. Explicitly authorized monitoring claims are gated by work sessions; session buttons alone never enable publishing or account creation. The historical full automation plan is not delivered scope.
+Reporting foundation plus an initial read-only dashboard-to-worker bridge implemented in source, with staging database setup applied on 2026-10-27. The original desktop code is unchanged; its posting, onboarding, cookie/proxy and other write workflows remain unconnected. One pilot worker is paired and live acceptance now covers read-only post checks and comment collection; no publish, onboarding or Sheet-write flow has run live. Explicitly authorized monitoring claims are gated by work sessions; session buttons alone never enable publishing or account creation. The historical full automation plan is not delivered scope.
 
 The user has requested full desktop-to-dashboard parity and authorized updating `AGENTS.md` for a phased migration. `DASHBOARD-PARITY-ROADMAP.md` records the direction and feature-family gaps. `apps/worker/agent.py` now implements the outbound monitoring protocol, reusing the opt-in pilot runner. It needs the new reviewed migration, private pairing, a compatible Python/Playwright environment and validated selectors. No live automation pilot, recurring Sheet ingestion or Sheet result writeback is implemented/validated by this change.
 
@@ -1274,7 +1317,7 @@ The user has requested full desktop-to-dashboard parity and authorized updating 
 
 | Area | State | Actual scope |
 |---|---|---|
-| Monitoring worker bridge | IMPLEMENTED / LOCAL VALIDATION / STAGING DATABASE APPLIED; WORKER NOT PAIRED OR LIVE-TESTED | Staff-only Automation control, private hashed worker credentials, explicit profile/customer/account binding, session-authorized due-check planning, leases/deduplication, atomic auto-check/comment/notification submission, cancellation, revocation and reviewed expired-lease/replacement-worker flows. Hosted versions: `20261027185858` (bridge), `20261027190052` (six covering indexes and schema comments). Agent never accepts publishing, onboarding or arbitrary executable jobs. See `WORKER-BRIDGE.md` for exact limits and deferred acceptance. |
+| Monitoring worker bridge | IMPLEMENTED / PAIRED / LIVE-TESTED ON THE PILOT (READ-ONLY) | Staff-only Automation control, private hashed worker credentials, explicit profile/customer/account binding, session-authorized due-check planning, leases/deduplication, atomic auto-check/comment/notification submission, cancellation, revocation and reviewed expired-lease/replacement-worker flows. Hosted versions: `20261027185858` (bridge), `20261027190052` (six covering indexes and schema comments), plus `20261030220000` (transient-failure retry), `20261030230000` (comment author/total/completion) and `20261030233000` (notification wording per outcome). Paired worker `Kashif PC` completed real read-only checks on the pilot binding; comment collection is validated at 22 of 22 on a real post. Agent never accepts publishing, onboarding or arbitrary executable jobs. See `WORKER-BRIDGE.md` for exact limits and deferred acceptance. |
 | Content drafts and human approval (F14/F23 preparation slice) | IMPLEMENTED / LOCALLY TESTED / STAGING APPLIED | Staff-only `/dashboard/content`: create/edit text-post and listing drafts bound to an explicit authorized worker/customer/profile assignment; unpublished preview; revision-bound save/approve/return/archive with optimistic concurrency; immutable per-revision content + exact-target snapshots (binding, customer, worker, profile UUID, account label) and actor attribution. Validation in both UI (zod) and SQL (`valid_draft_content`); exact decimal USD price parsing without floats; no credentials/media fields accepted. Migration `202610270004_content_drafts.sql` applied to staging as `20261027200411`; host verification confirmed RLS on both tables, anon access denied (permission errors in rolled-back transactions), authenticated read-only table access with all writes through the two RPCs, and 0 drafts/revisions. **No publishing RPC, worker job type, scheduling, attachments, or browser submission exists.** Approval is preparation only. |
 | Profile inventory (F03 foundation) | IMPLEMENTED / LOCALLY TESTED / STAGING APPLIED | Staff-only `/dashboard/profiles`: preview-validated CSV import (max 5,000 rows / 1 MB; legacy `id`/`Profile Name` aliases; credential columns rejected) into a tenant-scoped UUID/name/group inventory; explicit full-sync archiving (double confirmation), per-profile archive/reactivate, accurate insert/update/archive counts, payload-duplicate rejection, import serialization per workspace. Automation assignment form offers inventory claims as `<datalist>` suggestions while still requiring the exact UUID. Validation parity zod ↔ SQL (`valid_profile_row`); writes via two RPCs only. Migration `202610270005_profile_inventory.sql` staged as `20261027200913`; host verified RLS, anon denied, read-only client access, 0 rows. Inventory is a claim, **not** live existence/readiness and never authorizes launches; duplicate real-world profile names still resolve by exact UUID. |
 | Next.js/TypeScript application and lockfile | IMPLEMENTED / LOCALLY TESTED | Production build, strict types, lint and local tests; no fake customer dataset |

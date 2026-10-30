@@ -100,11 +100,30 @@ a newer observation/check summary.
 Worker observation time must be within the lease window, with one minute of
 backward and five minutes of forward clock tolerance; synchronize the worker
 clock. Server completion time is stored separately on the job. Comments have
-unknown platform creation times and explicit `auto_check` source. An author is
-not inferred: `Author not collected` is used until author extraction is supported.
-Initially rendered stable-ID comments only are collected; totals remain unknown
-and collection is always partial. Existing comment text is not overwritten on
-deduplication. History displays manual versus automatic provenance.
+unknown platform creation times and explicit `auto_check` source; a comment's
+platform creation time is never derived from a relative label such as "1w".
+
+The adapter (version 2) may collect an author label, the post's own comment total
+and a `comments_complete` flag. `Author not collected` is stored only when the
+adapter does not configure an author selector or the label is blank. Collection is
+complete only when the page's total was read, the number of collected items equals
+it, the adapter can expand the thread, and no expand control remained. The
+notification names the actual state: "all N comments captured" when complete,
+"collection is partial" when the thread was read but not exhausted, and "no comment
+collection was attempted" when the post was not confirmed live (that case can never
+carry comments). Existing comment text is not overwritten on deduplication. History
+displays manual versus automatic provenance.
+
+Opening and expanding a thread is a read-only interaction with the post's own
+controls (the comment count and "See previous comments"), enabled only when the
+adapter configures `comment_expand` **and** the operator passes
+`--allow-comment-expansion`. Nothing is typed, submitted, liked or shared.
+
+Nextdoor's terminal `/account_disabled/` redirect is recognised explicitly and
+recorded as `needs_review` with "Nextdoor redirected to its Account Disabled page;
+a person must review the account." It is never mapped to removal, proxy trouble or
+a completed collection. A suspended pilot account stops live acceptance until a
+person resolves it; the system does not attempt to evade it.
 
 Confirmed deletion is deliberately not accepted from the automated adapter yet.
 Removal-like notices require review, and technical failures never change post
@@ -141,8 +160,11 @@ visibility. See `apps/worker/MONITORING.md` for browser/selector limitations.
 7. Only for the approved pilot: start work, enable one assigned profile and run:
 
    ```powershell
-   python agent.py --connection .monitoring/worker.json --adapter .monitoring/adapter.json --execute --confirm-authorized --once
+   python agent.py --connection .monitoring/worker.json --adapter .monitoring/adapter.json --execute --confirm-authorized --once --allow-comment-expansion
    ```
+
+   `--allow-comment-expansion` is optional and does nothing unless the adapter
+   configures `comment_expand`; omit it to read the thread exactly as rendered.
 
    Remove `--once` only after reviewing the pilot. The agent polls every 15 seconds
    for up to eight hours. Refresh the dashboard for job progress; the job list
@@ -196,7 +218,9 @@ database; no indexes were removed. The security advisor still reports:
 - One [RLS-without-policy INFO](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) for the private credential table, which intentionally denies client access by default.
 
 These notices are recorded, not suppressed or represented as a clean security
-certification. Successful real-worker pairing, HTTP transport acceptance,
-multi-client concurrency and live profile/comment checks remain unverified.
+certification. One worker is now paired and has completed real read-only checks
+against the pilot, including a 22-of-22 comment collection; multi-client
+concurrency, multi-profile contention and publish/onboarding/Sheet flows remain
+unverified.
 The preserved workspace currently has no memberships after the earlier approved
 account deletion; no account was assigned a role as part of database setup.

@@ -49,7 +49,7 @@ class AgentTests(unittest.TestCase):
     @patch("agent.run_batch")
     def test_submits_the_single_observation_without_repeating_browser_work(self, run):
         value = VALUE
-        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline: emit(value)
+        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(value)
         bridge = Mock()
         bridge.rpc.side_effect = [{"enabled": True}, JOB]
         bridge.submit_result.return_value = True
@@ -58,6 +58,17 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(self.journal.read()["state"], "acknowledged")
         self.assertIsNone(self.journal.read()["result"])
         run.assert_called_once()
+
+    @patch("agent.run_batch")
+    def test_comment_expansion_is_forwarded_only_when_requested(self, run):
+        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(VALUE)
+        for requested in (False, True):
+            with self.subTest(requested=requested):
+                bridge = Mock()
+                bridge.rpc.side_effect = [{"enabled": True}, JOB]
+                bridge.submit_result.return_value = True
+                poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal, requested)
+                self.assertIs(run.call_args.kwargs.get("allow_expansion"), requested)
 
     @patch("agent.time.sleep")
     def test_completion_retry_does_not_execute_browser_actions(self, _sleep):
@@ -74,7 +85,7 @@ class AgentTests(unittest.TestCase):
 
     @patch("agent.run_batch")
     def test_ambiguous_browser_failure_stops_agent_after_submitting_recorded_failure(self, run):
-        def fail(posts, adapter, api, chromium, emit, deadline):
+        def fail(posts, adapter, api, chromium, emit, deadline, **options):
             emit({**VALUE, "outcome": "profile_error"})
             raise RuntimeError("unknown launch state")
         run.side_effect = fail
@@ -116,7 +127,7 @@ class AgentTests(unittest.TestCase):
 
     @patch("agent.run_batch")
     def test_lost_ack_response_recovers_only_saved_result_without_rerunning_or_claiming(self, run):
-        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline: emit(VALUE)
+        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(VALUE)
         bridge = Mock()
         bridge.rpc.side_effect = [{"enabled": True}, JOB]
         bridge.submit_result.side_effect = BridgeError("offline")
@@ -153,7 +164,7 @@ class AgentTests(unittest.TestCase):
 
     @patch("agent.run_batch")
     def test_cleanup_ambiguity_blocks_restart_until_exact_operator_confirmation(self, run):
-        def fail(posts, adapter, api, chromium, emit, deadline):
+        def fail(posts, adapter, api, chromium, emit, deadline, **options):
             emit(VALUE)
             raise RuntimeError("cleanup uncertain")
         run.side_effect = fail
@@ -171,7 +182,7 @@ class AgentTests(unittest.TestCase):
 
     @patch("agent.run_batch")
     def test_malformed_completion_keeps_saved_result_for_reconciliation(self, run):
-        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline: emit(VALUE)
+        run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(VALUE)
         bridge = Mock()
         bridge.rpc.side_effect = [{"enabled": True}, JOB]
         bridge.submit_result.return_value = {"unexpected": True}
