@@ -75,6 +75,32 @@ bounded 500-publication cohort. It also lists the evidence to collect and the
 stop/rollback steps. Nothing in the runbook enables Fudge uploads, publishing,
 profile mutation or Sheet writeback delivery.
 
+### Cleanup for a fresh test state (approved by the operator)
+
+- **Old worker `offive laptop` revoked.** Applied the same statements as
+  `reporting_revoke_worker`: deleted its one credential hash, set
+  `enabled = false`, and cancelled zero pending check/publish jobs. Result:
+  0 worker credentials and 0 enabled workers remain; a new registration is
+  required before any dispatch.
+- **Orphan organization `ND Posts` deleted.** Verified first that all 27
+  organization-scoped tables held **0 rows** for it and it had no memberships.
+  The two remaining workspaces are `My business` and `ND Test`.
+- Resulting `ND Test` state: 0 workers enabled, 0 profile inventory rows,
+  0 bindings, 0 publications, 0 sessions, 0 cohorts, 0 publish jobs,
+  0 writeback rows. This is a clean starting point, not evidence of a working
+  chain.
+
+### Incogniton install (2026-10-30)
+
+The official Windows build was downloaded (Incogniton **5.0.1.5**, 191,171,088
+bytes, SHA-256 `2eaad7bf…0d4c4`) after verifying its Authenticode signature:
+**Valid**, signed by `WorkingGreen B.V.` via Sectigo EV code signing. The
+installer was launched from `%USERPROFILE%\Downloads\IncognitonSetup-5.0.1.5.exe`.
+Completing the wizard, signing in, creating/importing profiles and confirming
+the local API on `127.0.0.1:35000` are operator steps; the worker still reports
+`unavailable` until they are done, so no profile has been opened and no browser
+check has run.
+
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
 side as a fully ready flow, keeping publishing/cohort SQL and live

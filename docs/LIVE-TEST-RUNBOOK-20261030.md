@@ -14,6 +14,7 @@ Fudge uploads, publishing, profile creation or Sheet writeback delivery.
 | Web validation | typecheck, lint (0 warnings), 805 tests / 57 files, production build PASS |
 | Worker unit tests | 65 PASS |
 | Worker runtime | Python 3.13 `.venv` with the exact pins; `pip check` clean, `preflight.py` dependencies + Playwright import PASS, wheel SHA-256 verified |
+| Test-state cleanup | Old worker `offive laptop` revoked (0 credentials, 0 enabled workers); empty orphan org `ND Posts` deleted; `ND Test` has 0 bindings/publications/sessions |
 
 ## Hard preconditions (operator actions)
 
@@ -24,6 +25,16 @@ Fudge uploads, publishing, profile creation or Sheet writeback delivery.
    no uninstall entry and nothing listening on `127.0.0.1:35000`. The desk-side
    app therefore has to be installed (or the worker moved to the machine that
    already has it) before any browser check can run.
+
+   The official Windows build was downloaded on 2026-10-30:
+   `%USERPROFILE%\Downloads\IncognitonSetup-5.0.1.5.exe`
+   (191,171,088 bytes, SHA-256
+   `2eaad7bf69eb8bf91514bc13d0b3c1014eccb1eb611d0991f841e5581e10d4c4`).
+   Its Authenticode signature is **Valid**, signed by `WorkingGreen B.V.`
+   (Incogniton's legal entity) through Sectigo EV code signing. Complete the
+   installer wizard, sign in or register, and confirm the local API answers on
+   `127.0.0.1:35000` (the worker's health command must report `reachable`)
+   before continuing. Keep the app running and logged in for every test.
 2. **A verified staff sign-in** to the dashboard for the `ND Test` workspace
    (`b59489ca-c7c3-4e1a-b2ae-ec9da429f415`). Live checks cannot be authorized
    from this session.
@@ -61,8 +72,9 @@ adapter and hosted-credential checks stay blocked until steps 3–5.
 3. Copy the private connection JSON **once** and save it as
    `apps/worker/.monitoring/worker.json`.
 4. Never commit, paste into chat or share this file. It can claim assigned jobs.
-5. If an old unused worker exists (`offive laptop`), leave it disabled; do not
-   reuse a credential that was never paired.
+5. The old unused worker `offive laptop` has already been revoked (credential
+   deleted, jobs cancelled); register a new machine name instead and never reuse
+   a credential that was never paired.
 
 ### 4. Bind profiles to the right customer
 
