@@ -2,6 +2,258 @@
 
 ## Current milestone
 
+**Authorized production web deployment (2026-10-30): public identity routes
+repaired.** After the database rollout, the user approved completing the ND
+side as a fully ready flow, keeping publishing/cohort SQL and live
+uploads/posts/Sheet writes excluded. Deployed the reviewed working tree to the
+existing Vercel project `jelly-bean2/nd-automation-dashboard` using the cached
+CLI 65.8.0 (linked account `boostera385-9959`). A first upload from the
+repository root failed — the project has **no Root Directory** set, so `next
+build` ran with no `app/` directory; the original deploy root is `apps/web`,
+and redeploying from there succeeded. Production
+`dpl_G4ywobKk25PHVffoeLQGAELpPr4t` is now aliased to
+https://nd-automation-dashboard.vercel.app. No Git connection was created;
+nothing was committed or pushed. The stale 404 deployment (`dpl_8nGq…`) and the
+failed root attempts remain only as history records.
+
+`npm.cmd run check:deployment -- https://nd-automation-dashboard.vercel.app`
+**passes on production**: `/login` 200 uncached + frame-denied; `/workspaces`,
+`/verify-email`, `/dashboard` and `/dashboard/run/cohorts` 307 to same-origin
+`/login` (`/workspaces` and `/verify-email` previously returned 404). Signed-in
+use, Auth form submission and authenticated acceptance remain unverified
+(`authenticatedReadiness: "unverified"`). Local hygiene: the mistaken repo-root
+`.vercel` link and its generated root `.env.local` were removed immediately;
+`apps/web/.env.local` was only refreshed with a new short-lived project-scoped
+`VERCEL_OIDC_TOKEN` (pre-application backup byte-compared; file is ignored and
+must never be staged); `apps/web/.vercel` was removed after deployment — see
+`docs/DEVELOPMENT.md` for the relink/redeploy procedure.
+
+Remaining ND gaps unchanged: publishing/cohort protocol deployment (excluded
+from all approvals), mapped Sheet delivery, supervised worker runtime, live
+Auth acceptance and F01–F36 desktop parity. User directed Fudge as the next
+repository.
+
+**Authorized database rollout (2026-10-30): verified-access fix is now applied.**
+After the local remediation below, the user explicitly authorized migrations via
+Supabase and Edge Functions if needed. Reverified the shared target, 11 existing
+migrations, tables, logs and advisors. Reused cached CLI 2.122.0 to generate source
+`supabase/migrations/20261030155515_verified_access_v1.sql`, promoted the tested
+draft, reran its security/historical-baseline cases (**14 PASS**), and applied
+only that migration through MCP as **`20261030155727 verified_access_v1`**.
+There are now **12 hosted migrations**; the 13 local files still include the
+intentionally undeployed publishing protocol. Cohort SQL remains a draft. No
+reset/history repair/wholesale push or historical source-file edit occurred.
+
+All five deployed hardening bodies match promoted source with CRLF/edge whitespace
+normalization. Trigger/grants verified; the pre/post aggregate of the existing
+claim/completion/heartbeat/credential-helper bodies is unchanged. Hosted
+read/role-only smoke **PASS**: existing verified staff own-business access,
+missing-identity read/session-action denial and anonymous denial. No fixture
+account/email/membership/customer/session/job write was used. Initial smoke
+harness grant inspection under anon hit intentional private-schema denial; moved
+that metadata check before assuming anon, without broadening any privilege.
+Unconfirmed-member and confirmation-loss dispatch cases remain local PGlite
+evidence, not a newly created hosted Auth account/browser acceptance.
+
+All 25 public tables still have RLS; bindings, publications, check jobs and outbox
+remain zero. Advisor counts unchanged (3 anonymous + 21 authenticated SECURITY
+DEFINER notices, private no-policy INFO, leaked-password protection disabled,
+27 unused-index INFOs). See `DB-DEPLOYMENT-20261030-VERIFIED-ACCESS.md` for source
+hashes, hosted version, limits and clickable remediation guidance. No Edge
+Function was needed or deployed; no live-operation gate changed.
+
+The earlier complete local run passed typecheck/lint, **805 tests / 57 files**,
+production build, **65 worker tests** and 12 signed-out local HTTP checks. The
+new deployment checker also passed against that owned local build. Promoted-source
+full validation is being rerun and will be recorded here when complete. Public
+web identity routes still 404: this database-only approval did not explicitly
+approve Vercel rollout. Publisher, mapped Sheet delivery, full restore and other
+desktop/full-flow work remain incomplete; Fudge remains the selected next repo,
+not a completed cutover. No user/browser/Sheet/content operation, install,
+commit/push, paid resource or Vercel deployment was performed.
+
+**Local remediation tranche (2026-10-30): confirmed SQL/worker findings addressed
+in source; NOT all full-flow gaps closed.** The user selected **Fudge** as the
+next repository. Deployment answer was delegated as a best-practice choice, not
+an unambiguous hosted-write approval; local-first validation was chosen and no
+Supabase/Vercel deployment, release enablement or real platform/Sheet write ran.
+
+Implemented:
+- `apps/worker/worker_protocol.py`: exact canonical job/lease contracts, zoned
+  timestamps, a 6–15 minute remaining-lease acceptance window, bounded browser
+  budget with a three-minute completion/cleanup reserve, strict bounded result
+  fields and exact boolean acknowledgment (`false` remains valid idempotent
+  replay). Invalid/short/expired/implausible claims stop before profile launch.
+- `apps/worker/monitoring_journal.py` plus `agent.py`: private single-checkpoint,
+  sibling-temp write/flush/fsync/atomic replacement; claim saved before launch,
+  bounded observation saved before backend submission, exact job/lease/result
+  replay on restart before any new claim. Malformed/lost receipts or disk errors
+  retain the result and block new work. No token is saved in the journal; pending
+  data is credential/project scoped and comment payload is removed only after
+  verified acknowledgment. Files remain Git-ignored/private, not encrypted.
+- Result-only recovery requires explicit authorization but no adapter, pinned
+  Playwright runtime, profile launch or new claim. Uncertain cleanup stays blocked
+  until an exact-job operator attestation. A claim with no observation never
+  replays the browser: a distinct exact-job/loss acknowledgment records
+  `operator_reconciled`, **not completed**. It asserts no server verification or
+  recovered observation and cannot discard a saved result. Operator must actually
+  inspect cleanup/reconcile the dashboard lease first. Clean terminal metadata
+  can be replaced by separately configured credentials; unresolved data cannot.
+- `supabase/drafts/verified_access_v1.sql`: additive, **undeployed** SQL hardening
+  of legacy membership/staff/customer helpers and own metadata reads using fresh
+  confirmed `auth.users`. A private trigger checks current verified active session
+  ownership before creating/leasing checks, including previously authorized
+  invalid sessions. It preserves existing claim function bodies/cross-type rules
+  and allows already-leased completion to drain. Invalid legacy authorizations
+  fail closed, potentially blocking that worker until operator reconciliation.
+  No historical migration was edited, promoted or applied.
+- `npm.cmd run check:deployment -- <origin>`: anonymous bounded GET gate, no
+  redirects followed or Auth submission. Missing identity/workspace routes fail,
+  login must be uncached and all inspected routes frame-denied. This is a
+  detection/pre-release gate, not a production fix or signed-in acceptance.
+- GitHub workflow now includes stdlib-only Python worker tests; workflow configured
+  locally, not run on GitHub. Web/worker regression tests and operator commands
+  are documented in `docs/DEVELOPMENT.md` and `apps/worker/README.md`.
+
+Fresh validation after this implementation:
+- Dashboard: typecheck PASS, lint PASS, **805 tests / 57 files PASS** (23 added),
+  production build PASS with both identity and both cohort routes.
+- Worker: **65 unittest cases PASS** (22 added), including failed storage/acks,
+  lost responses, malformed/expired leases, restart-only replay, no-result and
+  cleanup recovery, private scope isolation and explicit CLI confirmations.
+- Owned local production server: **12 signed-out HTTP checks PASS**, stopped
+  afterward. No Auth form submission or business row writes.
+- Actual public deployment gate exits **1 / FAIL**: `/workspaces` and
+  `/verify-email` still return 404; login and anonymous dashboard/cohort guards
+  pass. Hosted rollout remains outstanding rather than claimed repaired.
+- Eleven local PGlite cases specifically exercise the security draft; these are
+  included in 805, not additional cases. Tests deny unconfirmed members' direct
+  legacy reads/RPCs, preserve scoped verified access, block pending/new worker
+  dispatch after confirmation loss and allow already-leased result drain.
+- `git diff --check` PASS (existing Windows line-ending warnings only); ignored
+  runtime journal path verified. Fudge application source is unchanged; its
+  earlier 67/127 results are historical for this tranche, not freshly rerun.
+
+Remaining release/code gates: deploy reviewed additive SQL/current web source
+with explicit approval; keep cohort SQL/publishing migration deployment separate.
+Actual publisher/submit journal, media/schedule and safe browser adapters, mapped
+monitoring-to-Sheet outbox/delivery, field-writer ownership/stable IDs, latest-100
+policy, full comments, remaining F01–F36 desktop adapters and full backup/restore
+are not delivered by this tranche. Authorized test profiles/selectors, development
+Sheet mappings/write columns, content/media rights, retention and supervised
+pilots cannot be invented from passing fixtures. No missing functionality was
+enabled, no customer session opened, no package installed, no commit or push.
+The source-level findings in the prior review below are superseded only where
+this entry explicitly implements a fix; production and full-flow gaps stay open.
+
+**Fresh cross-repository review/testing (2026-10-30): NOT COMPLETE for the
+requested end-to-end workflow.** Reviewed dashboard commit `18777bb` and Fudge
+commit `2c64482`, with initially clean working trees. Targeted source review
+covered verified identity/workspace boundaries, cohort requests/receipts,
+monitoring claims/completion, extension consent/queue/catalog gates, Sheet
+transport/writeback and publishing boundaries. This is not an exhaustive audit
+or a desktop-parity sign-off. All 44 tracker IDs occur once; shared master plans
+and frozen readiness checkpoints remain byte-identical.
+
+Fresh checks actually run, rather than inherited from yesterday's entries:
+- `apps/web`: `npm.cmd run typecheck` PASS; `npm.cmd run lint` PASS;
+  `npm.cmd test` **782 tests / 55 files PASS** (233.51 seconds).
+- `apps/web`: `npm.cmd run build` **PASS**, including `/workspaces`,
+  `/verify-email` and both cohort routes in the production route manifest.
+- Owned local production server on `127.0.0.1:3107`: **12 signed-out HTTP
+  smoke checks PASS**. Login returns 200; workspace/verification, dashboard,
+  cohort list/detail, writeback, catalog, intake, publishing and both export
+  routes return 307 to `/login`; all inspected responses carry frame denial.
+  Test server stopped afterward. The temporary standalone harness is outside
+  the repositories; no Auth form was submitted or business row written.
+- `apps/web`: `npm.cmd audit --omit=dev --json` reports zero known production
+  dependency vulnerabilities; this is registry coverage, not security acceptance.
+- `apps/web`: `npm.cmd run check:readiness` exits 0 for local configuration only;
+  hosted/Auth/recovery/worker readiness remains explicitly unverified there.
+- Fudge: `node --test tests/backend.test.js` **67 PASS**;
+  `node tests/smoke.test.js` **127 PASS**; `node --check` PASS for all 18 tracked
+  JS/CJS files. Smoke fallback/rate-limit messages are fixture output, not proof
+  of a live writer or connector failure.
+- `apps/worker`: `python -m unittest discover -v` **43 PASS**.
+  Actual `python preflight.py` exits **1 / BLOCKED**, not a passing readiness
+  check: exact dependency/import and private connection/adapter checks fail.
+  Python 3.13.15 itself passes; zero network calls/profiles/jobs. Node v24.22.1.
+- Thirteen additional offline cross-repository fixtures agree: eight ingestion
+  projection/batch cases and five catalog snapshot cases. These ad hoc probes
+  are separate from the suite counts, not installed-extension acceptance.
+
+Findings requiring follow-up (no application fixes or deployments performed):
+1. **Release blocker / production route mismatch:** public production
+   `https://nd-automation-dashboard.vercel.app/workspaces` and `/verify-email`
+   both return **404**, including a repeat check. Current source contains both
+   routes and `src/proxy.ts:31` protects them. Production `/login` returns 200
+   with `DENY` and private/no-store; anonymous `/dashboard`, cohort and writeback
+   routes redirect 307 to `/login`. The latter does not prove that their pages
+   exist behind the guard. Verify the deployed revision/build root and deploy
+   the reviewed source only with approval. The fresh local production build
+   includes both routes and the local smoke redirects them to login, confirming
+   the observed difference from the public deployment; signed-in behavior and whether the
+   central guard is deployed were not established by anonymous HTTP probes.
+2. **Security / legacy SQL verification gap confirmed offline:** foundation
+   migration `202610260001_reporting_foundation.sql:128-140,187-190` authorizes
+   through membership without checking email confirmation. A fresh local PGlite
+   fixture seeded an unconfirmed user with an existing operator membership;
+   under that user's authenticated role, one fixture customer was readable and
+   `reporting_session_action(...,'start',...)` succeeded. Hosted read-only function
+   inspection also finds no `email_confirmed_at` reference in `is_staff`,
+   `is_member` or `can_view_customer`. The newer application guard blocks this
+   at the dashboard boundary, not direct legacy database access. This requires
+   an existing authenticated session AND assigned membership; it is not proof
+   that an ordinary fresh signup can read business data. Add reviewed additive
+   SQL defense-in-depth and direct-role denial tests; do not edit applied history.
+3. **Worker safety validation gap reproduced:** `apps/worker/agent.py:63-83`
+   accepts both `lease_expires_at='2020-01-01T00:00:00Z'` and
+   `'not-a-timestamp'`. Mocked `poll_once` calls the runner once and reports
+   completed for either. Validate a bounded, future lease and budget before any
+   profile operation. These probes patched the runner; no browser was opened.
+4. **Worker acknowledgment validation gap reproduced:**
+   `apps/worker/agent.py:46-56,88-91` accepts an arbitrary JSON object from
+   `reporting_complete_check`, and the caller does not verify the completion
+   receipt before reporting completed. An offline mock returned
+   `{"unexpected":"not a boolean acknowledgment"}` and was accepted.
+   Require the documented boolean response (false is legitimate idempotent
+   replay), reject malformed responses and add negative tests. The existing
+   43-test suite does not establish these two missing validations.
+5. **Implementation/recovery gates remain:** no connected publisher, submit
+   journal/media/schedule adapter, mapped monitoring-to-outbox deliverer, latest
+   100-per-profile policy, durable worker result recovery, complete comments or
+   accepted profile/onboarding/cookie/proxy replacement. Both Fudge release
+   constants remain false; catalog cache never applies rules to `serviceRules`.
+   Do not enable releases or remove the desktop app to make these checks pass.
+
+Fresh read-only hosted metadata: same selected shared project; **11 applied
+migrations**, **25 public tables / all RLS-enabled**, no anonymous table SELECT
+and no authenticated table-level INSERT/UPDATE/DELETE grants. Publishing and
+cohort tables are absent. Inventory, bindings, publications, check jobs, intake
+records and writeback intents are zero; active catalog has two rules. Thus the
+local cohort draft and publishing protocol are not hosted-ready, and there is no
+live monitoring corpus. This metadata is not a complete schema/grant equivalence
+or real tenant/Auth test. One initial metadata query used the wrong catalog-head
+column and was corrected; that review-generated SQL error is not an app defect.
+
+Hosted advisors remain non-clean: three anonymous and 21 authenticated
+SECURITY DEFINER notices, disabled leaked-password protection, one intentional
+private no-policy INFO and 27 unused-index INFOs. See
+[worker RPC review](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
+[staff RPC review](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable),
+[password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+and [private RLS notice](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+The initial last-24-hour log aggregate contained four PostgreSQL ERROR entries
+and two Auth WARNING entries; aggregate severity alone does not identify an
+application defect. No raw logs/customer payloads were copied into the repo.
+
+Real signed-in/multi-account/stale-tab browser tests, installed-extension MV3
+restart/permission tests, real PostgreSQL contention, supervised DOM/profile
+pilots, Sheet delivery and restore acceptance remain unrun. No hosted writes,
+DDL, Sheet edits, signup/reset requests, customer sessions, dependencies,
+release changes, commits or pushes were initiated by this review. Only status
+documentation is being updated; previous dated entries below are historical.
+
 **Code-first follow-up (2026-10-29): durable date-cohort checks and worker
 preflight implemented locally; setup deliberately deferred.** New
 `/dashboard/run/cohorts` and `/dashboard/run/cohorts/[id]` provide one explicit

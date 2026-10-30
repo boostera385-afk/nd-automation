@@ -82,6 +82,14 @@ for actually checking the local machine.
 
 ## Results and data accuracy
 
+Source hardening (2026-10-30): strict future lease budgets and boolean completion
+receipts now gate the agent. A private flushed/atomic monitoring journal records
+claim and observation before browser execution/backend submission respectively;
+restart/result-only recovery replays the identical saved job/lease/result, never
+the browser. Cleanup ambiguity and a claim with no result block new work. See
+`apps/worker/README.md` for commands and remaining filesystem/operator recovery
+limits. This is not a publishing journal or a live acceptance result.
+
 Completion validates worker ownership, lease, allowed outcomes, bounded comments,
 adapter fingerprint and observation time. Completion replay is idempotent for
 the same job/lease. Check history, observation, comment deduplication, notification

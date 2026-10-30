@@ -1,6 +1,6 @@
 # Master automation delivery tracker
 
-Updated: 2026-10-29. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
+Updated: 2026-10-30. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
 
 Readiness review (2026-10-29): all 44 feature IDs are present exactly once; no
 full desktop replacement sign-off. Fresh dashboard 649 tests/build/typecheck/lint,
@@ -35,13 +35,38 @@ result recovery and the remaining publishing/profile adapters still need code.
 
 ## Phase gates
 
+Authorized deployment follow-up (2026-10-30): promoted verified-access source
+`20261030155515` applied to the shared database as `20261030155727` (12 hosted
+migrations). All five source body hashes, trigger/grants and unchanged monitoring
+bodies verified; hosted read/role-only smoke PASS, advisors unchanged. The
+current web app was then deployed to the existing Vercel production site from
+`apps/web` — the original deploy root; a repository-root upload fails because
+the project has no Root Directory. The anonymous route gate now passes on
+https://nd-automation-dashboard.vercel.app: `/workspaces` and `/verify-email`
+redirect to same-origin `/login` instead of 404. Signed-in/Auth acceptance
+remains open; publishing/cohort deployments remain excluded. See
+`DB-DEPLOYMENT-20261030-VERIFIED-ACCESS.md` and the current status entry.
+
+Security/recovery remediation (2026-10-30): strict lease/receipt validation and
+durable monitoring-result replay are implemented locally (65 worker tests PASS).
+Explicit operator attestation can reconcile a claim with no recoverable result;
+it does not verify server state, fabricate an observation or discard a saved
+result. `supabase/drafts/verified_access_v1.sql` hardens legacy confirmed-user
+helpers/metadata policies and new check-job/session-owner dispatch; it is locally
+tested, **not deployed**. Dashboard typecheck/lint, 805 tests / 57 files, build
+and 12 signed-out local HTTP smoke checks PASS. New `check:deployment` fails on
+the two missing production identity routes, not a repaired production deployment.
+Worker CI coverage is configured, not remotely executed. Publishing, Sheet
+delivery/mapping, runtime/pilot, complete restore and desktop parity stay open.
+User selected Fudge as the next owning repository; no cutover or release implied.
+
 | Phase | State | Next deliverable / dependency |
 | --- | --- | --- |
 | P0 | In progress | Confirm Source/ND Master mapping and policy decisions in `P0-DISCOVERY.md`; feature inventory below |
-| P1 | Read-only hosted baseline reverified (11 migrations/50 matching function bodies); central app verification/workspace selection implemented | Basic owner login accepted; negative live isolation and new selector/stale-tab browser acceptance, SQL defense-in-depth, recovery and operational Sheet setup remain |
+| P1 | Central app verification/workspace selection and additive verified SQL hardening implemented; security source applied as hosted `20261030155727`, 12 migration records | Current dashboard deployment, negative live Auth/isolation and selector/stale-tab acceptance, restore and operational Sheet setup remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
 | P3 | Intake receipts, deployed catalog/review/activation and queue UI implemented; owner guided 2-rule catalog pass recorded; cache gated and Sheet delivery unwired | Full business rule matching/approval, operator/cross-business/concurrent live acceptance, cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
-| P4 | Monitoring source plus local date-cohort protocol/UI and offline worker preflight implemented; live acceptance pending | Protocol deployment/setup, durable worker result recovery, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
+| P4 | Monitoring source, local date-cohort protocol/UI, offline preflight and durable monitoring-result replay implemented; live acceptance pending | Protocol deployment/setup, real filesystem/worker recovery acceptance, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
 | P5 | Local protocol only; browser publishing paused | Reviewed publisher, media, durable submit journal, explicit release and live pilot |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
 | P7 | Not started | Approved linked reposts and bounded batching after correctness gates |

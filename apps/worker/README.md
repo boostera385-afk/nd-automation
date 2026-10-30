@@ -5,6 +5,63 @@ from the project root for the applied staging migrations, private pairing
 configuration, session authorization and staged acceptance requirements. Actual
 worker pairing and live browser acceptance remain deferred.
 
+## Durable monitoring recovery (source implementation)
+
+The agent rejects malformed/expired leases, leases with less than six minutes
+remaining, and leases more than fifteen minutes ahead of the local UTC clock.
+Keep the machine clock synchronized. Its browser-start budget reserves three
+minutes for the final bounded navigation, cleanup and completion attempts; this
+does not provide a hard kill of an in-flight browser/API operation.
+
+Before profile launch, the agent atomically writes and flushes a private
+`.worker-state/monitoring-journal.json`. It saves the bounded observation before
+backend submission, accepts only a boolean completion receipt (false is a valid
+idempotent replay), and clears saved comment text after acknowledgment. A
+restart replays only the saved result, never a browser action. Both normal
+execution and the result-only command use the same exclusive local lock.
+
+To replay an existing result without importing Playwright, loading selectors or
+touching Incogniton, after explicit authorization:
+
+```powershell
+python agent.py --connection .monitoring/worker.json --recover-results --confirm-authorized
+```
+
+Failed/expired/revoked result submissions retain the checkpoint and block new
+claims; repair/reconciliation is required, not a fresh browser run. If the
+backend acknowledged the result but profile cleanup was uncertain, inspect and
+close only the worker-owned profile, then explicitly attest that exact saved
+job UUID (this command itself never closes a browser or dispatches work):
+
+```powershell
+python agent.py --connection .monitoring/worker.json --confirm-profile-cleanup <exact-job-uuid> --confirm-authorized
+```
+
+A `claimed` checkpoint without an observation is never automatically replayed.
+Stop the old agent, inspect/close only its owned profile and explicitly reconcile
+the expired lease in the dashboard. Only after those actual operator steps,
+attest the exact job and the missing observation:
+
+```powershell
+python agent.py --connection .monitoring/worker.json --confirm-lease-reconciled <exact-job-uuid> --acknowledge-observation-loss --confirm-authorized
+```
+
+This stores `operator_reconciled`, not `completed`; it cannot discard a saved
+observation, makes no backend call, and does not verify server state or perform
+cleanup itself. It dispatches nothing. A future explicit execution may proceed
+only after the human prerequisite steps; do not use the attestation to bypass
+them. Changed credentials cannot inherit an unresolved checkpoint. Clean terminal
+metadata may be replaced by a separately configured worker. A corrupt journal
+fails closed; do not delete it to force another claim. Power-loss/filesystem
+guarantees, OS ACLs, restore and real operator recovery still need acceptance.
+The file uses
+private creation permissions where supported, inherits Windows directory ACLs,
+is not encrypted, contains customer data while pending and must never be shared
+or committed. Credential tokens are not stored in the journal.
+
+This is monitoring-result recovery only, not a publisher submit journal,
+complete backup/restore, or proof of live browser compatibility.
+
 ## Offline preflight and reproducible runtime
 
 `python preflight.py` requires no configuration to run. It reports missing

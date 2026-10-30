@@ -156,6 +156,52 @@ npm.cmd run build
 npm.cmd audit --omit=dev
 ```
 
+After an explicitly approved deployment, run the separate anonymous route gate:
+
+```powershell
+npm.cmd run check:deployment -- https://your-dashboard-origin.example
+```
+
+It uses anonymous GETs with redirects disabled; login must return 200/no-store
+and identity/workspace/dashboard/cohort paths must redirect to same-origin login
+with frame denial. It fails on missing `/workspaces` or `/verify-email`, so an
+older deployment cannot be mistaken for the current identity/workspace slice.
+It does not deploy, submit Auth forms, verify a signed-in flow, or prove that a
+dashboard page exists behind its authentication redirect. The local production
+build manifest and later authenticated acceptance are separate checks.
+
+## Deploying the web app (approved releases only)
+
+The Vercel project `jelly-bean2/nd-automation-dashboard` has **no Root
+Directory** setting: it must be deployed from `apps/web`. Uploading the
+repository root builds at the root and fails with "Couldn't find any `pages` or
+`app` directory" — that failed attempt and the stale pre-identity deployment
+remain harmless history records.
+
+```powershell
+cd apps/web
+npx vercel link --yes --project nd-automation-dashboard --scope jelly-bean2
+npx vercel deploy --prod --yes
+npm.cmd run check:deployment -- https://nd-automation-dashboard.vercel.app
+```
+
+Deploy only with explicit user approval. The CLI uploads the reviewed working
+tree directly (no Git connection, commit or push). `vercel link` refreshes the
+short-lived project-scoped `VERCEL_OIDC_TOKEN` line inside the ignored
+`.env.local`; never stage that file. The untracked `.vercel` link may be deleted
+afterward; relink before the next deploy. Record the deployment id, production
+alias and gate result in `docs/IMPLEMENTATION-STATUS.md`.
+
+`supabase/migrations/20261030155515_verified_access_v1.sql` is the additive
+verified-access hardening source, applied with approval to the shared project as
+`20261030155727`: fresh confirmed identities in legacy helpers/own metadata and
+session-owner confirmation before new check jobs/leases. Existing invalid
+authorizations fail closed and need operator reconciliation; already-leased
+result completion may drain. See `DB-DEPLOYMENT-20261030-VERIFIED-ACCESS.md`.
+Do not reapply it to that project. Other environments require separate approval;
+never edit historical migrations or push the migration directory wholesale
+(publishing remains intentionally undeployed).
+
 Run independent type/lint/tests in parallel if useful; run build after source fixes and do not race its generated types with a separate build. Never run legacy top-level `test_post*.py` or `test_update.py` as a test suite—they can write live sheet values.
 
 Tests cover Pacific/Pakistan date differences, 23/25-hour DST days, ambiguous times, pause accounting, strict CSV parsing, unsafe URLs, formula injection, auth redirect validation, public-key safety, real database RLS, no role self-escalation, atomic import rollback, unverified imports and observation/session permissions.

@@ -9,6 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  worker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # These tests use stdlib mocks/fixtures only; never install/start a browser.
+      - run: python -m unittest discover -v
+
   reporting:
     runs-on: ubuntu-latest
     defaults:
