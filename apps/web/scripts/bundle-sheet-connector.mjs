@@ -32,6 +32,7 @@ if (content === null) {
   await assertCommittedArtifact();
 } else {
   await mkdir(directory, { recursive: true });
-  await writeFile(target, `// Generated from integrations/sheets/reporting-sync.gs. Do not edit by hand.\nexport const SHEET_CONNECTOR_SOURCE = ${JSON.stringify(content)};\n`);
+  const normalized = content.replace(/\r\n/g, "\n");
+  await writeFile(target, `// Generated from integrations/sheets/reporting-sync.gs. Do not edit by hand.\nexport const SHEET_CONNECTOR_SOURCE = ${JSON.stringify(normalized)};\n`);
   console.log("Bundled the generic read-only Sheet connector (no connection secrets).");
 }
