@@ -120,20 +120,67 @@ relying on a new Incogniton/Nextdoor build.
 
 ### Why comment capture stays empty (verified 2026-10-30)
 
-The pilot post and four other tracked post links were scanned at both the
-profile's default window and at 1440×900 desktop emulation. In every case
-`.comment-list-container` contained **no text**, no `button`, `role="button"` or
-link containing the word "comment" was present, and at desktop width the list
-container was not rendered at all. Comments only appear after opening a post's
-detail view, which the read-only contract forbids (no click, no expansion).
+The pilot post and four other tracked post links were scanned at the profile's
+default window and at 1440×900 desktop emulation. In every case the target
+post's own `.comment-list-container` contained **no text**, and no `button`,
+`role="button"` or link containing the word "comment" was present. At desktop
+width the list container was not rendered at all.
+
+**The pilot post itself has no comments to collect.** A later scan scoped
+strictly to the target card found `own_chars = 0` both before and after a
+programmatic click on `post-body` (the click opens the detail view without
+mutating anything). The list that grew to 117–118 characters during that run
+belonged to a **neighbouring feed card**, not to the pilot post — an earlier note
+misattributed it, and that attribution is withdrawn here.
+
+Two things therefore remain true and must not be conflated:
+
+- zero rendered comment characters is **not** proof of zero comments. The card
+  shows a comment composer avatar, so a rendered "no text" list says nothing
+  about the real comment count. `comments_total` stays `null`.
+- enabling capture still needs an explicit, separately approved expansion step
+  **and** a post that actually has comments, so a selector can be validated
+  against real items before it ships.
 
 Consequences, by design:
 
 - the `comment`, `comment_body` and `comment_id_attribute` values stay
   non-matching;
 - checks store `comments_total = null` and `comments_complete = false`;
-- enabling comment capture needs an explicit, separately approved read-only
-  expansion step, not an inferred selector.
+- the dashboard already renders stored comment detail (author, body,
+  first-observed time, platform creation time when known) on
+  `/dashboard/comments`, `/dashboard/posts/<id>` and
+  `/dashboard/results?view=comments`. It is empty because no comment has been
+  recorded — not because the view is missing.
+
+### Transient failures and the 24-hour window
+
+`reporting_complete_check` records `last_checked_at` for every outcome, including
+`proxy_issue`, `network_error` and `profile_error`. Those three are therefore
+re-planned after a 30-minute cooldown instead of a full day, capped at 6 attempts
+per rolling 24 hours. Everything else keeps 24 hours, and `needs_review` never
+fast-retries because it is waiting on a human decision.
+
+What this means while operating:
+
+- a proxy blip no longer costs a post its whole day; wait ~30 minutes and the
+  next claim can pick it up;
+- if a post shows `Last attempt: Proxy issue…` in the ledger for several hours,
+  the proxy is persistently broken — fix or reassign it, not the post;
+- after 6 failures in 24 hours the post is intentionally parked; there is no
+  manual single-post requeue yet, so a genuinely dead proxy needs the profile's
+  proxy replaced rather than more retries.
+
+### Geo and proxy posture ("is Pakistan banned?")
+
+Nextdoor availability is decided by the **egress address of the profile's proxy**,
+not by where the worker machine runs. Verified 2026-10-30 inside the pilot profile
+via `ipinfo.io/json`: `country: US`. So this pilot browses as a US visitor and the
+banned-region risk does not apply to it.
+
+The rule to keep: a profile whose proxy is missing, misconfigured or in a blocked
+region fails closed as `proxy_issue` and is never reported as a removed post. Do
+not "verify" reachability from the host machine — always from inside the profile.
 
 ### Where an undated post appears
 

@@ -154,14 +154,27 @@ ignored the `status` key (`{"status":"Ready"}`), so every idle profile looked
 busy; and the first identity draft accepted a wrong target URL because the title
 branch was not gated on the page address.
 
-**Comment capture is not possible without interaction.** The pilot post and four
-other tracked links were scanned at the profile's default window and at 1440×900
-emulation: no `.comment-list-container` ever contained text, no control
-mentioning "comment" was present, and at desktop width the list was not rendered
-at all. Comments require opening a post's detail view, which the contract forbids.
-So the comment selectors stay non-matching, `comments_total` stays `null` and
-`comments_complete` stays `false`; enabling capture is a separate, explicitly
-approved read-only expansion feature.
+**Comment capture is not possible without interaction, and the pilot post has
+no comments to collect.** The pilot post and four other tracked links were
+scanned at the profile's default window and at 1440×900 emulation: the target
+post's own `.comment-list-container` never contained text, no control mentioning
+"comment" was present, and at desktop width the list was not rendered at all.
+
+A later scan scoped strictly to the target card measured `own_chars = 0` both
+before and after a programmatic `post-body` click (which opens the detail view
+without mutating anything). The 117–118 character list seen in that run belonged
+to a **neighbouring feed card**; the earlier "comments appear after a click"
+attribution was wrong and is withdrawn. A rendered empty list is also *not* proof
+of zero comments, because the card carries a composer avatar — so `comments_total`
+stays `null` and `comments_complete` stays `false`.
+
+The dashboard side is already complete: `/dashboard/comments`,
+`/dashboard/posts/<id>` and `/dashboard/results?view=comments` all render stored
+comment detail (author, body, first-observed time, platform creation time when
+known), and the post ledger shows the per-post count. Those views are empty only
+because `reporting_comments` holds no rows. Enabling automatic capture still
+needs an explicit approval for the detail-opening step **and** a post that
+actually has comments, so a selector can be validated against real items.
 
 **Reporting chain checked at the data layer** (the UI needs the operator's own
 session). `/dashboard/checks` reads `reporting_post_checks` and shows the single
@@ -171,6 +184,29 @@ counted in `unknownDates` (1) with the existing coverage notice; it is not
 silently dropped and no date was invented. A proxy failure observed on an
 unrelated profile during probing (`ERR_SOCKS_CONNECTION_FAILED`) maps to
 `proxy_issue`, never to a dead-post outcome.
+
+**Transient failures no longer consume the 24-hour window (2026-10-30).**
+`reporting_complete_check` advances `last_checked_at` for every outcome, so one
+30-second `ERR_SOCKS_CONNECTION_FAILED` used to block a publication for a full
+day — and an undated post had no manual requeue path at all. Migration
+`20261030220000_transient_check_retry.sql` re-plans a publication whose
+`last_check_outcome` is `proxy_issue`, `network_error` or `profile_error` once 30
+minutes have passed, capped at **6 attempts per rolling 24 hours** so a
+persistently broken profile cannot create job churn. Authoritative outcomes
+(`alive`, `deleted_from_nd`, `unavailable`, `needs_review`, login/verification)
+keep the full 24-hour window; `needs_review` deliberately does **not** fast-retry
+because a human decision is pending. Verified as a truth table before rollout:
+proxy + 40 min + 1 attempt → replan; proxy + 10 min → wait; proxy + 40 min + 6
+attempts → wait; `alive` + 40 min → wait; `alive` + 25 h → replan.
+
+**Egress is US, not Pakistan (verified in the profile's own browser).**
+`ipinfo.io/json` loaded inside the pilot Incogniton profile on 2026-10-30
+returned `country: US` with a non-datacenter organisation hint. The pilot is
+therefore not browsing Nextdoor from a Pakistani address; the banned-region risk
+is a property of whichever proxy a profile is assigned, not of the host machine.
+The same proxy is demonstrably flaky (`ERR_SOCKS_CONNECTION_FAILED` observed on
+two different profiles minutes apart), which is exactly the case the retry rule
+above now covers.
 
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
