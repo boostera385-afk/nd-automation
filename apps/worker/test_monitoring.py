@@ -3,7 +3,9 @@ from unittest.mock import Mock, patch
 
 from local_incogniton import Incogniton, ProfileUnavailable, debug_endpoint
 from monitor import check_page, run_batch
-from monitoring import canonical_post_url, classify_snapshot, navigation_failure, validate_adapter, validate_manifest
+from monitoring import (canonical_post_url, classify_snapshot, navigation_failure, normalized_title,
+                        validate_adapter, validate_manifest)
+from worker_protocol import validate_job
 
 
 POST = {"publication_id": "11111111-1111-4111-8111-111111111111",
@@ -28,6 +30,19 @@ class ContractTests(unittest.TestCase):
         for posts in ([], [POST, POST], [{**POST, "password": "secret"}], [{**POST, "profile_id": "ambiguous name"}]):
             with self.assertRaises((ValueError, TypeError)):
                 validate_manifest({"version": 1, "posts": posts})
+
+    def test_stored_title_is_normalized_for_identity_matching(self):
+        self.assertEqual(normalized_title("  Hello,   WORLD!! "), "hello world")
+        self.assertEqual(normalized_title(None), "")
+        self.assertEqual(len(normalized_title("x" * 900)), 500)
+
+    def test_manifest_carries_an_optional_title_only(self):
+        self.assertEqual(validate_manifest({"version": 1, "posts": [{**POST, "title": " Big   News, Today "}]}),
+                         [{**POST, "title": "big news today"}])
+        self.assertEqual(validate_manifest({"version": 1, "posts": [{**POST, "title": "   "}]}), [POST])
+        for title in (123, ["news"], {"text": "news"}):
+            with self.assertRaises(ValueError):
+                validate_manifest({"version": 1, "posts": [{**POST, "title": title}]})
 
     def test_adapter_requires_explicit_configuration(self):
         self.assertEqual(validate_adapter(ADAPTER), ADAPTER)
@@ -79,7 +94,37 @@ class ContractTests(unittest.TestCase):
             self.assertEqual(api.request.call_count, 1)
 
 
+class JobContractTests(unittest.TestCase):
+    JOB = {"job_id": "55555555-5555-4555-8555-555555555555",
+           "publication_id": POST["publication_id"], "profile_id": POST["profile_id"], "url": POST["url"],
+           "lease_token": "66666666-6666-4666-8666-666666666666",
+           "lease_expires_at": "2026-10-30T20:00:00+00:00"}
+
+    def job(self, **extra):
+        return {**self.JOB, **extra}
+
+    def test_claim_forwards_an_optional_normalized_title(self):
+        self.assertEqual(validate_job(self.job()), POST)
+        self.assertEqual(validate_job(self.job(title="Hello, World"))["title"], "hello world")
+        self.assertEqual(validate_job(self.job(title=None)), POST)
+        self.assertEqual(validate_job(self.job(title="  ")), POST)
+        self.assertEqual(validate_job(self.job(account_label="Example account")), POST)
+
+    def test_claim_still_rejects_unknown_fields(self):
+        for extra in ({"selector": "x"}, {"title": 5}, {"title": ["news"]}):
+            with self.assertRaises(ValueError):
+                validate_job(self.job(**extra))
+
+
 class RunnerTests(unittest.TestCase):
+    def test_check_page_passes_the_stored_title_to_the_adapter(self):
+        page = Mock()
+        page.goto.return_value.status = 200
+        page.evaluate.return_value = {"url": POST["url"], "exact_post": True}
+        check_page(page, {**POST, "title": "big news today"}, ADAPTER)
+        self.assertEqual(page.evaluate.call_args[0][1]["title"], "big news today")
+        self.assertEqual(page.evaluate.call_args[0][1]["target"], POST["url"])
+
     @patch("monitor.time.sleep")
     def test_profiles_are_grouped_and_only_worker_page_is_closed(self, _sleep):
         api, chromium, emit = Mock(), Mock(), Mock()

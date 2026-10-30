@@ -12,14 +12,36 @@ from monitoring import classify_snapshot, navigation_failure, result, validate_a
 from worker_lock import monitoring_lock
 
 
-SNAPSHOT_JS = """({adapter, target}) => {
+SNAPSHOT_JS = """({adapter, target, title}) => {
   const visible = el => el && !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
   const has = selector => [...document.querySelectorAll(selector)].some(visible);
   const clean = value => { try { const u = new URL(value, location.href); u.hash = ''; u.search = ''; return u.pathname.replace(/\\/$/, ''); } catch { return ''; } };
-  const roots = [...document.querySelectorAll(adapter.post_root)].filter(visible).filter(root =>
-    [...root.querySelectorAll(adapter.post_body)].some(body => visible(body) && body.innerText.trim()) &&
-    [...root.querySelectorAll(adapter.post_link)].some(link => visible(link) &&
-      ['https://nextdoor.com', 'https://www.nextdoor.com'].includes(new URL(link.href, location.href).origin) && clean(link.href) === clean(target)));
+  const same = (a, b) => { try { return clean(a) === b; } catch { return false; } };
+  const norm = value => (value || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\\s+/g, ' ').trim();
+  const want = clean(target);
+  const onTarget = clean(location.href) === want;
+  const expect = typeof title === 'string' ? title : '';
+  const words = expect.split(' ').filter(word => word.length > 3);
+  // Nextdoor post pages never link a card to itself, so a stored title match is the
+  // alternative identity signal. It only counts on the canonical post address.
+  const matchesTitle = body => {
+    if (expect.length < 20) return false;
+    if (body.includes(expect.slice(0, 40))) return true;
+    if (words.length < 3) return false;
+    const tokens = new Set(body.split(' '));
+    let shared = 0;
+    for (const word of words) if (tokens.has(word)) shared++;
+    return shared / words.length >= 0.8;
+  };
+  const roots = [...document.querySelectorAll(adapter.post_root)].filter(visible).filter(root => {
+    const bodies = [...root.querySelectorAll(adapter.post_body)].filter(body => visible(body) && body.innerText.trim());
+    if (!bodies.length) return false;
+    const linked = [...root.querySelectorAll(adapter.post_link)].some(link => visible(link) &&
+      ['https://nextdoor.com', 'https://www.nextdoor.com'].includes(new URL(link.href, location.href).origin) &&
+      same(link.href, want));
+    // A title match only identifies the target while the page itself is that post.
+    return linked || (onTarget && matchesTitle(norm(bodies.map(body => body.innerText).join(' '))));
+  });
   const root = roots.length === 1 ? roots[0] : null;
   return {url: location.href, exact_post: !!root,
     login: has(adapter.login), verification: has(adapter.verification),
@@ -39,15 +61,16 @@ def check_page(page, post, adapter):
     except Exception as error:
         return navigation_failure(post, error)
     try:
+        expect = {"adapter": adapter, "target": post["url"], "title": post.get("title", "")}
         try:
             page.wait_for_function(
                 "args => { const s = (" + SNAPSHOT_JS + ")(args); return s.exact_post || s.login || s.verification || s.removed || s.unavailable; }",
-                arg={"adapter": adapter, "target": post["url"]}, timeout=15000)
+                arg=expect, timeout=15000)
         except Exception:
             # Still inspect the final page conservatively; an unknown layout is not a network failure.
             pass
         # Read only DOM state: no click, fill, engagement, expansion or API scraping.
-        snapshot = page.evaluate(SNAPSHOT_JS, {"adapter": adapter, "target": post["url"]})
+        snapshot = page.evaluate(SNAPSHOT_JS, expect)
         if response and response.status >= 400 and not snapshot.get("login") and not snapshot.get("verification"):
             return result(post, "needs_review", "The post returned an HTTP access error; removal is not established.")
         return classify_snapshot(post, snapshot)

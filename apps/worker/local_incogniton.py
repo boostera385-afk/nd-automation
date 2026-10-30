@@ -29,9 +29,12 @@ class Incogniton:
         data = self.request("/profile/status/" + profile_id)
         if not isinstance(data, dict):
             return False
-        states = [data[key].strip().lower() for key in ("profile_status", "state", "profileStatus", "data")
+        # Incogniton 5 reports {"status": "Ready"} when idle and {"status":
+        # "Launched"} while running; older builds use the other keys. Any
+        # unknown or ambiguous shape stays "not stopped" so launch is refused.
+        states = [data[key].strip().lower() for key in ("status", "profile_status", "state", "profileStatus", "data")
                   if isinstance(data.get(key), str) and data[key].strip()]
-        return bool(states) and all(state in {"stopped", "closed", "inactive", "idle"} for state in states)
+        return bool(states) and all(state in {"stopped", "closed", "inactive", "idle", "ready"} for state in states)
 
     def launch(self, profile_id):
         if not self.stopped(profile_id):

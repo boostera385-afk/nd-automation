@@ -25,13 +25,20 @@ def timestamp(value):
 
 
 def validate_job(job):
-    if not isinstance(job, dict) or set(job) != {"job_id", "publication_id", "profile_id", "url", "lease_token", "lease_expires_at"}:
+    required = {"job_id", "publication_id", "profile_id", "url", "lease_token", "lease_expires_at"}
+    if not isinstance(job, dict) or not required <= set(job) or set(job) - required - {"title", "account_label"}:
         raise ValueError("Unexpected monitoring job contract")
     for key in ("job_id", "lease_token"):
         if not isinstance(job[key], str) or str(UUID(job[key])) != job[key].lower():
             raise ValueError("A canonical job and lease UUID are required")
     timestamp(job["lease_expires_at"])
-    return validate_manifest({"version": 1, "posts": [{key: job[key] for key in ("publication_id", "profile_id", "url")}]})[0]
+    post = {key: job[key] for key in ("publication_id", "profile_id", "url")}
+    # The stored title is optional; without it only an in-card post link can identify a post.
+    if "title" in job and job["title"] is not None and not isinstance(job["title"], str):
+        raise ValueError("A stored post title must be text")
+    if isinstance(job.get("title"), str) and job["title"].strip():
+        post["title"] = job["title"]
+    return validate_manifest({"version": 1, "posts": [post]})[0]
 
 
 def remaining_lease(job, now=None):

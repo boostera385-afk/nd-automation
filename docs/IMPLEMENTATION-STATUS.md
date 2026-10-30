@@ -101,6 +101,59 @@ the local API on `127.0.0.1:35000` are operator steps; the worker still reports
 `unavailable` until they are done, so no profile has been opened and no browser
 check has run.
 
+### First supervised live monitoring check (2026-10-30)
+
+**Adapter derivation from the live DOM.** Probing the pilot post
+(`nextdoor.com/p/C2-PfTCsR2XN`, customer `ND Test`, account
+`Thomas Gutierrez`, Incogniton profile `6d98db87…208fa`) showed that Nextdoor
+serves a permalink page in a feed shell: `document.title` stays *News Feed*, the
+page carries many `feed-item-card` elements, and **no card ever links to its own
+post**. The only anchors whose path equalled the post lived in the `navbar`
+(offscreen 32×32 icons). The previously required "visible body **and** in-card
+self-link" contract is therefore unsatisfiable on this platform, so the contract
+was corrected rather than faked.
+
+**Identity rule now implemented** (`apps/worker/monitor.py`, `SNAPSHOT_JS`). A
+visible `post_root` counts as the exact post when it has a non-empty visible body
+**and** either (a) contains a visible in-card link to the target path, or (b) the
+page address itself is the target path **and** the body matches the stored post
+title — the normalized first 40 characters contained in the body, or at least
+80% of the title's words longer than three letters. Exactly one match is
+required; zero or several yield `needs_review`. Content identity is never
+accepted off the canonical address, and no title means only rule (a) applies.
+
+**Claim payload (additive migration `20261030203000_check_claim_identity`).**
+`reporting_claim_check` now also returns the publication's `title` and
+`account_label` so the browser can verify identity. Planning, leasing, session
+authorization and the 24-hour rule are unchanged, and the worker still rejects
+unknown job fields. Verified live against the pilot: the stored title matched the
+target card with 100% word overlap while every other card scored 0.
+
+**Selectors taken from the live DOM:** `post_root` `[data-testid="feed-item-card"]`,
+`post_body` `[data-testid="post-body"]`, `post_link` `a[href*="/p/"]`, `login`
+`[data-testid="email-address-input"]` (absent when signed in). The `comment`,
+`comment_id_attribute`, `comment_body`, `removed`, `verification` and
+`unavailable` values are deliberately non-matching placeholders: the current
+build exposes **no** per-comment identity attribute, and a post card's
+`comment-avatar-container` is the comment *composer*, not a comment. Comment
+capture therefore stays empty and is recorded as incomplete — never as zero
+verified comments.
+
+**Live result.** One auto-planned job, claimed and completed
+`ca03a6b3…50e5`: outcome `alive`, adapter fingerprint recorded, publication
+`visibility` moved `not_checked` → `live` at `last_checked_at`
+`2026-10-30 18:52:24Z`, `comments_total` left `null`, observation
+`comments_complete = false`, post check `alive`/positive "Post is alive", and one
+notification noting partial comment collection. A second `--once` poll returned
+`idle` with no second job, and the Incogniton profile returned to `Ready`.
+
+**Fail-closed matrix verified live before the run:** stored title → `exact_post`
+true; wrong title → false; missing title → false; different target URL → false.
+Two real defects were found and fixed on the way: `local_incogniton.stopped()`
+ignored the `status` key (`{"status":"Ready"}`), so every idle profile looked
+busy; and the first identity draft accepted a wrong target URL because the title
+branch was not gated on the page address.
+
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
 side as a fully ready flow, keeping publishing/cohort SQL and live
@@ -1193,6 +1246,22 @@ The user has requested full desktop-to-dashboard parity and authorized updating 
 | GitHub Actions CI | PASSING on GitHub (run #1, 2026-10-27) | Clean Linux install from the lockfile on Node 24, then typecheck, lint, tests, production build and `npm audit --omit=dev`: all steps succeeded on commit `233eeb8` |
 
 ## Validation log
+
+First supervised live monitoring check (2026-10-30): **80 worker unit tests
+PASS** (75 + 5 new for the optional stored title, job-field strictness and the
+title hand-off to the page evaluator). Live DOM derivation against the pilot post
+identified the target card by title with 100% word overlap; all other cards
+scored 0 and no card carries a self-link, which is why the exact-post contract
+now accepts a title match **only** on the canonical post address. Live
+fail-closed checks: correct title `exact_post=true`; wrong title, empty title and
+a different target URL all `false`. Applied additive migration
+`20261030203000_check_claim_identity` (claim returns `title`/`account_label`;
+same signature, same planning/leasing) and recorded it in
+`supabase_migrations`. The foreground agent then completed one job
+(`alive`) end to end and a second poll returned `idle` with no duplicate job. No
+Sheet cell was written, nothing was published, and no comment, removal or
+verification claim was made. Web gates were not re-run in this step because no
+file under `apps/web` changed.
 
 Live-test setup (2026-10-30): added the read-only connector gate
 `scripts/check-sheet-live.ts` (`npm run check:sheet`) and ran it against the

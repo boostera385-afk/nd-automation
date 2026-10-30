@@ -10,6 +10,8 @@ HOSTS = {"nextdoor.com", "www.nextdoor.com"}
 POST_PATH = re.compile(r"/(p|for_sale_and_free)/([A-Za-z0-9_-]+)/?")
 PROXY_CODES = {"ERR_PROXY_CONNECTION_FAILED", "ERR_TUNNEL_CONNECTION_FAILED",
                "ERR_PROXY_AUTH_REQUESTED", "ERR_SOCKS_CONNECTION_FAILED"}
+TITLE_LIMIT = 500
+TITLE_MIN_CHARS = 20  # Shorter titles cannot identify a post on their own.
 
 
 def canonical_post_url(value):
@@ -22,6 +24,14 @@ def canonical_post_url(value):
     return "https://nextdoor.com" + url.path.rstrip("/")
 
 
+def normalized_title(value):
+    """Compare a stored title with on-page text without case, punctuation or spacing noise."""
+    if not isinstance(value, str):
+        return ""
+    compact = re.sub(r"[^a-z0-9 ]+", " ", value.lower())
+    return re.sub(r"\s+", " ", compact).strip()[:TITLE_LIMIT]
+
+
 def validate_manifest(payload):
     """Fail the entire batch before opening any profile if input is invalid."""
     if not isinstance(payload, dict) or set(payload) != {"version", "posts"} or payload["version"] != 1:
@@ -29,9 +39,10 @@ def validate_manifest(payload):
     posts = payload["posts"]
     if not isinstance(posts, list) or not 1 <= len(posts) <= 100:
         raise ValueError("Expected 1 to 100 posts")
+    required = {"publication_id", "profile_id", "url"}
     seen, targets, validated = set(), set(), []
     for post in posts:
-        if not isinstance(post, dict) or set(post) != {"publication_id", "profile_id", "url"}:
+        if not isinstance(post, dict) or not required <= set(post) or set(post) - required - {"title"}:
             raise ValueError("Unexpected post fields")
         publication_id = str(UUID(post["publication_id"]))
         profile_id = str(UUID(post["profile_id"]))
@@ -40,7 +51,14 @@ def validate_manifest(payload):
             raise ValueError("Duplicate publication or profile/post target")
         seen.add(publication_id)
         targets.add((profile_id, url))
-        validated.append({"publication_id": publication_id, "profile_id": profile_id, "url": url})
+        entry = {"publication_id": publication_id, "profile_id": profile_id, "url": url}
+        if "title" in post:
+            if not isinstance(post["title"], str):
+                raise ValueError("A stored post title must be text")
+            title = normalized_title(post["title"])
+            if title:
+                entry["title"] = title
+        validated.append(entry)
     return validated
 
 
@@ -96,7 +114,7 @@ def classify_snapshot(post, snapshot):
             continue
         seen.add(external_id)
         comments.append({"external_id": external_id, "body": body, "created_at": None})
-    return result(post, "alive", "An exact-post link was found within the configured visible post root.", comments)
+    return result(post, "alive", "The exact post was identified on its canonical page address (post link or stored title match).", comments)
 
 
 def navigation_failure(post, error):
