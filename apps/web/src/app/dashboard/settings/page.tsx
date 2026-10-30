@@ -8,6 +8,10 @@ export default async function Settings() {
   const connected = sheetSyncConfigured(organization.id);
   return <>
     <PageHeader title="Settings / More" description="One-time connections, customers and advanced tools. Everyday work stays in the five main sections." />
+    <section className="guide-banner guide-tone-blue">
+      <div><h2>New here? Open the colored setup &amp; how-to guide</h2><p>Step-by-step for first-time setup, Fudge intake, ND dashboard automations, the daily rhythm and troubleshooting. Opening it starts nothing automatically.</p></div>
+      <Link className="button" href="/dashboard/settings/guide">Open the guide</Link>
+    </section>
     {isStaff && <section id="connections"><Panel title="One-time connection setup">
       <div className="workflow-links">
         <Link href="/dashboard/automation"><strong>Pair laptop / worker</strong><small>Save the private credential locally; register once, not every day.</small></Link>

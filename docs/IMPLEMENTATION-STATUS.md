@@ -34,8 +34,8 @@ and will expire on its own. Leaked-password protection and signed-in production
 acceptance remain open. On 2026-10-30 the pilot Nextdoor account was found
 indefinitely suspended, so live monitoring is paused until a person resolves it.
 
-Validation on the final tree: typecheck PASS, lint PASS (**0 warnings**), **809
-tests / 58 files** PASS, production build PASS. Hosted post-deploy checks confirmed
+Validation on the final tree: typecheck PASS, lint PASS (**0 warnings**), **814
+tests / 59 files** PASS, production build PASS. Hosted post-deploy checks confirmed
 table/function/policy presence, the publication-source and notification-kind
 constraints, the timestamp regex in `reporting_complete_publish`, and read-only
 grants. Real signed-in cohort execution and publish claim/completion were not run;
@@ -44,6 +44,23 @@ See `docs/DB-DEPLOYMENT-20261030-COHORT.md`; the drafts README and test path now
 point at the promoted migration. Worker side: **88 unittest cases PASS**, covering
 adapter v2 validation, the two comment gates, mount/expansion behaviour, completion
 honesty and the account-disabled redirect.
+
+## First-time setup guide (2026-10-30)
+
+Added `/dashboard/settings/guide`, a colored, step-by-step guide linked prominently
+from Settings and the Home daily-workflow panel. It covers the one-time setup
+(verified account, business timezone, customers, worker pairing, exact-UUID
+profile mapping, Master Sheet connection), the Fudge intake flow
+(collect → source Sheet → cleanup → ND master Sheet, with intake upload still
+off), the dashboard automation loop (work session → Master Sheet sync →
+monitoring batch → Results/comments), a daily rhythm, troubleshooting
+(login/verification, proxy, profile busy, account disabled, worker offline, Sheet
+not configured, partial counts) and a separate desktop-only/gated section. It
+states that publishing, listings, account creation, cookie/proxy execution,
+scheduled or unattended work, automatic Sheet writeback and Fudge upload remain
+unimplemented or desktop-only, and that an account-disabled page is a human
+stop — never something to evade. Opening the guide starts no browser, upload,
+post or Sheet write.
 
 ## Live-test setup (2026-10-30)
 
