@@ -43,9 +43,10 @@ the browser shows the generated credential only in the registration response.
 
 Code-first extension (2026-10-29): `/dashboard/run/cohorts` adds explicit
 prior-business-date cohort requests in source, using the existing job/worker
-contract. Its separate `supabase/drafts/check_cohort_v1.sql` is not deployed.
-Snapshot membership and receipts are immutable; strict action/read/UI paths
-fail closed until setup. A configurable 60–1440 minute explicit-refresh window
+contract. Its protocol is now applied as hosted `20261030164030 check_cohort_v1`
+(2026-10-30); no worker or job ran from the deployment. Snapshot membership and
+receipts are immutable; strict action/read/UI paths fail closed until setup. A
+configurable 60–1440 minute explicit-refresh window
 does not alter the scheduled 24-hour policy below. It never enables profiles,
 changes sessions, reclaims expired leases or writes Sheets. Unknown dates and
 unsupported/unmapped targets remain explicit, not replacement cohort members.

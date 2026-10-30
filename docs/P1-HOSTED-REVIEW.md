@@ -27,7 +27,7 @@ No advisor-driven DDL or Auth setting change was performed. No all-clear securit
 
 ## Migration decision
 
-Do **not** replay the six existing migrations. Do **not** reset the database, create a duplicate reporting schema, or blindly push the directory. The local `202610270006_publish_jobs.sql` migration is absent from hosted history and remains deliberately undeployed until publisher review and separate approval.
+Do **not** replay the six existing migrations. Do **not** reset the database, create a duplicate reporting schema, or blindly push the directory. The `202610270006_publish_jobs.sql` protocol was applied separately as hosted `20261030164110 publish_jobs_v1` on 2026-10-30 (queue only; no publisher adapter). Earlier text in this review records the pre-deployment state.
 
 Fudge raw ingestion and its workspace/revision model are not implemented on this backend. The per-user SQL in the Fudge repository must not be applied unchanged as a shortcut. Settle ingestion authorization/ownership and implement a separately tested additive migration when its P0/P1 dependencies are resolved.
 

@@ -14,7 +14,7 @@ export default async function CheckCohorts() {
     <PageHeader eyebrow="EXACT DATE COHORT" title="Refresh post statuses" description="Choose a prior publication date once. Preserve every tracked member and follow its exact job or skip reason." actions={<Link className="button secondary" href="/dashboard/run">Run controls</Link>} />
     <div className="notice">Read-only monitoring only. A queued job is not a completed observation. Worker availability, active session and explicit profile authorization remain required. Sheet delivery is not connected.</div>
     <Panel title="Queue a reviewed cohort">
-      {!history.available ? <p className="notice">{history.setup ? "Cohort protocol setup is pending. The local reviewed SQL draft has not been deployed here; no refresh controls are enabled." : "Cohort history could not be verified. Refresh controls are disabled rather than treating failed reads as empty."}</p>
+      {!history.available ? <p className="notice">{history.setup ? "Cohort protocol setup is pending in this environment; no refresh controls are enabled." : "Cohort history could not be verified. Refresh controls are disabled rather than treating failed reads as empty."}</p>
         : data.truncated ? <p className="notice">Customer/reporting records are incomplete. Resolve loaded-data limits before choosing a cohort.</p>
           : !data.customers.length ? <p>Add an authorized customer and exact tracked publication records first.</p>
             : <CohortRefresh customers={data.customers} initialDay={shiftDay(businessDate(now, organization.time_zone), -1)} activeSession={Boolean(activeSession)} />}

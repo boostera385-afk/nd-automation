@@ -31,7 +31,7 @@ beforeAll(async () => {
     grant usage on schema auth to authenticated,anon;
     insert into auth.users values ('${user}',now()),('${other}',now()),('${unverified}',null),('${customerUser}',now());`);
   for (const name of ["202610260001_reporting_foundation.sql", "202610270001_post_checks_and_notifications.sql", "202610270002_monitoring_worker_bridge.sql", "202610270003_worker_bridge_indexes.sql"]) await db.exec(await readFile(new URL(`../../../supabase/migrations/${name}`, import.meta.url), "utf8"));
-  await db.exec(await readFile(new URL("../../../supabase/drafts/check_cohort_v1.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/20261030164030_check_cohort_v1.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   org = String(await owner(() => scalar("select public.reporting_create_workspace('Fixture workspace')")));
   otherOrg = String(await as("authenticated", other, () => scalar("select public.reporting_create_workspace('Other fixture')")));

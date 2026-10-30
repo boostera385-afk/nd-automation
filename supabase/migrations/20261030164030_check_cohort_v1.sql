@@ -1,5 +1,5 @@
--- LOCAL REVIEW DRAFT ONLY. Not applied to hosted history; promote with the CLI
--- after separate deployment approval. Requires the existing monitoring bridge.
+-- Promoted from the reviewed draft and applied as hosted migration 20261030164030
+-- (source filename matches the hosted version). Requires the existing monitoring bridge.
 -- Additive: never replaces worker claim/complete or enables a profile/session.
 create function private_reporting.cohort_staff(org uuid) returns boolean
 language sql stable security definer set search_path = '' as $$

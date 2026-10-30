@@ -17,6 +17,8 @@ still require an administrator save/restart; no auto-credential persistence.
 
 [P1 hosted review](P1-HOSTED-REVIEW.md) — current shared-project identity, existing migration mapping/source-body baseline, grants/RLS/advisor findings and remaining acceptance/recovery gates. No hosted changes applied.
 
+[Protocol deployment — cohort and publish jobs](DB-DEPLOYMENT-20261030-COHORT.md) — hosted versions, additive guards, zero-row state and the still-gated adapters/delivery.
+
 [Implementation tracker](IMPLEMENTATION-TRACKER.md) — P0–P8 and individual F01–F36/N01–N08 acceptance backlog. [P0 discovery / P1 readiness](P0-DISCOVERY.md) — unresolved mappings, field ownership, secret-safe offline preflight and hosted inspection prerequisites.
 
 [Fudge + ND Master Automation Implementation Guide](MASTER-AUTOMATION-PLAN.md) — shared cross-repository master plan for collection through approved execution, profile operations, previous-100 monitoring, comments, Sheet writeback and controlled reposting. Includes phased gates, minimal-human operating model, security and recovery. Proposed implementation only; actual delivery remains in the implementation-status record.
@@ -25,7 +27,8 @@ still require an administrator save/restart; no auto-credential persistence.
 connections/profile mappings, and the exact desktop-versus-dashboard boundary.
 
 [Publishing preparation and protocol](PUBLISHING-PROTOCOL.md) — staged drafts and
-inventory, locally tested publish jobs, and the missing browser-execution gates.
+inventory, the applied queue-only publish-jobs protocol, and the missing
+browser-execution gates.
 
 [Operational workbook workflow review](WORKBOOK-WORKFLOW-REVIEW.md) — read-only review of the supplied workbook copy, execution-versus-monitoring status mapping, missing-link reconciliation and unsafe column-layout assumptions.
 

@@ -11,9 +11,11 @@
 - `/dashboard/publishing`: staff-only protocol-job inspection, pending-job
   cancellation and expired-operation acknowledgement. Degrades to a setup notice
   when its migration is absent. **No enqueue/publish server action or button.**
-- `202610270006_publish_jobs.sql`: locally tested publishing protocol, **not
-  applied to hosted staging**. It must be reviewed with the actual submit adapter
-  before deployment. The bundled `agent.py` still allowlists monitoring RPCs only.
+- `202610270006_publish_jobs.sql`: publishing protocol applied to hosted staging
+  as **`20261030164110 publish_jobs_v1`** (2026-10-30). The durable queue is live,
+  but **no submit adapter exists** and no enqueue action is exposed; the bundled
+  `agent.py` still allowlists monitoring RPCs only. See
+  `docs/DB-DEPLOYMENT-20261030-COHORT.md`.
 
 ## Protocol rules implemented locally
 

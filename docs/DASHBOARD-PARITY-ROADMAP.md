@@ -61,8 +61,9 @@ revision/target snapshots. There is **no publish job type** yet; connecting an
 approved draft to a worker publish flow is the next gated step and must reuse
 the audited legacy flows with fixed result capture (see plan §2.3 defects 1–6).
 
-Subsequent local protocol: `202610270006_publish_jobs.sql` now implements durable
-approved-revision jobs, immutable snapshots, cross-type leases and exact result
-capture with duplicate/ambiguity guards, but it is **not deployed** and the
-bundled agent has no publishing support. `/dashboard/publishing` is inspection
-only; no release-to-browser action exists. See `PUBLISHING-PROTOCOL.md`.
+Subsequent protocol: `202610270006_publish_jobs.sql` is now applied as hosted
+`20261030164110 publish_jobs_v1` (2026-10-30). It implements durable approved-revision
+jobs, immutable snapshots, cross-type leases and exact result capture with
+duplicate/ambiguity guards, but the bundled agent has no publishing support and no
+enqueue action is exposed. `/dashboard/publishing` is inspection only. See
+`PUBLISHING-PROTOCOL.md` and `DB-DEPLOYMENT-20261030-COHORT.md`.

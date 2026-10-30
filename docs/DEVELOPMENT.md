@@ -199,8 +199,10 @@ session-owner confirmation before new check jobs/leases. Existing invalid
 authorizations fail closed and need operator reconciliation; already-leased
 result completion may drain. See `DB-DEPLOYMENT-20261030-VERIFIED-ACCESS.md`.
 Do not reapply it to that project. Other environments require separate approval;
-never edit historical migrations or push the migration directory wholesale
-(publishing remains intentionally undeployed).
+never edit historical migrations or push the migration directory wholesale.
+Cohort (`check_cohort_v1`) and publish-job (`publish_jobs_v1`) protocols are now
+applied as hosted `20261030164030` and `20261030164110`; their adapters, uploads
+and Sheet delivery remain off.
 
 Run independent type/lint/tests in parallel if useful; run build after source fixes and do not race its generated types with a separate build. Never run legacy top-level `test_post*.py` or `test_update.py` as a test suite—they can write live sheet values.
 

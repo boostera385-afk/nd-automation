@@ -1,5 +1,11 @@
 # Local SQL design drafts — not deployment migrations
 
+The former `check_cohort_v1.sql` draft was promoted after explicit deployment
+approval to `../migrations/20261030164030_check_cohort_v1.sql` and applied through
+MCP as hosted version `20261030164030` (source filename matches hosted). Tests now
+load the migration source; there is no second draft copy to deploy. See
+`docs/DB-DEPLOYMENT-20261030-COHORT.md`.
+
 The former `service_catalog_v1.sql` draft was promoted after authorization to
 `../migrations/20261029165237_service_catalog_v1.sql`, applied as hosted
 `20261029165416`. Follow-up FK indexes are source `20261029165727`, hosted

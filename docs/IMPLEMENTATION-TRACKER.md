@@ -13,6 +13,18 @@ Sheet mapping/delivery and recovery/rights gates remain; see the current status
 entry for evidence and precise limitations. Do not enable automation from this
 tracker or infer live readiness from test counts.
 
+Protocol deployment (2026-10-30): after the full-chain audit the user directed
+implementation of the safe readiness items. Hosted history now contains **14
+migrations** — cohort `20261030164030 check_cohort_v1` and publish jobs
+`20261030164110 publish_jobs_v1` were added — and **28 public base tables**, all
+RLS-enabled. Both protocols are queue/history only: no worker, publish adapter,
+Fudge upload release, Sheet delivery or live job was enabled, and the new tables
+remain empty. `/dashboard/run/cohorts` now unlocks for verified staff with an
+active session; `/dashboard/publishing` reads an existing empty queue with no
+enqueue action. Dashboard validation: 805 tests / 57 files, typecheck and lint
+PASS; the production build result is recorded in the current status entry. See
+`DB-DEPLOYMENT-20261030-COHORT.md`.
+
 Security follow-up (2026-10-29): central application-layer email confirmation,
 explicit authorized workspace selection, stale-account/business form rejection
 across all 30 business form actions, and matching notification scope are now
@@ -66,8 +78,8 @@ User selected Fudge as the next owning repository; no cutover or release implied
 | P1 | Central app verification/workspace selection and additive verified SQL hardening implemented; security source applied as hosted `20261030155727`, 12 migration records | Current dashboard deployment, negative live Auth/isolation and selector/stale-tab acceptance, restore and operational Sheet setup remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
 | P3 | Intake receipts, deployed catalog/review/activation and queue UI implemented; owner guided 2-rule catalog pass recorded; cache gated and Sheet delivery unwired | Full business rule matching/approval, operator/cross-business/concurrent live acceptance, cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
-| P4 | Monitoring source, local date-cohort protocol/UI, offline preflight and durable monitoring-result replay implemented; live acceptance pending | Protocol deployment/setup, real filesystem/worker recovery acceptance, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
-| P5 | Local protocol only; browser publishing paused | Reviewed publisher, media, durable submit journal, explicit release and live pilot |
+| P4 | Monitoring source, deployed date-cohort protocol/UI, offline preflight and durable monitoring-result replay implemented; live acceptance pending | Real filesystem/worker recovery acceptance, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
+| P5 | Durable publish-job queue applied as hosted `20261030164110`; browser publishing paused | Reviewed publisher/adapter, media, explicit release and live pilot |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
 | P7 | Not started | Approved linked reposts and bounded batching after correctness gates |
 | P8 | Not started | Full acceptance/recovery/rollback; individual feature sign-off |
@@ -115,7 +127,7 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | F35 | Theme/settings foundations; connections unverified | P1/P4 web + worker | Real target/machine checks without exposing secrets |
 | F36 | Desktop launchers preserved; worker operations incomplete | P4/P8 worker | Versioned install/update/drain/restart/rollback |
 | N01 | Publication ledger foundation | P3/P5 backend | Sourced time/customer/exact URL; unknown stays unknown |
-| N02 | Local one-click date-cohort snapshot/queue/history/progress code and tests; undeployed SQL draft | P4 web + backend | Real contention, setup, live exact-cohort/restart/pause acceptance and mapped result writeback; latest-100 remains separate |
+| N02 | One-click date-cohort snapshot/queue/history/progress code and tests; SQL deployed as hosted `20261030164030` | P4 web + backend | Real contention, live exact-cohort/restart/pause acceptance and mapped result writeback; latest-100 remains separate |
 | N03 | Observation/check history foundation | P4 web + worker | Staleness, evidence, technical failure != removal |
 | N04 | Manual comments + partial worker collector | P4 worker + backend | Exact-post stable IDs, partial/completeness, unknown totals |
 | N05 | Reporting foundations | P4/P8 web | Date cohorts, DST, true coverage and partial-data indicators |

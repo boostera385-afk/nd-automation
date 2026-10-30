@@ -52,10 +52,13 @@ its current state. Do not delete or repurpose the other project without approval
 ## Source migrations
 
 P2 intake is **deployed**: source `20261028203213_fudge_ingestion_v1.sql`, hosted
-version `20261028203642`. There are now seven applied migrations and 19 public
-RLS-enabled tables. See `docs/DB-DEPLOYMENT-20261028.md` for verification and the
-remaining release/acceptance gates. Do not apply the older per-user Fudge SQL or
-deploy the publishing protocol as an intake shortcut. Extension uploads stay off.
+version `20261028203642`. As of 2026-10-30 there are **14 applied migrations** and
+**28 public RLS-enabled tables**. See `docs/DB-DEPLOYMENT-20261028.md`,
+`docs/DB-DEPLOYMENT-20261030-VERIFIED-ACCESS.md` and
+`docs/DB-DEPLOYMENT-20261030-COHORT.md` for verification and the remaining
+release/acceptance gates. Do not apply the older per-user Fudge SQL as an intake
+shortcut. The publishing protocol is deployed as a durable queue only; no submit
+adapter or upload release is enabled. Extension uploads stay off.
 
 | Source file | Scope |
 |---|---|
@@ -65,8 +68,10 @@ deploy the publishing protocol as an intake shortcut. Extension uploads stay off
 | `202610270003_worker_bridge_indexes.sql` | Covering indexes and schema comments |
 | `202610270004_content_drafts.sql` | Drafts, immutable revisions, human approval |
 | `202610270005_profile_inventory.sql` | Staff-maintained UUID/name/group claims |
-| `202610270006_publish_jobs.sql` | Local-only publishing protocol; not a validated publisher |
+| `202610270006_publish_jobs.sql` | Publishing protocol, applied as hosted `20261030164110`; queue only, no submit adapter |
 | `20261028203213_fudge_ingestion_v1.sql` | Applied workspace-scoped raw intake and immutable revisions (hosted `20261028203642`) |
+| `20261030155515_verified_access_v1.sql` | Applied verified-email/session hardening (hosted `20261030155727`) |
+| `20261030164030_check_cohort_v1.sql` | Applied prior-date check cohort protocol (hosted `20261030164030`) |
 
 Use MCP `apply_migration` for reviewed DDL, not raw SQL. Change the initial
 read-only MCP mode only after target/schema review and explicit deployment

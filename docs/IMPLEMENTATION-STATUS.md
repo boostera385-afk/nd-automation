@@ -2,6 +2,43 @@
 
 ## Current milestone
 
+**Protocol deployment (2026-10-30): cohort and publish-job schemas are live;
+execution stays gated.** After the full-chain audit the user directed implementing
+all safe readiness items. Deployed the reviewed cohort protocol — promoted from
+`supabase/drafts/check_cohort_v1.sql` to
+`supabase/migrations/20261030164030_check_cohort_v1.sql` — through MCP as hosted
+**`20261030164030 check_cohort_v1`**, and applied the publish-jobs protocol as
+hosted **`20261030164110 publish_jobs_v1`** (source
+`202610270006_publish_jobs.sql`). Hosted history is now **14 migrations**; there
+are **28 public base tables**, all RLS-enabled. The three new tables
+(`reporting_check_cohorts`, `reporting_check_cohort_items`,
+`reporting_publish_jobs`) have staff-read policies; `authenticated` can select but
+not insert directly, and `anon` has no table access. All three remain empty.
+
+`/dashboard/run/cohorts` now unlocks for verified staff with an active work
+session: it queues an explicit prior-business-date cohort bounded to 500 tracked
+publications with immutable membership/receipts and per-item dispositions. The
+rate limit, replay conflict checks and 60–1440 minute freshness window are
+unchanged from local review. `/dashboard/publishing` now reads an existing empty
+queue; its cancel/reconcile controls remain, and there is still no enqueue action
+or browser adapter.
+
+Nothing irreversible was switched on: `UPLOAD_RELEASED` and
+`CATALOG_DOWNLOAD_RELEASED` remain false; the bundled agent allowlists monitoring
+RPCs only and claims no publish jobs; the Sheet connector is still read-only with
+no delivery worker; the single worker has never heartbeated and no work session is
+active; no publication, check, cohort, publish-job or writeback row was created.
+Leaked-password protection and signed-in production acceptance remain open.
+
+Validation on the final tree: typecheck PASS, lint PASS (**0 warnings**), **805
+tests / 57 files** PASS, production build PASS. Hosted post-deploy checks confirmed
+table/function/policy presence, the publication-source and notification-kind
+constraints, the timestamp regex in `reporting_complete_publish`, and read-only
+grants. Real signed-in cohort execution and publish claim/completion were not run;
+they need an authenticated session, a paired worker and real tracked publications.
+See `docs/DB-DEPLOYMENT-20261030-COHORT.md`; the drafts README and test path now
+point at the promoted migration.
+
 **Authorized production web deployment (2026-10-30): public identity routes
 repaired.** After the database rollout, the user approved completing the ND
 side as a fully ready flow, keeping publishing/cohort SQL and live
