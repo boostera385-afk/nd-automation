@@ -1867,9 +1867,14 @@ unverified against a live Incogniton install: profile creation, cookie/proxy
 writes and now the first real scan — each would surface an honest failure.
 
 With explicit approval, the slice was deployed to production the same day
-(`vercel --prod` from `apps/web`, deployment `dpl_CmPBS8SZ2pmFQHteCNR5v9oYAVYe`,
-status Ready and aliased to the production URL where the login page serves).
-Production still runs without `SHEET_SYNC_URL` / `SHEET_SYNC_TOKEN` /
-`SHEET_SYNC_ORGANIZATION_ID`, so live Master-Sheet sync is unavailable there
-until those are added to the Vercel project; the dashboard otherwise matches
-local.
+(`vercel --prod` from `apps/web`; final deployment `4h1omaw5m`, status Ready
+at **https://nd-automation-dashboard.vercel.app**, alias verified). At the
+operator's direction the `SHEET_SYNC_URL` / `SHEET_SYNC_TOKEN` /
+`SHEET_SYNC_ORGANIZATION_ID` values were briefly added to Vercel and then
+removed again for a fresh Sheet-sync setup later, so production deliberately
+runs without them until that setup happens: the setup guide now has a
+Phase 1 step telling the operator to add them in Vercel →
+Settings → Environment Variables (production) and redeploy, with the
+"Sheet not configured" troubleshooting card pointing back to it; the
+Settings connection instructions match. Local `.env.local` retains its
+Sheet-sync values (never staged).
