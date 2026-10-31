@@ -13,7 +13,7 @@ describe("simple navigation", () => {
   it.each(["automation", "publishing", "content", "reports", "sessions", "customers", "sheet-sync", "settings"])("keeps %s under Settings / More without deleting its route", (section) => {
     expect(navigationSection(`/dashboard/${section}`)).toBe("/dashboard/settings");
   });
-  it.each(["posts/123", "posts/new", "checks", "comments", "today", "yesterday"])("groups %s under Results", (section) => {
+  it.each(["posts/123", "posts/new", "checks", "comments", "today", "yesterday", "responses"])("groups %s under Results", (section) => {
     expect(navigationSection(`/dashboard/${section}`)).toBe("/dashboard/results");
   });
   it("does not prefix-match unrelated routes", () => {

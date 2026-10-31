@@ -10,7 +10,7 @@ export const primaryNavigation = [
 export function navigationSection(path: string): string {
   const section = path.split("/")[2];
   if (!section) return "/dashboard";
-  if (["results", "posts", "today", "yesterday", "checks", "comments"].includes(section)) return "/dashboard/results";
+  if (["results", "responses", "posts", "today", "yesterday", "checks", "comments"].includes(section)) return "/dashboard/results";
   if (section === "master-sheet" || section === "run" || section === "profiles") return `/dashboard/${section}`;
   return "/dashboard/settings";
 }

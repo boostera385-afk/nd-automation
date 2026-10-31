@@ -1558,3 +1558,117 @@ Local monitoring pilot runner (2026-10-27): added opt-in batch execution, fixed-
 The existing `core/`, `gui/`, desktop launchers, live accounts and source workbook were not modified or executed. The only cloud change is the reviewed reporting schema applied to the supplied staging Supabase project; no paid resource, production deployment, Edge Function or customer dataset was created. The work was committed and pushed to GitHub on 2026-10-27 with explicit approval (see the GitHub remote row). Only the standalone reporting app, developer tooling/docs, the sheet integration script and the legacy code as-is were published.
 
 Developer setup and migrations live in documentation/admin workflows, not in the user-facing app. No live customer data or platform actions have been used for this implementation.
+
+## Browser task queue and the 24-hour profile board (2026-10-31)
+
+Two gaps closed without opening a live gate: a real task queue for the browser
+work that does not touch a Nextdoor session, and a counts-only daily board.
+
+### Browser task queue (`20261031093000_automation_tasks_v1.sql`)
+
+New additive table `reporting_automation_tasks` with five RPCs. The kind
+allowlist is enforced in SQL, so a browser cannot request a type the worker must
+not run:
+
+- `profile_create` — creates one blank Incogniton profile through the local API.
+- `preset_snapshot` — returns profile/group counts only.
+- `cookie_import` / `proxy_import` — validate a file that already exists on the
+  laptop; counts and short domain/host samples only, never a value.
+
+`publish_post`, `publish_listing`, `account_create` and any other string are
+rejected with "This task type is not executable from the dashboard".
+
+- One open task per laptop (partial unique index) and one browser operation at a
+  time across monitoring, publishing and automation leases.
+- Payloads are size-capped, key-allowlisted, and rejected if they carry a
+  password, cookie or token field; 10-minute leases with idempotent completion
+  (a replayed result returns `false` instead of writing twice).
+- Staff-only enqueue/cancel/reconcile; the worker calls claim/complete with its
+  existing scoped credential.
+- `/dashboard/run` replaces the static "Desktop tasks" list with a queue form
+  and a task ledger. Auto Posting, Auto Listing, ND Acc Creation and content
+  presets remain listed as **Gated**, each with its reason.
+- The worker runs one queued task per poll before monitoring
+  (`automation_tasks.execute`, `poll_automation`), and reports failure with a
+  bounded reason. A malformed task is refused before any action.
+- Incogniton profile creation is implemented against `POST /profile/create` on
+  the loopback API and validates the returned UUID; it is **not yet verified
+  against a live Incogniton install**, so a first run may fail visibly. No proxy,
+  cookie or account label is sent.
+
+Proof: `apps/web/tests/automation-tasks-db.test.ts` (8 PGlite cases, including
+the cross-family lease guard) and `apps/worker/test_automation_tasks.py`
+(18 cases).
+
+### Last 24 hours by profile, and Responses
+
+- `src/lib/daily-board.ts` groups loaded publications and comments by
+  `account_label` and counts only what falls inside a rolling 24-hour window:
+  posts by `published_at`, falling back to the record time when the platform
+  date is unknown; comments by `first_observed_at`.
+- Home adds "Last 24 hours by profile": profile, customer, posts, comments, last
+  comment seen, and an Open link. Busiest first, capped at 24 rows; profiles with
+  no saved activity in the window are left off rather than shown as a zero.
+  Counts only — no thread renders there.
+- `/dashboard/responses` lists those profiles and their posts in the window, with
+  per-post saved-comment counts and an "Open thread" link to the existing post
+  page. Results now carries a "Responses (24h)" button, and the route groups
+  under Results in the sidebar, so the board is reachable without a sixth main
+  destination. Replying is explicitly not enabled: there is no reply job type and
+  the pilot account is suspended.
+- A profile showing 0 in Responses means nothing was saved, not that nothing was
+  posted, and the copy says so. Loaded records are partial, so the counts are
+  partial too.
+- Responses opens with a comment inbox (`src/lib/comment-inbox.ts`): only the
+  profiles with a comment from someone else in the window, each with the
+  Incogniton profile name/UUID from the staff inventory, direct post links,
+  comment previews, quiet profiles collapsed, and one honest notice for posts
+  never checked. Our own replies do not count, and a fresh comment on an older
+  post still surfaces. Panel order: inbox, profile counts, posts, reply gate.
+
+Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
+(0 warnings), `npm.cmd test` **865 tests / 64 files** PASS, `npm.cmd run build`
+PASS, worker `python -m unittest discover` **106 tests** PASS. The migration was
+applied to the hosted database on 2026-10-31 (`automation_tasks_v1`) after
+preserving the existing transient-retry logic in `reporting_claim_check`; the
+table has RLS, one staff read policy, four indexes and zero rows, and anon can
+execute only the token-checked claim/complete RPCs. Nothing was committed,
+deployed or run live.
+
+## Read-only profile and session health on /dashboard/run (2026-10-31)
+
+The "Desktop tasks" list claimed six desktop capabilities while showing nothing
+about whether a paired laptop or profile could actually take work. One of those
+gaps is now a real dashboard view, with no new gate opened.
+
+`src/lib/profile-health.ts` derives a per-binding status from data the dashboard
+already stores: `reporting_workers.last_seen_at`/`enabled` for the agent level,
+the active reporting session for the session column, and open `leased` rows in
+`reporting_check_jobs` for the laptop-wide lease count.
+
+- **Levels:** live (heartbeat <= 5 minutes), heartbeat stale (<= 30 minutes),
+  agent offline (older, missing or unparseable), laptop disabled (an explicit
+  `enabled = false` wins over a fresh heartbeat). A future timestamp is reported
+  as live rather than a negative age.
+- **Session column:** "Bound to session" only when the binding points at the
+  active session and its laptop is enabled. No session means nothing is
+  dispatched.
+- **Leases:** `reporting_check_jobs` records the worker, never the Incogniton
+  profile, so the count is labelled as laptop-wide and expired leases are called
+  out separately instead of being attributed to a profile.
+- **Explicitly read-only:** the panel does not probe Incogniton, open a browser,
+  launch or stop a profile, or start a check. The copy says so on the page.
+
+`/dashboard/run` keeps Auto Posting, Auto Listing, Incog Profile Creation, ND Acc
+Creation, Bulk cookies / proxies import and Content presets as desktop-only,
+with wording that states there is no dashboard job type behind them and a Start
+button would do nothing. "Session health" was removed from that list because the
+read-only view above now covers it; content presets remain desktop-only.
+
+Tests: `tests/profile-health.test.ts` (14 cases) covers the thresholds, disabled
+and missing laptops, unparseable and future timestamps, session binding, lease
+attribution, expired leases without deadlines and the summary counts.
+
+Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
+(0 warnings), `npm.cmd test` **828 tests / 60 files** PASS, `npm.cmd run build`
+PASS. No worker change, migration, deployment, commit or live action was made.

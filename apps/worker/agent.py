@@ -12,6 +12,7 @@ from local_incogniton import Incogniton, NoRedirect
 from monitor import load_json, run_batch
 from monitoring import validate_adapter
 from monitoring_journal import MonitoringJournal
+from automation_tasks import execute as execute_task, validate_task
 from worker_protocol import (COMPLETION_RESERVE_SECONDS, completion_payload, remaining_lease,
                              validate_completion, validate_job)
 from worker_lock import monitoring_lock
@@ -28,7 +29,8 @@ class WorkerBridge:
         self.opener = opener or build_opener(ProxyHandler({}), NoRedirect())
 
     def rpc(self, method, params=None):
-        allowed = {"reporting_worker_heartbeat", "reporting_claim_check", "reporting_complete_check"}
+        allowed = {"reporting_worker_heartbeat", "reporting_claim_check", "reporting_complete_check",
+                   "reporting_claim_automation_task", "reporting_complete_automation_task"}
         if method not in allowed:
             raise BridgeError("Worker method is not allowed")
         body = {**(params or {}), "credential": self.connection["worker_token"]}
@@ -65,6 +67,25 @@ class WorkerBridge:
                     raise
                 time.sleep(2 ** attempt)
 
+    def complete_task(self, task, status, result, error):
+        """Report an automation outcome. The action itself is never retried."""
+        if status == "succeeded":
+            params = {"task": task["task_id"], "lease": task["lease_token"], "status": status,
+                      "task_result": result, "task_error": None}
+        else:
+            params = {"task": task["task_id"], "lease": task["lease_token"], "status": status,
+                      "task_result": None, "task_error": (error or "The task failed")[:2000]}
+        for attempt in range(3):
+            try:
+                response = self.rpc("reporting_complete_automation_task", params)
+                if type(response) is not bool:
+                    raise BridgeError("Browser task completion receipt was malformed")
+                return response
+            except BridgeError:
+                if attempt == 2:
+                    raise
+                time.sleep(2 ** attempt)
+
 
 def validate_claim(job):
     post = validate_job(job)
@@ -88,9 +109,27 @@ def recover_result(bridge, journal):
     return "recovered" if saved["state"] == "result_ready" else "settled"
 
 
-def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False):
+def poll_automation(bridge, incogniton):
+    """Run at most one queued browser task. Returns a state or None when idle."""
+    task = bridge.rpc("reporting_claim_automation_task")
+    if task is None:
+        return None
+    validate_task(task)
+    try:
+        result = execute_task(task, incogniton)
+    except Exception as error:
+        bridge.complete_task(task, "failed", None, str(error))
+        return "automation_failed"
+    bridge.complete_task(task, "succeeded", result, None)
+    return "automation_succeeded"
+
+
+def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False, incogniton=None):
     recover_result(bridge, journal)  # Never claim another job while a result is unresolved.
     bridge.rpc("reporting_worker_heartbeat")
+    automation = poll_automation(bridge, incogniton or Incogniton())
+    if automation is not None:
+        return automation
     job = bridge.rpc("reporting_claim_check")
     if job is None:
         return "idle"

@@ -1,8 +1,11 @@
 """Narrow local Incogniton adapter. Never force-stops or retries a launch."""
 
 import json
+import re
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -14,16 +17,74 @@ class ProfileUnavailable(ValueError):
     """Preflight refused to launch; no launch request was sent."""
 
 
+def _profile_id(data):
+    """Accept only an explicit UUID from a creation response; never guess."""
+    candidates = []
+    if isinstance(data, dict):
+        for key in ("profile_id", "profileId", "id"):
+            candidates.append(data.get(key))
+        if isinstance(data.get("data"), dict):
+            for key in ("profile_id", "profileId", "id"):
+                candidates.append(data["data"].get(key))
+    for value in candidates:
+        if isinstance(value, str) and _UUID.fullmatch(value.strip()):
+            return value.strip().lower()
+    return None
+
+
 class Incogniton:
     def __init__(self):
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
 
-    def request(self, path, timeout=10):
-        with self.opener.open("http://127.0.0.1:35000" + path, timeout=timeout) as response:
-            data = response.read(2_000_001)
-            if len(data) > 2_000_000:
+    def request(self, path, timeout=10, body=None):
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        request = Request("http://127.0.0.1:35000" + path, data=data, method="POST" if data else "GET",
+                          headers={"Content-Type": "application/json"} if data else {})
+        with self.opener.open(request, timeout=timeout) as response:
+            content = response.read(2_000_001)
+            if len(content) > 2_000_000:
                 raise ValueError("Local API response too large")
-            return json.loads(data)
+            return json.loads(content)
+
+    def all_profiles(self):
+        data = self.request("/profile/all")
+        profiles = data.get("profiles") if isinstance(data, dict) else data
+        if not isinstance(profiles, list):
+            raise ValueError("Local API did not return a profile list")
+        return profiles
+
+    def all_groups(self):
+        data = self.request("/group/all")
+        groups = data.get("groups") if isinstance(data, dict) else data
+        if not isinstance(groups, list):
+            raise ValueError("Local API did not return a group list")
+        return groups
+
+    def inventory(self):
+        """Counts only: no profile names, cookies, proxies or account labels."""
+        profiles = self.all_profiles()
+        groups = self.all_groups()
+        launched = 0
+        for profile in profiles:
+            if isinstance(profile, dict):
+                state = str(profile.get("status") or profile.get("profile_status") or "").strip().lower()
+                if state in {"launched", "running", "active", "in use"}:
+                    launched += 1
+        return {"profiles": len(profiles), "groups": len(groups), "launched": launched}
+
+    def create(self, name, operating_system="windows", group=""):
+        """Create one profile. The response shape is validated before it is trusted.
+
+        The dashboard never sends a proxy, cookie, password or account label here.
+        """
+        body = {"profileName": name, "os": operating_system}
+        if group:
+            body["groupName"] = group
+        data = self.request("/profile/create", timeout=60, body=body)
+        profile_id = _profile_id(data)
+        if not profile_id:
+            raise ValueError("Profile creation was not confirmed by the local API")
+        return profile_id
 
     def stopped(self, profile_id):
         data = self.request("/profile/status/" + profile_id)

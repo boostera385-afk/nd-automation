@@ -41,7 +41,7 @@ class AgentTests(unittest.TestCase):
 
     def test_idle_agent_does_not_touch_local_profiles(self):
         bridge, api, chromium = Mock(), Mock(), Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, None]
+        bridge.rpc.side_effect = [{"enabled": True}, None, None]
         self.assertEqual(poll_once(bridge, ADAPTER, api, chromium, self.journal), "idle")
         self.assertEqual(api.mock_calls, [])
         self.assertEqual(chromium.mock_calls, [])
@@ -51,7 +51,7 @@ class AgentTests(unittest.TestCase):
         value = VALUE
         run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(value)
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         bridge.submit_result.return_value = True
         self.assertEqual(poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal), "completed")
         bridge.submit_result.assert_called_once()
@@ -65,7 +65,7 @@ class AgentTests(unittest.TestCase):
         for requested in (False, True):
             with self.subTest(requested=requested):
                 bridge = Mock()
-                bridge.rpc.side_effect = [{"enabled": True}, JOB]
+                bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
                 bridge.submit_result.return_value = True
                 poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal, requested)
                 self.assertIs(run.call_args.kwargs.get("allow_expansion"), requested)
@@ -90,7 +90,7 @@ class AgentTests(unittest.TestCase):
             raise RuntimeError("unknown launch state")
         run.side_effect = fail
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         bridge.submit_result.return_value = True
         with self.assertRaises(BridgeError):
             poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal)
@@ -103,7 +103,7 @@ class AgentTests(unittest.TestCase):
                        (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()]:
             with self.subTest(expiry=expiry), patch("agent.run_batch") as run:
                 bridge, api, chromium = Mock(), Mock(), Mock()
-                bridge.rpc.side_effect = [{"enabled": True}, {**JOB, "lease_expires_at": expiry}]
+                bridge.rpc.side_effect = [{"enabled": True}, None, {**JOB, "lease_expires_at": expiry}]
                 with self.assertRaises(ValueError):
                     poll_once(bridge, ADAPTER, api, chromium, self.journal)
                 run.assert_not_called()
@@ -129,7 +129,7 @@ class AgentTests(unittest.TestCase):
     def test_lost_ack_response_recovers_only_saved_result_without_rerunning_or_claiming(self, run):
         run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(VALUE)
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         bridge.submit_result.side_effect = BridgeError("offline")
         with self.assertRaises(BridgeError):
             poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal)
@@ -147,7 +147,7 @@ class AgentTests(unittest.TestCase):
     @patch("agent.run_batch")
     def test_storage_failure_before_launch_blocks_all_browser_work(self, run):
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         with patch.object(self.journal, "_write", side_effect=OSError("private storage failure")):
             with self.assertRaises(OSError):
                 poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal)
@@ -169,7 +169,7 @@ class AgentTests(unittest.TestCase):
             raise RuntimeError("cleanup uncertain")
         run.side_effect = fail
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         bridge.submit_result.return_value = True
         with self.assertRaises(BridgeError):
             poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal)
@@ -184,7 +184,7 @@ class AgentTests(unittest.TestCase):
     def test_malformed_completion_keeps_saved_result_for_reconciliation(self, run):
         run.side_effect = lambda posts, adapter, api, chromium, emit, deadline, **options: emit(VALUE)
         bridge = Mock()
-        bridge.rpc.side_effect = [{"enabled": True}, JOB]
+        bridge.rpc.side_effect = [{"enabled": True}, None, JOB]
         bridge.submit_result.return_value = {"unexpected": True}
         with self.assertRaises(ValueError):
             poll_once(bridge, ADAPTER, Mock(), Mock(), self.journal)

@@ -10,7 +10,7 @@ const icons = [LayoutDashboard, ArrowDownUp, MonitorCog, MonitorCheck, Files];
 
 const pageLabels: Record<string, string> = {
   today: "Today", yesterday: "Yesterday", checks: "Post checks", posts: "All posts", customers: "Customers", comments: "Comments",
-  reports: "Reports", sessions: "Work sessions", settings: "Settings / More", "sheet-sync": "Advanced import & export", automation: "Worker setup", content: "Content & approvals", profiles: "Profiles", publishing: "Publishing diagnostics", "master-sheet": "Master Sheet", run: "Run automation", results: "Results",
+  reports: "Reports", responses: "Responses", sessions: "Work sessions", settings: "Settings / More", "sheet-sync": "Advanced import & export", automation: "Worker setup", content: "Content & approvals", profiles: "Profiles", publishing: "Publishing diagnostics", "master-sheet": "Master Sheet", run: "Run automation", results: "Results",
 };
 
 export function Navigation({ isStaff = false }: { isStaff?: boolean }) {
