@@ -22,6 +22,9 @@ def task(kind, payload, **overrides):
 class FakeIncogniton:
     def __init__(self):
         self.created = []
+        self.cookie_writes = []
+        self.deleted_cookies = []
+        self.proxy_writes = []
 
     def create(self, name, operating_system="windows", group=""):
         self.created.append((name, operating_system, group))
@@ -29,6 +32,17 @@ class FakeIncogniton:
 
     def inventory(self):
         return {"profiles": 7, "groups": 2, "launched": 1}
+
+    def add_cookies(self, profile_id, cookies):
+        self.cookie_writes.append((profile_id, cookies))
+        return len(cookies)
+
+    def delete_cookies(self, profile_id):
+        self.deleted_cookies.append(profile_id)
+
+    def set_proxy(self, profile_id, proxy):
+        self.proxy_writes.append((profile_id, proxy))
+        return f"{proxy['host']}:{proxy['port']}"
 
 
 class FakeBridge:
@@ -60,7 +74,7 @@ class TaskContractTests(unittest.TestCase):
         self.assertEqual(tasks.validate_task(task("preset_snapshot", {}))["kind"], "preset_snapshot")
 
     def test_refuses_types_the_dashboard_must_not_execute(self):
-        for kind in ("publish_post", "publish_listing", "account_create", "cookie_write", ""):
+        for kind in ("publish_post", "publish_listing", "account_create", "proxy_write_all", ""):
             with self.assertRaises(tasks.TaskError):
                 tasks.validate_task(task(kind, {}))
 
@@ -136,7 +150,6 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(result, {"profile_id": "33333333-3333-4333-8333-333333333333",
                                   "name": "Fixture", "os": "windows"})
         self.assertEqual(fake.created, [("Fixture", "windows", "Team A")])
-
     def test_preset_snapshot_is_counts_only(self):
         self.assertEqual(tasks.execute(task("preset_snapshot", {}), FakeIncogniton()),
                          {"profiles": 7, "groups": 2, "launched": 1})
@@ -154,6 +167,96 @@ class ExecutionTests(unittest.TestCase):
         path = write("1.2.3.4:8080\n")
         try:
             self.assertEqual(tasks.execute(task("proxy_import", {"path": path}), None)["entries"], 1)
+        finally:
+            os.unlink(path)
+
+
+TARGET = "44444444-4444-4444-8444-444444444444"
+
+
+class WritePayloadTests(unittest.TestCase):
+    def test_requires_one_canonical_profile_uuid_and_an_absolute_path(self):
+        spec = tasks.profile_target({"profile_id": TARGET, "path": "C:\\Exports\\cookies.txt"})
+        self.assertEqual(spec, {"profile_id": TARGET, "replace": False, "path": "C:\\Exports\\cookies.txt"})
+        for payload in ({"path": "C:\\x.txt"}, {"profile_id": "not-a-uuid", "path": "C:\\x.txt"},
+                        {"profile_id": TARGET}, {"profile_id": TARGET, "path": "relative.txt"},
+                        {"profile_id": TARGET, "path": "C:\\x.txt", "password": "x"}):
+            with self.assertRaises(tasks.TaskError):
+                tasks.profile_target(payload)
+
+    def test_replace_must_be_a_flag(self):
+        self.assertTrue(tasks.profile_target({"profile_id": TARGET, "path": "C:\\x.txt", "replace": True})["replace"])
+        with self.assertRaises(tasks.TaskError):
+            tasks.profile_target({"profile_id": TARGET, "path": "C:\\x.txt", "replace": "yes"})
+
+
+class WriteExecutionTests(unittest.TestCase):
+    def test_cookie_write_sends_the_parsed_netscape_rows(self):
+        text = "\n".join([
+            "# Netscape HTTP Cookie File",
+            ".nextdoor.com\tTRUE\t/\tTRUE\t1999999999\tsid\tSECRET",
+            "#HttpOnly_.example.com\tTRUE\t/\tTRUE\t1999999999\th\ts2",
+        ])
+        path = write(text)
+        fake = FakeIncogniton()
+        try:
+            result = tasks.execute(task("cookie_write", {"profile_id": TARGET, "path": path}), fake)
+        finally:
+            os.unlink(path)
+        self.assertEqual(result, {"entries": 2, "written": 2, "replaced": False})
+        self.assertEqual(fake.deleted_cookies, [])
+        self.assertEqual(fake.cookie_writes[0][0], TARGET)
+        sent = fake.cookie_writes[0][1]
+        self.assertEqual(sent[0], {"domain": ".nextdoor.com", "hostOnly": False, "path": "/",
+                                  "secure": True, "expirationDate": "1999999999",
+                                  "name": "sid", "value": "SECRET", "httpOnly": False})
+        self.assertTrue(sent[1]["httpOnly"])
+        self.assertNotIn("SECRET", json.dumps(result))
+
+    def test_cookie_write_replace_clears_first_and_reports_it(self):
+        path = write(".nextdoor.com\tTRUE\t/\tTRUE\t1999999999\ts\tv\n")
+        fake = FakeIncogniton()
+        try:
+            result = tasks.execute(task("cookie_write", {"profile_id": TARGET, "path": path, "replace": True}), fake)
+        finally:
+            os.unlink(path)
+        self.assertEqual(result["replaced"], True)
+        self.assertEqual(fake.deleted_cookies, [TARGET])
+
+    def test_cookie_write_refuses_an_empty_file(self):
+        path = write("# only comments\n")
+        try:
+            with self.assertRaises(tasks.TaskError):
+                tasks.execute(task("cookie_write", {"profile_id": TARGET, "path": path}), FakeIncogniton())
+        finally:
+            os.unlink(path)
+
+    def test_proxy_write_applies_the_first_valid_line_only(self):
+        path = write("\n".join(["# proxies", "bad line", "1.2.3.4:8080", "5.6.7.8:3128:user:pass"]))
+        fake = FakeIncogniton()
+        try:
+            result = tasks.execute(task("proxy_write", {"profile_id": TARGET, "path": path}), fake)
+        finally:
+            os.unlink(path)
+        self.assertEqual(result, {"entries": 2, "applied": "1.2.3.4:8080"})
+        self.assertEqual(fake.proxy_writes, [(TARGET, {"type": "SOCKS5", "host": "1.2.3.4",
+                                                       "port": 8080, "username": "", "password": ""})])
+        self.assertNotIn("user", json.dumps(result))
+
+    def test_proxy_write_honours_a_scheme_prefix(self):
+        path = write("http://9.9.9.9:80\n")
+        fake = FakeIncogniton()
+        try:
+            tasks.execute(task("proxy_write", {"profile_id": TARGET, "path": path}), fake)
+        finally:
+            os.unlink(path)
+        self.assertEqual(fake.proxy_writes[0][1]["type"], "HTTP")
+
+    def test_proxy_write_without_any_usable_line_fails(self):
+        path = write("not a proxy\n")
+        try:
+            with self.assertRaises(tasks.TaskError):
+                tasks.execute(task("proxy_write", {"profile_id": TARGET, "path": path}), FakeIncogniton())
         finally:
             os.unlink(path)
 

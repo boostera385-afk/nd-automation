@@ -1672,3 +1672,72 @@ attribution, expired leases without deadlines and the summary counts.
 Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
 (0 warnings), `npm.cmd test` **828 tests / 60 files** PASS, `npm.cmd run build`
 PASS. No worker change, migration, deployment, commit or live action was made.
+
+## Cookie/proxy real import into a chosen profile (2026-10-31)
+
+The `cookie_import`/`proxy_import` kinds only validated a file. They stay, and
+two new executable kinds now perform the real import — still one task, one
+profile, one confirmation, and **not verified against a live Incogniton
+install**, so a first run may report a failure honestly.
+
+- New kinds `cookie_write` and `proxy_write` in the worker, SQL and UI. A write
+  task payload names exactly one Incogniton profile by canonical UUID and one
+  absolute local file path (plus `replace` for cookies). Old kinds and payloads
+  are unchanged; `publish_post`, `publish_listing`, `account_create` and
+  friends are still refused at every layer.
+- Migration `20261031120000_cookie_proxy_write_v1.sql` extends the kind
+  constraint and replaces enqueue/complete with write validation (replace must
+  be boolean `true`/`false`, not a string). Proven in PGlite **before** it was
+  applied: the first proof run caught a real bug —
+  `task_result->'written' < 1` compares jsonb to an integer and would have
+  failed every valid cookie-write completion on PostgreSQL. It is now
+  `(task_result->>'written')::numeric < 1`. Applied to the hosted database on
+  2026-10-31 as `cookie_proxy_write_v1` (16th hosted migration). Hosted
+  verification: the constraint lists all six kinds, both replaced function
+  bodies contain the write branches, anon can still only execute the
+  token-checked claim/complete RPCs (not enqueue), RLS is on with the one staff
+  read policy.
+- Worker (`automation_tasks.py`, `local_incogniton.py`): the Netscape parser
+  is field-for-field the desktop importer's (`#HttpOnly_` handling, seven
+  columns, same cookie shape) and the proxy parser is the desktop
+  `parse_proxy` line-by-line (scheme prefix picks the type, default SOCKS5).
+  Write calls copy the desktop's exact wire formats: cookies via
+  `POST /profile/addCookie` with base64json and an optional
+  `/profile/deleteCookie/{id}` when replacing; proxy via `POST /profile/update`
+  form-urlencoded with `profileData` as a JSON string (three known-good
+  shapes, first confirmed wins, attempted once).
+- The dashboard never receives a cookie value or a proxy credential: a
+  cookie-write result is counts (`entries`, `written`, `replaced`), and a
+  proxy-write result is `entries` plus the applied `host:port` only — the SQL
+  completion check rejects any result that carries a username/password, and
+  the wording says the login details never leave the laptop.
+- The queue form gains an Incogniton profile picker fed from the
+  **active-only** profile inventory (an earlier draft included archived rows;
+  fixed), a replace checkbox for cookies, and a confirm sentence that changes
+  for writes: it says exactly which profile on which laptop receives the
+  import, and that nothing is posted, published or browsed. Enqueue
+  validation (`validateWriteInput`), an `InventoryProfile` type, and
+  write-aware outcome wording (`describeResult` resolves the profile name from
+  the inventory) close the loop.
+- No write has been executed against a real Incogniton install; the worker's
+  Incogniton API surface (create, cookie, proxy) remains
+  **unverified live**, like the profile creation added on 2026-10-31. This
+  slice adds no posting, listing, account creation or reply capability, and
+  the reply gate is unchanged.
+
+Proof: `apps/web/tests/automation-tasks-db.test.ts` grew from 8 to 10 PGlite
+cases (write payload validation; cookie+proxy write through claim/complete,
+including rejections of a zero count, a smuggled `cookie_value` and a
+credential-bearing `applied`), `apps/web/tests/automation-tasks.test.ts`
+covers the six kinds, write input validation and the write outcome wording,
+and `apps/worker/test_automation_tasks.py` grew from 18 to 26 cases
+(payload/profile target contract, parsed Netscape rows, replace-clears-first,
+empty-file refusal, first-valid-proxy-only, scheme prefix, no-usable-line
+refusal).
+
+Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
+(0 warnings), `npm.cmd test` **870 tests / 64 files** PASS, `npm.cmd run build`
+PASS; worker `python -m unittest discover` **114 tests** PASS (exit 0). The
+local dev server runs for operator testing from `apps/web` with
+`apps/web/.env.local` (never staged). Nothing was deployed to production;
+Vercel still serves the previous build until a separate approved manual deploy.

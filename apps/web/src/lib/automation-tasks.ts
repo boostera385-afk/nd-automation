@@ -1,5 +1,8 @@
-export type AutomationKind = "profile_create" | "preset_snapshot" | "cookie_import" | "proxy_import";
+export type AutomationKind = "profile_create" | "preset_snapshot" | "cookie_import" | "proxy_import" | "cookie_write" | "proxy_write";
 export type AutomationStatus = "pending" | "leased" | "succeeded" | "failed" | "cancelled";
+
+/** Incogniton profiles staff recorded in the dashboard inventory. */
+export type InventoryProfile = { profile_id: string; name: string };
 
 export type AutomationTask = {
   id: string;
@@ -15,13 +18,15 @@ export type AutomationTask = {
   lease_expires_at: string | null;
 };
 
-export const automationKinds: AutomationKind[] = ["profile_create", "preset_snapshot", "cookie_import", "proxy_import"];
+export const automationKinds: AutomationKind[] = ["profile_create", "preset_snapshot", "cookie_import", "proxy_import", "cookie_write", "proxy_write"];
 
 export const kindLabels: Record<AutomationKind, string> = {
   profile_create: "Create Incogniton profile",
   preset_snapshot: "Read preset inventory",
   cookie_import: "Check a local cookie file",
   proxy_import: "Check a local proxy file",
+  cookie_write: "Import cookies into a profile",
+  proxy_write: "Set a profile's proxy",
 };
 
 export const kindDescriptions: Record<AutomationKind, string> = {
@@ -29,6 +34,8 @@ export const kindDescriptions: Record<AutomationKind, string> = {
   preset_snapshot: "Reads how many profiles and groups exist and how many are open. Counts only; no names, cookies or proxies are returned.",
   cookie_import: "Validates a Netscape cookies.txt file already on the worker machine. Counts entries and domains; never stores or uploads cookie values.",
   proxy_import: "Validates a host:port or host:port:user:pass list already on the worker machine. Reports counts; credentials are never returned.",
+  cookie_write: "Writes a Netscape cookies.txt file from the laptop into one Incogniton profile, using the same local API call the desktop importer uses. One profile at a time, with your confirmation per task.",
+  proxy_write: "Applies the first valid host:port(:user:pass) line of a local file to one Incogniton profile. Never echoes username or password back to the dashboard.",
 };
 
 export const statusLabels: Record<AutomationStatus, string> = {
@@ -57,6 +64,14 @@ export function isAutomationKind(value: unknown): value is AutomationKind {
   return typeof value === "string" && (automationKinds as string[]).includes(value);
 }
 
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** A write task names exactly one Incogniton profile and one local file. */
+export function validateWriteInput(input: { profile: string; path: string }): string | null {
+  if (!UUID.test(input.profile)) return "Choose the Incogniton profile to import into.";
+  return validateLocalPath(input.path);
+}
+
 export function validateProfileInput(input: { name: string; group: string; os: string }): string | null {
   const name = input.name.trim();
   if (name.length < 2 || name.length > 60) return "Enter a profile name of 2–60 characters.";
@@ -79,7 +94,7 @@ const number = (value: unknown) => (typeof value === "number" && Number.isFinite
 const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
 
 /** One honest sentence per outcome; never invents a value the worker did not report. */
-export function describeResult(task: AutomationTask, workerName?: string): string {
+export function describeResult(task: AutomationTask, workerName?: string, profileNameOf?: (profileId: string) => string | undefined): string {
   if (task.status === "pending") return "Waiting for the paired laptop to poll.";
   if (task.status === "leased") return `Running${workerName ? ` on ${workerName}` : ""}; the lease expires automatically.`;
   if (task.status === "cancelled") return "Cancelled before it ran.";
@@ -94,6 +109,19 @@ export function describeResult(task: AutomationTask, workerName?: string): strin
     const profiles = number(result.profiles), groups = number(result.groups), launched = number(result.launched);
     if (profiles === null || groups === null) return "The worker reported success without counts.";
     return `${profiles} profile(s), ${groups} group(s)${launched === null ? "" : `, ${launched} open`}.`;
+  }
+  if (task.kind === "cookie_write" || task.kind === "proxy_write") {
+    const targetProfile = typeof task.payload?.profile_id === "string" ? task.payload.profile_id : null;
+    const target = (targetProfile && profileNameOf?.(targetProfile)) || "the chosen profile";
+    if (task.kind === "cookie_write") {
+      const written = number(result.written);
+      const replaced = result.replaced === true;
+      if (written === null) return "The worker reported success without a cookie count.";
+      return `Imported ${written} cookie(s) into ${target}${replaced ? ", after clearing existing cookies" : ", added alongside existing cookies"}.`;
+    }
+    const applied = text(result.applied);
+    if (!applied) return "The worker reported success without a proxy confirmation.";
+    return `Proxy ${applied} applied to ${target}. Username and password are never stored here.`;
   }
   const entries = number(result.entries), credentials = number(result.with_credentials);
   const sample = Array.isArray(result.sample) ? result.sample.filter((item) => typeof item === "string").slice(0, 3) : [];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { automationKinds, describeResult, gatedTasks, isAutomationKind, kindLabels, statusLabels, statusTones, validateLocalPath, validateProfileInput, type AutomationTask } from "@/lib/automation-tasks";
+import { automationKinds, describeResult, gatedTasks, isAutomationKind, kindLabels, statusLabels, statusTones, validateLocalPath, validateProfileInput, validateWriteInput, type AutomationTask } from "@/lib/automation-tasks";
 
 const base: AutomationTask = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -17,10 +17,11 @@ const base: AutomationTask = {
 const task = (overrides: Partial<AutomationTask>): AutomationTask => ({ ...base, ...overrides });
 
 describe("task kinds", () => {
-  it("lists only the four executable kinds", () => {
-    expect(automationKinds).toEqual(["profile_create", "preset_snapshot", "cookie_import", "proxy_import"]);
+  it("lists only the six executable kinds", () => {
+    expect(automationKinds).toEqual(["profile_create", "preset_snapshot", "cookie_import", "proxy_import", "cookie_write", "proxy_write"]);
     expect(isAutomationKind("profile_create")).toBe(true);
     expect(isAutomationKind("publish_post")).toBe(false);
+    expect(isAutomationKind("cookie_write_all")).toBe(false);
     expect(isAutomationKind(null)).toBe(false);
     expect(Object.keys(kindLabels).sort()).toEqual([...automationKinds].sort());
   });
@@ -64,6 +65,18 @@ describe("local path", () => {
   });
 });
 
+describe("write input", () => {
+  it("accepts one canonical profile UUID with an absolute path", () => {
+    expect(validateWriteInput({ profile: "44444444-4444-4444-8444-444444444444", path: "C:\\Exports\\cookies.txt" })).toBeNull();
+  });
+
+  it("rejects a missing or malformed profile and a bad path", () => {
+    expect(validateWriteInput({ profile: "", path: "C:\\Exports\\cookies.txt" })).toMatch(/Choose the Incogniton profile/);
+    expect(validateWriteInput({ profile: "not-a-uuid", path: "C:\\Exports\\cookies.txt" })).toMatch(/Choose the Incogniton profile/);
+    expect(validateWriteInput({ profile: "44444444-4444-4444-8444-444444444444", path: "relative.txt" })).toMatch(/absolute path/);
+  });
+});
+
 describe("honest outcome wording", () => {
   it("never claims work before the laptop reports", () => {
     expect(describeResult(task({ status: "pending", result: null }))).toMatch(/Waiting/);
@@ -93,5 +106,20 @@ describe("honest outcome wording", () => {
     expect(describeResult(task({ kind: "proxy_import", result: { entries: 2, with_credentials: 1, sample: ["1.2.3.4:8080"] } })))
       .toBe("2 proxy entry(ies), 1 with credentials · 1.2.3.4:8080.");
     expect(describeResult(task({ kind: "cookie_import", result: { entries: null } }))).toMatch(/without a count/);
+  });
+
+  it("reports write outcomes for one named profile and never a secret", () => {
+    const target = "44444444-4444-4444-8444-444444444444";
+    const nameOf = (id: string) => (id === target ? "ND 001" : undefined);
+    expect(describeResult(task({ kind: "cookie_write", payload: { profile_id: target }, result: { entries: 12, written: 12, replaced: true } }), undefined, nameOf))
+      .toBe("Imported 12 cookie(s) into ND 001, after clearing existing cookies.");
+    expect(describeResult(task({ kind: "cookie_write", payload: { profile_id: target }, result: { entries: 12, written: 12, replaced: false } }), undefined, nameOf))
+      .toBe("Imported 12 cookie(s) into ND 001, added alongside existing cookies.");
+    expect(describeResult(task({ kind: "cookie_write", payload: { profile_id: target }, result: { entries: 12, written: 12, replaced: false } })))
+      .toBe("Imported 12 cookie(s) into the chosen profile, added alongside existing cookies.");
+    expect(describeResult(task({ kind: "cookie_write", payload: { profile_id: target }, result: { entries: 12, written: null } }), undefined, nameOf)).toMatch(/without a cookie count/);
+    expect(describeResult(task({ kind: "proxy_write", payload: { profile_id: target }, result: { entries: 2, applied: "1.2.3.4:1080" } }), undefined, nameOf))
+      .toBe("Proxy 1.2.3.4:1080 applied to ND 001. Username and password are never stored here.");
+    expect(describeResult(task({ kind: "proxy_write", payload: { profile_id: target }, result: { entries: 2, applied: null } }), undefined, nameOf)).toMatch(/without a proxy confirmation/);
   });
 });

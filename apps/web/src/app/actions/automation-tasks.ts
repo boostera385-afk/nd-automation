@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/data";
-import { isAutomationKind, validateLocalPath, validateProfileInput } from "@/lib/automation-tasks";
+import { isAutomationKind, validateLocalPath, validateProfileInput, validateWriteInput } from "@/lib/automation-tasks";
 import type { FormState } from "./auth";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
@@ -16,7 +16,7 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
   if (!isAutomationKind(kind)) return { error: "Choose a browser task that the worker is allowed to run." };
   if (form.get("confirmed") !== "on") return { error: "Confirm you want the paired laptop to run this task now." };
 
-  let payload: Record<string, string>;
+  let payload: Record<string, unknown>;
   let summary: string;
   if (kind === "profile_create") {
     const name = String(form.get("name") ?? "");
@@ -32,6 +32,14 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
     if (invalid) return { error: invalid };
     payload = { path: path.trim() };
     summary = kind === "cookie_import" ? "Check local cookie file" : "Check local proxy file";
+  } else if (kind === "cookie_write" || kind === "proxy_write") {
+    const profile = String(form.get("profile") ?? "");
+    const path = String(form.get("path") ?? "");
+    const invalid = validateWriteInput({ profile, path });
+    if (invalid) return { error: invalid };
+    payload = { profile_id: profile.trim().toLowerCase(), path: path.trim() };
+    if (kind === "cookie_write" && form.get("replace") === "on") payload.replace = true;
+    summary = kind === "cookie_write" ? "Import cookies into a profile" : "Set a profile proxy";
   } else {
     payload = {};
     summary = "Read preset inventory";

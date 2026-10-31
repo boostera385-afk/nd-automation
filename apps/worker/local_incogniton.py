@@ -1,8 +1,9 @@
 """Narrow local Incogniton adapter. Never force-stops or retries a launch."""
 
+import base64
 import json
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 _UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -109,6 +110,85 @@ class Incogniton:
         data = self.request("/profile/stop/" + profile_id, timeout=30)
         if not isinstance(data, dict) or (data.get("status") not in {"ok", "success"} and data.get("success") is not True):
             raise ValueError("Profile stop was not confirmed")
+
+    def post_form(self, path, fields, timeout=30):
+        """Incogniton's profileData endpoints expect form fields whose value is a
+        JSON *string*; the desktop sends exactly this shape, so the worker does
+        too instead of guessing a second wire format."""
+        request = Request("http://127.0.0.1:35000" + path, data=urlencode(fields).encode("utf-8"),
+                          method="POST", headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with self.opener.open(request, timeout=timeout) as response:
+            content = response.read(2_000_001)
+            if len(content) > 2_000_000:
+                raise ValueError("Local API response too large")
+            text = content.decode("utf-8", "replace")
+        try:
+            return json.loads(text), text
+        except ValueError:
+            return None, text
+
+    @staticmethod
+    def _confirmed(data, text):
+        """The success shapes Incogniton actually returns, per the desktop adapter."""
+        if isinstance(data, dict):
+            status = str(data.get("status", "")).strip().lower()
+            if status in {"ok", "success", "true"} or data.get("success") is True:
+                return True
+            return False
+        lowered = (text or "").strip().lower()
+        return "ok" in lowered or "success" in lowered
+
+    def add_cookies(self, profile_id, cookies):
+        """Write cookies into one profile: POST /profile/addCookie, base64json,
+        the same payload the desktop's working importer sends. Attempted once."""
+        body = {
+            "profile_browser_id": str(profile_id),
+            "format": "base64json",
+            "cookie": base64.b64encode(json.dumps(cookies).encode("utf-8")).decode("ascii"),
+        }
+        data = self.request("/profile/addCookie", timeout=60, body=body)
+        if isinstance(data, dict):
+            text = json.dumps(data)
+            if not self._confirmed(data, text):
+                raise ValueError("Incogniton rejected the cookies: "
+                                 + str(data.get("message") or data.get("error") or data)[:300])
+        elif not isinstance(data, str) or "ok" not in data.lower():
+            raise ValueError("Incogniton rejected the cookies")
+        return len(cookies)
+
+    def delete_cookies(self, profile_id):
+        """Clear a profile's cookies before a replace-import. Failure is ignored:
+        the desktop ignores it the same way, because a profile with no cookies
+        yet has nothing to delete."""
+        try:
+            self.request("/profile/deleteCookie/" + profile_id, timeout=30)
+        except (OSError, ValueError):
+            pass
+
+    def set_proxy(self, profile_id, proxy):
+        """Set one profile's proxy. The payload mirrors the desktop updater:
+        form-encoded, profileData a JSON string of primitive fields only.
+        Attempted once per known-good wire format."""
+        clean = {
+            "connection_type": str(proxy["type"]).upper(),
+            "proxy_url": f"{proxy['host']}:{proxy['port']}",
+            "proxy_username": str(proxy.get("username") or ""),
+            "proxy_password": str(proxy.get("password") or ""),
+        }
+        variants = [
+            {"profileData": json.dumps({"profile_browser_id": profile_id, "Proxy": clean})},
+            {"profileData": json.dumps({"profile_browser_id": profile_id, "proxy": clean})},
+            {"profile_browser_id": profile_id,
+             "profileData": json.dumps({"profile_browser_id": profile_id, "Proxy": clean})},
+        ]
+        last_error = "Local API did not confirm the proxy update"
+        for fields in variants:
+            data, text = self.post_form("/profile/update", fields, timeout=30)
+            if self._confirmed(data, text):
+                return f"{proxy['host']}:{proxy['port']}"
+            if isinstance(data, dict):
+                last_error = str(data.get("message") or data.get("error") or data)[:300]
+        raise ValueError("Incogniton rejected the proxy: " + last_error)
 
 
 def debug_endpoint(data):

@@ -43,6 +43,7 @@ beforeAll(async () => {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${name}`, import.meta.url), "utf8"));
   }
   await db.exec(await readFile(new URL("../../../supabase/migrations/20261031093000_automation_tasks_v1.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/20261031120000_cookie_proxy_write_v1.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   org = String(await rpc(owner, "select public.reporting_create_workspace('Automation fixture')"));
   await db.query("insert into public.reporting_memberships values ($1,$2,'operator'),($1,$3,'customer')", [org, operator, client]);
@@ -121,6 +122,47 @@ it("keeps local file paths out of the result and reports only redacted counts", 
   expect(await complete(task, claimed.lease_token, "succeeded", { entries: 12, with_credentials: 12, domains: 4, sample: [".nextdoor.com"] })).toBe(true);
   const result = await scalar("select result::text from public.reporting_automation_tasks where id=$1", [task]);
   expect(String(result)).not.toContain("C:\\\\Exports");
+});
+
+it("validates write payloads: one profile UUID, one absolute local file", async () => {
+  const target = "44444444-4444-4444-8444-444444444444";
+  const enqueue = (kind: string, payload: unknown) =>
+    rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,$3,'Import into profile',$4)", [org, worker, kind, JSON.stringify(payload)]);
+  await expect(enqueue("cookie_write", { profile_id: "not-a-uuid", path: "C:\\c.txt" })).rejects.toThrow();
+  await expect(enqueue("cookie_write", { path: "C:\\c.txt" })).rejects.toThrow();
+  await expect(enqueue("proxy_write", { profile_id: target, path: "ab" })).rejects.toThrow();
+  await expect(enqueue("cookie_write", { profile_id: target, path: "C:\\c.txt", cookie_value: "SECRET" })).rejects.toThrow();
+  await expect(enqueue("cookie_write", { profile_id: target, path: "C:\\c.txt", replace: "yes" })).rejects.toThrow();
+  const task = String(await enqueue("cookie_write", { profile_id: target, path: "C:\\Exports\\cookies.txt", replace: true }));
+  expect(await scalar("select payload->>'profile_id' from public.reporting_automation_tasks where id=$1", [task])).toBe(target);
+  expect(await scalar("select (payload->>'replace')::boolean from public.reporting_automation_tasks where id=$1", [task])).toBe(true);
+});
+
+it("runs a cookie write then a proxy write through claim and completion, without secrets", async () => {
+  const target = "44444444-4444-4444-8444-444444444444";
+  const cookieTask = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'cookie_write','Import cookies into one profile',$3)",
+    [org, worker, JSON.stringify({ profile_id: target, path: "C:\\Exports\\cookies.txt", replace: true })]));
+  const claimed = await claimTask() as { task_id: string; kind: string; payload: { profile_id: string; replace: boolean }; lease_token: string };
+  expect(claimed.task_id).toBe(cookieTask);
+  expect(claimed.kind).toBe("cookie_write");
+  expect(claimed.payload.profile_id).toBe(target);
+  expect(claimed.payload.replace).toBe(true);
+  // A written count of zero or a smuggled cookie value must be refused.
+  await expect(complete(cookieTask, claimed.lease_token, "succeeded", { written: 0 })).rejects.toThrow();
+  await expect(complete(cookieTask, claimed.lease_token, "succeeded", { written: 12, cookie_value: "SECRET" })).rejects.toThrow();
+  expect(await complete(cookieTask, claimed.lease_token, "succeeded", { entries: 12, written: 12, replaced: true })).toBe(true);
+  const store = await scalar("select result::text from public.reporting_automation_tasks where id=$1", [cookieTask]);
+  expect(String(store)).not.toContain("SECRET");
+
+  const proxyTask = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'proxy_write','Set proxy on one profile',$3)",
+    [org, worker, JSON.stringify({ profile_id: target, path: "C:\\Exports\\proxies.txt" })]));
+  const claimedProxy = await claimTask() as { kind: string; lease_token: string };
+  expect(claimedProxy.kind).toBe("proxy_write");
+  // Credentials must not ride along in the applied host:port.
+  await expect(complete(proxyTask, claimedProxy.lease_token, "succeeded", { entries: 2, applied: "1.2.3.4:1080:user:pass" })).rejects.toThrow();
+  await expect(complete(proxyTask, claimedProxy.lease_token, "succeeded", { applied: "jdbc://bad" })).rejects.toThrow();
+  expect(await complete(proxyTask, claimedProxy.lease_token, "succeeded", { entries: 2, applied: "1.2.3.4:1080" })).toBe(true);
+  expect(await scalar("select result->>'applied' from public.reporting_automation_tasks where id=$1", [proxyTask])).toBe("1.2.3.4:1080");
 });
 
 it("allows only one open task per laptop and lets staff cancel a pending one", async () => {

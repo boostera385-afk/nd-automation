@@ -23,7 +23,7 @@ beforeEach(() => {
   mocks.getContext.mockResolvedValue({ organization, isStaff: true });
   mocks.requireWorkspace.mockResolvedValue({ organization, isStaff: true });
   mocks.getDashboardData.mockResolvedValue({ publications: [], customers: [], comments: [], session: null, truncated: false });
-  mocks.getOperationsData.mockResolvedValue({ workers: [], bindings: [], jobs: [], tasks: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.parse("2026-10-27T12:00:00Z") });
+  mocks.getOperationsData.mockResolvedValue({ workers: [], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.parse("2026-10-27T12:00:00Z") });
   mocks.sheetSyncConfigured.mockReturnValue(false);
 });
 
@@ -58,11 +58,13 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     expect(html).not.toContain("LOCAL LAPTOP"); expect(html).toContain("View results");
   });
   it("offers only executable browser tasks and names what stays gated", async () => {
+    mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });
     const html = renderToStaticMarkup(await RunAutomation());
     expect(html).not.toContain("Desktop only");
     expect(html).not.toContain("Start posting"); expect(html).not.toContain("Create accounts now");
     expect(html).toContain("Post checks &amp; comments");
     expect(html).toContain("Browser tasks");
+    for (const label of ["Import cookies into a profile", "Set a profile&#x27;s proxy", "Create Incogniton profile", "Read preset inventory"]) expect(html).toContain(label);
     for (const label of ["Auto Posting", "Auto Listing", "ND Acc Creation", "Content presets / warmup"]) expect(html).toContain(label);
     expect(html).toContain("Gated");
   });
@@ -83,7 +85,7 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     // The inbox reads Incogniton profile names straight from the inventory table.
     const inventoryQuery = { select: () => inventoryQuery, eq: () => inventoryQuery, limit: async () => ({ data: [{ profile_id: "uuid-fixture", name: "ND 001" }], error: null }) };
     mocks.requireWorkspace.mockResolvedValue({ organization, isStaff: true, db: { from: () => inventoryQuery } });
-    mocks.getOperationsData.mockResolvedValue({ workers: [], bindings: [{ id: "b1", worker_id: "w1", customer_id: "c1", profile_id: "uuid-fixture", account_label: "Fixture profile", monitoring_session_id: null }], jobs: [], tasks: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });
+    mocks.getOperationsData.mockResolvedValue({ workers: [], bindings: [{ id: "b1", worker_id: "w1", customer_id: "c1", profile_id: "uuid-fixture", account_label: "Fixture profile", monitoring_session_id: null }], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });
     const responses = renderToStaticMarkup(await Responses({ searchParams: Promise.resolve({}) }));
     expect(responses).toContain("Open these 1 profile(s)");
     expect(responses).toContain("ND 001");
