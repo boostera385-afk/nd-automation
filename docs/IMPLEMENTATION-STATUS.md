@@ -1865,5 +1865,11 @@ build` PASS; worker `python -m unittest discover` **122 tests** PASS (exit
 0). Migration applied hosted and verified in the migration list. Still
 unverified against a live Incogniton install: profile creation, cookie/proxy
 writes and now the first real scan — each would surface an honest failure.
-Production still serves the pre-slice build; deploy only on explicit
-approval.
+
+With explicit approval, the slice was deployed to production the same day
+(`vercel --prod` from `apps/web`, deployment `dpl_CmPBS8SZ2pmFQHteCNR5v9oYAVYe`,
+status Ready and aliased to the production URL where the login page serves).
+Production still runs without `SHEET_SYNC_URL` / `SHEET_SYNC_TOKEN` /
+`SHEET_SYNC_ORGANIZATION_ID`, so live Master-Sheet sync is unavailable there
+until those are added to the Vercel project; the dashboard otherwise matches
+local.
