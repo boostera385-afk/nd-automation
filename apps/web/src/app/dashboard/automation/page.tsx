@@ -29,21 +29,21 @@ export default async function Automation() {
   const jobs = (jobQuery.data || []).slice(0, 100) as Job[];
   const limited = truncated || [workerQuery.data, bindingQuery.data, jobQuery.data].some((rows) => (rows?.length || 0) > 100);
   return <>
-    <PageHeader eyebrow="LOCAL AUTOMATION" title="Automation control" description="Authorize read-only monitoring on your own laptop. This console does not yet provide publishing, account creation or full desktop parity." actions={<Link className="button secondary" href="/dashboard/checks">Check results</Link>} />
-    <div className="notice subtle"><strong>{session?.status === "active" ? "Work session active" : "Work session is not active"}</strong><p>Enable each assigned profile for the current session. A connected agent plans checks for older/unknown-date posts that have not been checked in 24 hours. Pause/End work prevents new claims; an in-flight read may finish. Dispatch expires after ten hours. The laptop and Incogniton must remain available.</p></div>
+    <PageHeader eyebrow="LOCAL AUTOMATION" title="Automation control" description="Authorize read-only monitoring on this device. This console does not yet provide publishing, account creation or full desktop parity." actions={<Link className="button secondary" href="/dashboard/checks">Check results</Link>} />
+    <div className="notice subtle"><strong>{session?.status === "active" ? "Work session active" : "Work session is not active"}</strong><p>Enable each assigned profile for the current session. A connected agent plans checks for older/unknown-date posts that have not been checked in 24 hours. Pause/End work prevents new claims; an in-flight read may finish. Dispatch expires after ten hours. The agent and Incogniton on this device must remain available.</p></div>
     {!available ? <Panel title="Worker setup pending"><p>The monitoring-worker database migration has not been applied. Ask your administrator to review and apply <code>202610270002_monitoring_worker_bridge.sql</code> to staging. No browser controls are enabled here until that setup is complete.</p></Panel> : <>
       {limited && <p className="notice">Lists are limited to 100 records per section and may be partial. No overall automation-coverage count is claimed.</p>}
-      <Panel title="1. Register a local worker" hint="Private, revocable credential; no service-role key"><WorkerRegistration /></Panel>
+      <Panel title="1. Register this device's automation agent" hint="Private, revocable credential; no service-role key"><WorkerRegistration /></Panel>
       <Panel title="2. Assign an authorized profile" hint="Exact UUID and account label — no guessed profile names">
         {customers.length && workers.some((worker) => worker.enabled) ? <ActionForm action={bindWorkerProfile} label="Assign profile">
-          <label>Worker<select name="worker" required>{workers.filter((worker) => worker.enabled).map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
+          <label>Automation agent<select name="worker" required>{workers.filter((worker) => worker.enabled).map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
           <label>Customer<select name="customer" required>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
           <label>Exact Incogniton profile UUID<input name="profile" required placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off" list="profile-inventory" /></label>
           <datalist id="profile-inventory">{(inventoryQuery.data ?? []).slice(0, 500).map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{`${profile.name} · ${profile.group_name}`}</option>)}</datalist>
           <p className="muted small">Suggestions come from your <Link href="/dashboard/profiles">profile inventory</Link> and are claims, not live verification. The exact UUID is still required.</p>
           <label>Account label used by this customer’s post records<input name="label" required maxLength={120} /></label>
           <label className="check-label"><input type="checkbox" name="authorized" required />This customer authorizes this exact profile and its read-only post checks.</label>
-        </ActionForm> : <EmptyState title="Customer and worker needed">Register a worker and add an authorized customer before assigning profiles.</EmptyState>}
+        </ActionForm> : <EmptyState title="Customer and agent needed">Register this device&apos;s automation agent and add an authorized customer before assigning profiles.</EmptyState>}
       </Panel>
       <Panel title="3. Enable monitoring for this session" hint="New sessions require a new authorization">
         {bindings.length ? bindings.map((binding) => {
@@ -55,13 +55,13 @@ export default async function Automation() {
             </ActionForm>
             {workers.find((worker) => worker.id === binding.worker_id)?.enabled === false && workers.some((worker) => worker.enabled) && <ActionForm action={reassignWorkerProfile} label="Move to replacement worker" secondary>
               <input type="hidden" name="binding" value={binding.id} />
-              <label>Replacement worker<select name="replacement" required>{workers.filter((worker) => worker.enabled).map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
+              <label>Replacement agent<select name="replacement" required>{workers.filter((worker) => worker.enabled).map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
               <label className="check-label"><input type="checkbox" name="confirmed" required />The old agent is stopped, the profile is closed, and outstanding leases have been reconciled.</label>
             </ActionForm>}</article>;
         }) : <EmptyState title="No assigned profiles">Assignments are explicit and organization-scoped. Never import cookies or proxy passwords into these forms.</EmptyState>}
       </Panel>
-      <Panel title="Workers" hint="Last seen is a heartbeat, not proof a browser is ready">
-        {workers.map((worker) => <article className="notice subtle" key={worker.id}><strong>{worker.name} · {worker.enabled ? "Credential enabled" : "Revoked"}</strong><p>Last seen: {worker.last_seen_at ? formatTime(worker.last_seen_at, organization.time_zone) : "Never connected"}</p>{worker.enabled && <ActionForm action={revokeWorker} label="Revoke worker" secondary><input type="hidden" name="worker" value={worker.id} /><label className="check-label"><input type="checkbox" name="confirmed" required />Revoke its credential and cancel pending jobs. This does not force-close a browser.</label></ActionForm>}</article>)}
+      <Panel title="Automation agents" hint="Last seen is a heartbeat, not proof a browser is ready">
+        {workers.map((worker) => <article className="notice subtle" key={worker.id}><strong>{worker.name} · {worker.enabled ? "Credential enabled" : "Revoked"}</strong><p>Last seen: {worker.last_seen_at ? formatTime(worker.last_seen_at, organization.time_zone) : "Never connected"}</p>{worker.enabled && <ActionForm action={revokeWorker} label="Revoke agent" secondary><input type="hidden" name="worker" value={worker.id} /><label className="check-label"><input type="checkbox" name="confirmed" required />Revoke its credential and cancel pending jobs. This does not force-close a browser.</label></ActionForm>}</article>)}
       </Panel>
       <Panel title="Latest 100 monitoring jobs" hint="Refresh to see new progress; expired leases are not retried automatically">
         {jobs.length ? <div className="table-wrap"><table><thead><tr><th>Post</th><th>Created</th><th>State</th><th>Result</th><th>Action</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}>

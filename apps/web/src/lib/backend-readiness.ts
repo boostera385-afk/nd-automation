@@ -68,7 +68,7 @@ export function backendReadiness(input: ReadinessInput): {
     ["hosted_database", "Inspect target identity, migration history, grants, RLS and advisors through authorized read-only access."],
     ["hosted_auth", "Verify a real login, workspace/customer isolation and configured Auth redirect/email delivery."],
     ["recovery", "Verify backup/restore and retention decisions before production enablement."],
-    ["worker", "Pairing, exact profile ownership, adapter validation and supervised live acceptance remain separate gates."],
+    ["worker", "Agent registration, exact profile ownership, adapter validation and supervised live acceptance remain separate gates."],
   ]) checks.push({ id, status: "unverified", message });
 
   return { localConfigurationReady: !checks.some((check) => check.status === "blocked"), hostedReadiness: "unverified", checks };

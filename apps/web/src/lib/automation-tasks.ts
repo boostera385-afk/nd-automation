@@ -30,17 +30,17 @@ export const kindLabels: Record<AutomationKind, string> = {
 };
 
 export const kindDescriptions: Record<AutomationKind, string> = {
-  profile_create: "Asks the paired laptop to create one blank Incogniton profile. No proxy, cookie, password or account label is sent or stored here.",
+  profile_create: "Asks this device's automation agent to create one blank Incogniton profile. No proxy, cookie, password or account label is sent or stored here.",
   preset_snapshot: "Reads how many profiles and groups exist and how many are open. Counts only; no names, cookies or proxies are returned.",
   cookie_import: "Validates a Netscape cookies.txt file already on the worker machine. Counts entries and domains; never stores or uploads cookie values.",
   proxy_import: "Validates a host:port or host:port:user:pass list already on the worker machine. Reports counts; credentials are never returned.",
-  cookie_write: "Writes a Netscape cookies.txt file from the laptop into one Incogniton profile, using the same local API call the desktop importer uses. One profile at a time, with your confirmation per task.",
+  cookie_write: "Writes a Netscape cookies.txt file from this device into one Incogniton profile, using the same local API call the desktop importer uses. One profile at a time, with your confirmation per task.",
   proxy_write: "Applies the first valid host:port(:user:pass) line of a local file to one Incogniton profile. Never echoes username or password back to the dashboard.",
 };
 
 export const statusLabels: Record<AutomationStatus, string> = {
-  pending: "Waiting for laptop",
-  leased: "Running on laptop",
+  pending: "Waiting for agent",
+  leased: "Running on agent",
   succeeded: "Succeeded",
   failed: "Failed",
   cancelled: "Cancelled",
@@ -83,7 +83,7 @@ export function validateProfileInput(input: { name: string; group: string; os: s
 
 export function validateLocalPath(path: string): string | null {
   const value = path.trim();
-  if (value.length < 3 || value.length > 400) return "Enter the absolute path of the file on the laptop.";
+  if (value.length < 3 || value.length > 400) return "Enter the absolute path of the file on this device.";
   const absolute = /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("/") || value.startsWith("\\\\");
   if (!absolute) return "Use an absolute path, for example C:\\Exports\\cookies.txt.";
   if (value.split(/[\\/]/).includes("..")) return "The path must not traverse upwards.";
@@ -95,7 +95,7 @@ const text = (value: unknown) => (typeof value === "string" && value.trim() ? va
 
 /** One honest sentence per outcome; never invents a value the worker did not report. */
 export function describeResult(task: AutomationTask, workerName?: string, profileNameOf?: (profileId: string) => string | undefined): string {
-  if (task.status === "pending") return "Waiting for the paired laptop to poll.";
+  if (task.status === "pending") return "Waiting for this device's automation agent to poll.";
   if (task.status === "leased") return `Running${workerName ? ` on ${workerName}` : ""}; the lease expires automatically.`;
   if (task.status === "cancelled") return "Cancelled before it ran.";
   if (task.status === "failed") return task.error ? `Failed: ${task.error}` : "Failed without a stored reason.";

@@ -17,7 +17,7 @@ export type MonitoringJob = { id: string; publication_id: string; worker_id: str
 
 export function heartbeatState(worker: LocalWorker, now = Date.now()): string {
   if (!worker.enabled) return "Disabled";
-  if (!worker.last_seen_at) return "Not paired yet";
+  if (!worker.last_seen_at) return "Not registered yet";
   const age = now - Date.parse(worker.last_seen_at);
   return Number.isFinite(age) && age >= 0 && age < 120_000 ? "Seen recently" : "Offline or stale";
 }

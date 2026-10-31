@@ -50,8 +50,8 @@ describe("saved profile mappings, not repeated manual assignment", () => {
 
 describe("honest readiness and strict master metadata", () => {
   const worker = { id: "w", name: "Laptop", enabled: true, last_seen_at: null as string | null };
-  it("distinguishes never paired, revoked, stale and recently seen without claiming browser readiness", () => {
-    expect(heartbeatState(worker)).toBe("Not paired yet");
+  it("distinguishes never registered, revoked, stale and recently seen without claiming browser readiness", () => {
+    expect(heartbeatState(worker)).toBe("Not registered yet");
     expect(heartbeatState({ ...worker, enabled: false })).toBe("Disabled");
     expect(heartbeatState({ ...worker, last_seen_at: "2026-10-27T12:00:00Z" }, Date.parse("2026-10-27T12:01:00Z"))).toBe("Seen recently");
     expect(heartbeatState({ ...worker, last_seen_at: "2026-10-27T12:00:00Z" }, Date.parse("2026-10-27T12:03:00Z"))).toBe("Offline or stale");

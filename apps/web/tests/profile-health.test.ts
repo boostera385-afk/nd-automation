@@ -57,9 +57,9 @@ describe("profile health", () => {
     expect(item.monitored).toBe(true);
   });
 
-  it("does not call an unassigned laptop a named worker", () => {
+  it("does not call an unassigned device a named agent", () => {
     const item = profileHealth({ binding: binding(), worker: undefined, jobs: [], sessionId: "s1", now });
-    expect(item.workerName).toBe("Unassigned laptop");
+    expect(item.workerName).toBe("Unassigned device");
     expect(item.level).toBe("offline");
     expect(item.monitored).toBe(false);
   });

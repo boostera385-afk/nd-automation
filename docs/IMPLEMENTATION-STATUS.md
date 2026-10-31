@@ -1741,3 +1741,49 @@ PASS; worker `python -m unittest discover` **114 tests** PASS (exit 0). The
 local dev server runs for operator testing from `apps/web` with
 `apps/web/.env.local` (never staged). Nothing was deployed to production;
 Vercel still serves the previous build until a separate approved manual deploy.
+
+## One-device wording: no separate "paired laptop" (2026-10-31)
+
+The operator directed that the whole workflow — Fudge, the master-Sheet sync,
+the automation agent and Incogniton — is **one and the same device**, and the
+"paired laptop" wording should go. That was already the real architecture (the
+registered worker `Kashif PC` is this same PC), but the copy implied a second
+machine. This is a wording/wording-honesty change only: the worker
+registration, credential scoping, lease rules and RLS are untouched, because a
+hosted website cannot start local programs without an authenticated local
+agent — the "pairing" is that security handshake, now called registration.
+
+- The registered software agent is now called the **automation agent**, and
+  physical-machine references say **this device**: the queue form's Device
+  select, file paths ("on this device"), confirmations ("this device's
+  automation agent"), status labels ("Waiting for agent", "Running on agent"),
+  action messages (enqueue/cancel/reconcile), the Home card ("LOCAL AUTOMATION
+  AGENT", "Register once"), heartbeat state ("Not registered yet"), profile
+  health ("Agent disabled", "Unassigned device") and column headers on Run,
+  Profiles and monitoring tables.
+- The setup entry points follow: Settings now links **Automation agent setup**
+  (not "Pair laptop / worker"); `/dashboard/automation` registers "this
+  device's automation agent" with a "Device name" field (placeholder "e.g.
+  This PC"); the setup guide step is "Register this device's automation agent
+  once" and its troubleshooting card says to start the agent on this device.
+- Honesty fix found during the sweep: the setup guide's desktop-only card
+  still claimed "Incogniton profile creation, cookie and proxy handling" were
+  desktop-only, but the browser task queue now runs those. The card now says
+  posting, listings, media work and bulk operations stay on the desktop app,
+  while profile creation and cookie/proxy imports are queued from Run
+  automation with the desktop app as fallback — matching the queue built
+  earlier on 2026-10-31.
+- Kept deliberately: the internal `worker`/`reporting_workers` names in code
+  and SQL, the token-gated claim/complete RPC design, and the DB error string
+  "This laptop already has a queued or running browser task" (the web action
+  maps it to a generic agent message and never shows the raw text). The lucide
+  `Laptop` icon and "column/value pairs" mentions are not pairing language.
+
+Five test assertions were updated with the copy
+(`workflow.test.ts`, `workflow-ui.test.tsx` ×2, `setup-guide-ui.test.tsx` ×2,
+`profile-health.test.ts`), including the corrected desktop-only guide card.
+
+Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
+(0 warnings), `npm.cmd test` **870 tests / 64 files** PASS, `npm.cmd run build`
+PASS. No migration, worker code, deployment or live action was involved; the
+local dev server serves the reworded UI immediately for operator review.

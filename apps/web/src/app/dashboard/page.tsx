@@ -32,7 +32,7 @@ export default async function Home() {
     {isStaff && <>
       <div className="connection-grid">
         <Link className="connection-card" href="/dashboard/master-sheet"><span className="muted small">MASTER SHEET</span><strong>{configured ? "Connection configured" : "Connect once"}</strong><small>{configured ? "Open to read and check your tabs" : "Your existing Sheet stays unchanged"}</small></Link>
-        <Link className="connection-card" href="/dashboard/settings#connections"><span className="muted small">LOCAL LAPTOP</span><strong>{recent ? `${recent} seen recently` : enabledWorkers.length ? "Waiting for worker" : "Pair once"}</strong><small>A heartbeat is not a browser-readiness check</small></Link>
+        <Link className="connection-card" href="/dashboard/settings#connections"><span className="muted small">LOCAL AUTOMATION AGENT</span><strong>{recent ? `${recent} seen recently` : enabledWorkers.length ? "Waiting for agent" : "Register once"}</strong><small>A heartbeat is not a browser-readiness check</small></Link>
         <Link className="connection-card" href="/dashboard/profiles"><span className="muted small">PROFILES</span><strong>{operations?.available ? `${operations.bindings.length} saved mappings` : "Not loaded"}</strong><small>Choose customers once, reuse for Sheet sync</small></Link>
       </div>
       <div className="stats-grid">{[

@@ -12,9 +12,9 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
   const { db, organization } = await requireWorkspace(true, form);
   const worker = z.uuid().safeParse(form.get("worker"));
   const kind = form.get("kind");
-  if (!worker.success) return { error: "Choose the paired laptop that should run this task." };
+  if (!worker.success) return { error: "Choose the automation agent that should run this task." };
   if (!isAutomationKind(kind)) return { error: "Choose a browser task that the worker is allowed to run." };
-  if (form.get("confirmed") !== "on") return { error: "Confirm you want the paired laptop to run this task now." };
+  if (form.get("confirmed") !== "on") return { error: "Confirm you want the automation agent to run this task now." };
 
   let payload: Record<string, unknown>;
   let summary: string;
@@ -48,9 +48,9 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
   const { error } = await db.rpc("reporting_enqueue_automation_task", {
     org: organization.id, worker: worker.data, kind, summary, payload,
   });
-  if (error) return { error: "Task could not be queued. Check that the laptop is enabled, has no other queued task, and that the automation migration is applied." };
+  if (error) return { error: "Task could not be queued. Check that the automation agent is enabled, has no other queued task, and that the automation migration is applied." };
   refresh();
-  return { success: "Task queued. The paired laptop runs it on its next poll; nothing runs in this browser tab." };
+  return { success: "Task queued. The automation agent on this device runs it on its next poll; nothing runs in this browser tab." };
 }
 
 export async function cancelBrowserTask(_previous: FormState, form: FormData): Promise<FormState> {
@@ -58,15 +58,15 @@ export async function cancelBrowserTask(_previous: FormState, form: FormData): P
   const task = z.uuid().safeParse(form.get("task"));
   if (!task.success) return { error: "Invalid task." };
   const { error } = await db.rpc("reporting_cancel_automation_task", { org: organization.id, task: task.data });
-  if (error) return { error: "Only a task still waiting for the laptop can be cancelled. Refresh to see its state." };
+  if (error) return { error: "Only a task still waiting for the agent can be cancelled. Refresh to see its state." };
   refresh();
-  return { success: "Queued task cancelled before the laptop started it." };
+  return { success: "Queued task cancelled before the agent started it." };
 }
 
 export async function reconcileExpiredBrowserTask(_previous: FormState, form: FormData): Promise<FormState> {
   const { db, organization } = await requireWorkspace(true, form);
   const task = z.uuid().safeParse(form.get("task"));
-  if (!task.success || form.get("reconciled") !== "on") return { error: "Confirm the laptop stopped and you have inspected Incogniton before reconciling." };
+  if (!task.success || form.get("reconciled") !== "on") return { error: "Confirm the agent stopped and you have inspected Incogniton before reconciling." };
   const { error } = await db.rpc("reporting_reconcile_expired_automation_task", { org: organization.id, task: task.data });
   if (error) return { error: "Only an expired lease can be reconciled. Refresh to see the current state." };
   refresh();

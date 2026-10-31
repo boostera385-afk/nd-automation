@@ -26,7 +26,8 @@ describe("first-time setup guide", () => {
     for (const phase of ["PHASE 1 · DO THIS ONCE", "PHASE 2 · FUDGE INTAKE", "PHASE 3 · ND DASHBOARD AUTOMATIONS", "PHASE 4 · EVERY WORKING DAY"]) {
       expect(html).toContain(phase);
     }
-    expect(html).toContain("Pair your laptop / worker once");
+    expect(html).toContain("Register this device");
+    expect(html).toContain("automation agent once");
     expect(html).toContain("Map the exact profile, not a guessed name");
     expect(html).toContain("Sync the Master Sheet");
     expect(html).toContain("Confirm a monitoring batch once");
@@ -56,7 +57,7 @@ describe("first-time setup guide", () => {
   it("separates desktop-only work and keeps irreversible actions gated", async () => {
     const html = renderToStaticMarkup(await SetupGuide());
     expect(html).toContain("STILL DESKTOP OR GATED");
-    expect(html).toContain("Auto Posting, Auto Listing, Incogniton profile creation");
+    expect(html).toContain("Auto Posting, Auto Listing, media work");
     expect(html).toContain("Dashboard publishing and listings, scheduling, account creation, automatic Sheet writeback");
     expect(html).toContain("Desktop only");
     expect(html).toContain("Irreversible actions stay off");

@@ -52,5 +52,5 @@ export async function setBatchMonitoring(_previous: FormState, form: FormData): 
     changed++;
   }
   revalidatePath("/dashboard", "layout");
-  return { success: mode.data === "enable" ? `Monitoring enabled for ${changed} profiles in this work session. The paired local agent will plan due checks; this does not publish anything.` : `Monitoring disabled for ${changed} profiles and their pending checks cancelled. An in-flight read may finish.` };
+  return { success: mode.data === "enable" ? `Monitoring enabled for ${changed} profiles in this work session. The automation agent on this device will plan due checks; this does not publish anything.` : `Monitoring disabled for ${changed} profiles and their pending checks cancelled. An in-flight read may finish.` };
 }

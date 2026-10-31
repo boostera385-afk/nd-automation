@@ -50,10 +50,10 @@ export default async function SetupGuide() {
         <Step title="Verify one account for both apps">Use the same email and password in Fudge and this dashboard — there is no second signup. Open the verification email before staff pages will work. An unverified account sees only limited screens.</Step>
         <Step title="Confirm the business timezone">Open <Link href="/dashboard/customers">Customers</Link> and check the customer record. The default business timezone is <code>America/Los_Angeles</code>. Timestamps are stored in UTC and shown in the business timezone; do not change the timezone just to make an unknown date look known.</Step>
         <Step title="Create only real customer records">Add the customers you are authorized to report on. Never create a placeholder, competitor or test customer to explore a page.</Step>
-        <Step title="Pair your laptop / worker once">Open <Link href="/dashboard/automation">Pair laptop / worker</Link> and register the worker. Save its private credential locally on the paired laptop as the worker asks. A credential is revocable; if it is exposed, revoke it and pair again. There is no service-role key in the web app or worker.</Step>
+        <Step title="Register this device&apos;s automation agent once">Open <Link href="/dashboard/automation">Automation agent setup</Link> and register the agent. Save its private credential locally on this same device as the agent asks. A credential is revocable; if it is exposed, revoke it and register again. There is no service-role key in the web app or agent.</Step>
         <Step title="Map the exact profile, not a guessed name">Open <Link href="/dashboard/profiles">Profiles</Link> or <Link href="/dashboard/automation">Automation control</Link>. Choose the existing Incogniton profile by exact UUID, its customer, its worker and the account label used on post records. Duplicate names are never resolved by guessing. A saved mapping is reused by Sheet sync and monitoring.</Step>
         <Step title="Connect the Master Sheet if you use Sheet sync">Open <Link href="/dashboard/master-sheet">Master Sheet</Link> → Connect Master Sheet — step-by-step. The server needs <code>SHEET_SYNC_URL</code>, <code>SHEET_SYNC_TOKEN</code> and <code>SHEET_SYNC_ORGANIZATION_ID</code> (the workspace ID is shown in the wizard). Deploy the separate read-only connector; never replace the Fudge or desktop Apps Script with it. Test the saved connection — a saved setting alone does not prove the Sheet is reachable.</Step>
-        <Step title="Check the Home setup cards">Open <Link href="/dashboard">Home</Link> and confirm Master Sheet, local laptop and profile mappings show as configured or seen. A worker heartbeat means the worker checked in; it is not proof that Incogniton or the browser profile is ready.</Step>
+        <Step title="Check the Home setup cards">Open <Link href="/dashboard">Home</Link> and confirm Master Sheet, local automation agent and profile mappings show as configured or seen. A heartbeat means the agent checked in; it is not proof that Incogniton or the browser profile is ready.</Step>
       </ol>
       <Callout tone="amber" icon="warn" title="Skipping a step is safe — the dashboard will not improvise">Without a worker or a saved profile mapping, no monitoring batch is planned. The dashboard never guesses a profile, customer or publication link.</Callout>
     </GuideSection>
@@ -75,7 +75,7 @@ export default async function SetupGuide() {
         <Step title="Start a work session">Use the top bar or <Link href="/dashboard">Home</Link>. A work session is an 8–10 hour human work record, not 24/7 operation. Enablement is tied to the current session; a new session requires a new authorization.</Step>
         <Step title="Sync the Master Sheet">Open <Link href="/dashboard/master-sheet">Master Sheet</Link>, choose Auto Posting or Auto Listing, then use <strong>Sync known profiles now</strong>. The sync is explicit and idempotent and uses saved mappings only. A Sheet “Posted” or “Alive” label is a claim, not an automatically verified observation.</Step>
         <Step title="Confirm a monitoring batch once">Open <Link href="/dashboard/run">Run automation</Link>, select the saved profiles and confirm the batch. Alternatively use <Link href="/dashboard/automation">Automation control</Link> to enable each assigned profile. Comment collection is partial by design and only happens when the operator has authorized it for the session.</Step>
-        <Step title="Let the paired worker plan due checks">The worker plans read-only checks for older or unknown-date posts that have not been checked in 24 hours. The laptop and Incogniton must stay available. The dashboard dispatches work; it does not open a profile itself.</Step>
+        <Step title="Let the automation agent plan due checks">The agent plans read-only checks for older or unknown-date posts that have not been checked in 24 hours. The agent and Incogniton on this device must stay available. The dashboard dispatches work; it does not open a profile itself.</Step>
         <Step title="Review Results, Posts and Comments">Open <Link href="/dashboard/results">Results</Link> for saved links, visibility, comments and problems. Visibility describes the saved observation time, not guaranteed current status. Use <Link href="/dashboard/posts">Posts</Link> and <Link href="/dashboard/comments">Comments</Link> for the detailed ledger.</Step>
         <Step title="Read comments honestly">A stored sample can be incomplete. When the page does not expose a comment total or an expansion path, the run is marked incomplete instead of claiming completeness. Authors and bodies are saved only when read from the page; when only a relative label exists, the platform creation time stays “unknown” and is never invented.</Step>
         <Step title="Pause or end the session when you stop">Pause/End work stops new claims; an in-flight read may finish. Pending jobs are not retried automatically after an expired lease — reconcile only after stopping the old agent.</Step>
@@ -98,7 +98,7 @@ export default async function SetupGuide() {
         <article className="guide-card guide-tone-amber"><h3>Proxy issue</h3><p>Stop the run. Check the proxy in the desktop app or Incogniton profile. Never paste proxy passwords into a dashboard form or a Sheet.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Profile busy</h3><p>Another agent or tab is using the profile. Close it and wait. Run one profile at a time; reconcile an expired lease only after the old agent is stopped.</p></article>
         <article className="guide-card guide-tone-red"><h3>Account disabled / needs review</h3><p>Nextdoor redirected to its Account Disabled page. Everything stops for a person to review the account.</p><p>Never use another profile or technique to evade a suspension.</p></article>
-        <article className="guide-card guide-tone-amber"><h3>Waiting for worker / offline</h3><p>Start the local worker on the paired laptop and confirm the heartbeat. A heartbeat still is not proof that Incogniton or the browser profile is ready.</p></article>
+        <article className="guide-card guide-tone-amber"><h3>Waiting for agent / offline</h3><p>Start the automation agent on this device and confirm the heartbeat. A heartbeat still is not proof that Incogniton or the browser profile is ready.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Sheet not configured</h3><p>The server is missing its <code>SHEET_SYNC_*</code> settings (for example on a deployment). Use the CSV import/export fallback; no live Sheet write happens.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Counts look partial</h3><p>Lists are intentionally limited (for example the latest 100 jobs or 50 revision receipts). Partial data is labelled; never present it as an all-time total.</p></article>
       </div>
@@ -110,9 +110,9 @@ export default async function SetupGuide() {
         <div><p className="eyebrow">STILL DESKTOP OR GATED</p><h2>What this dashboard does not do yet</h2><p className="muted small">No pretend buttons. Use the preserved desktop app for these jobs and avoid overlapping work on the same profile.</p></div>
       </header>
       <div className="guide-cards">
-        <article className="guide-card guide-tone-blue"><h3>Desktop app</h3><p>Auto Posting, Auto Listing, Incogniton profile creation, cookie and proxy handling, and media work.</p></article>
+        <article className="guide-card guide-tone-blue"><h3>Desktop app</h3><p>Auto Posting, Auto Listing, media work and bulk operations. Blank profile creation, cookie and proxy imports are queued from Run automation instead; the desktop app remains the fallback if a queued write fails.</p></article>
         <article className="guide-card guide-tone-red"><h3>Not implemented or validated</h3><p>Dashboard publishing and listings, scheduling, account creation, automatic Sheet writeback, Fudge intake upload and unattended ingestion.</p></article>
-        <article className="guide-card guide-tone-amber"><h3>Labelled honestly</h3><p>Run automation marks these tasks <strong>Desktop only</strong>. There is no Start button that pretends otherwise.</p></article>
+        <article className="guide-card guide-tone-amber"><h3>Labelled honestly</h3><p>Run automation marks posting, listings, account creation and presets <strong>Desktop only</strong>. There is no Start button that pretends otherwise.</p></article>
       </div>
       <div className="guide-callout guide-tone-red"><TriangleAlert size={17} aria-hidden /><div><strong>Irreversible actions stay off</strong><p>Uploads, publishing, client-facing posts and real Sheet writes require a separate, explicit authorization. Do not enable them to “test” the guide.</p></div></div>
     </section>
@@ -124,7 +124,7 @@ export default async function SetupGuide() {
       </header>
       <ul className="guide-rules">
         <li><ShieldCheck size={15} aria-hidden />Never share, screenshot or commit tokens, cookies, proxies, <code>.env</code> files, customer exports or signed-in sessions.</li>
-        <li><CircleAlert size={15} aria-hidden />There is no service-role key in the web app or worker. Worker requests use narrow, revocable credentials.</li>
+        <li><CircleAlert size={15} aria-hidden />There is no service-role key in the web app or agent. Agent requests use narrow, revocable credentials.</li>
         <li><TriangleAlert size={15} aria-hidden />Never guess a profile UUID, customer assignment, post date or observation. Unknown stays unknown.</li>
         <li><Laptop size={15} aria-hidden />No 24/7 execution. Work sessions are 8–10 hours and must be ended cleanly.</li>
       </ul>
@@ -141,7 +141,7 @@ export default async function SetupGuide() {
         <Link href="/dashboard/run"><strong>Run automation</strong><small>Confirm a read-only monitoring batch.</small></Link>
         <Link href="/dashboard/results"><strong>Results</strong><small>Links, visibility, comments and problems.</small></Link>
         <Link href="/dashboard/profiles"><strong>Profiles</strong><small>Saved exact-UUID customer mappings.</small></Link>
-        <Link href="/dashboard/automation"><strong>Automation control</strong><small>Worker health, authorization and lease recovery.</small></Link>
+        <Link href="/dashboard/automation"><strong>Automation control</strong><small>Agent health, authorization and lease recovery.</small></Link>
         <Link href="/dashboard/fudge"><strong>Fudge intake receipts</strong><small>Read-only backend counts and revisions.</small></Link>
         <Link href="/dashboard/settings/sheet-setup"><strong>Connect Master Sheet</strong><small>Numbered wizard with copy buttons and testing.</small></Link>
       </div>

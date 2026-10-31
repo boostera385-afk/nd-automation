@@ -1,6 +1,6 @@
 import type { LocalWorker, MonitoringJob, ProfileBinding } from "./workflow";
 
-// A paired agent reports a heartbeat when it polls. These thresholds describe
+// The registered agent reports a heartbeat when it polls. These thresholds describe
 // that report only: nothing here probes Incogniton, opens a browser or starts a
 // job. A profile can look healthy while its desktop app is still unusable.
 export const HEARTBEAT_LIVE_MS = 5 * 60_000;
@@ -13,7 +13,7 @@ export const healthLabels: Record<HealthLevel, string> = {
   live: "Agent live",
   stale: "Heartbeat stale",
   offline: "Agent offline",
-  disabled: "Laptop disabled",
+  disabled: "Agent disabled",
 };
 
 export const healthTones: Record<HealthLevel, HealthTone> = {
@@ -58,8 +58,8 @@ export type ProfileHealth = {
   expiredLeases: number;
 };
 
-// Leases belong to a laptop, not to a single profile: reporting_check_jobs
-// records the worker, never the Incogniton profile. Label them as laptop-wide.
+// Leases belong to a device, not to a single profile: reporting_check_jobs
+// records the worker, never the Incogniton profile. Label them as device-wide.
 export function profileHealth(input: {
   binding: ProfileBinding;
   worker: LocalWorker | undefined;
@@ -74,10 +74,10 @@ export function profileHealth(input: {
   return {
     level,
     tone: healthTones[level],
-    workerName: worker?.name ?? "Unassigned laptop",
+    workerName: worker?.name ?? "Unassigned device",
     heartbeat: relativeAge(worker?.last_seen_at ?? null, now),
     // A profile counts as monitored only inside the active session it was
-    // bound to, on an enabled laptop. No session means nothing is dispatched.
+    // bound to, on an enabled device. No session means nothing is dispatched.
     monitored: Boolean(sessionId) && binding.monitoring_session_id === sessionId && Boolean(worker?.enabled),
     workerLeases: leases.length,
     expiredLeases,

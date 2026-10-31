@@ -46,7 +46,7 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
   });
   it("makes Sheet and run controls the home workflow, without a manual-entry checklist", async () => {
     const html = renderToStaticMarkup(await Home());
-    expect(html).toContain("MASTER SHEET"); expect(html).toContain("LOCAL LAPTOP"); expect(html).toContain("saved mappings");
+    expect(html).toContain("MASTER SHEET"); expect(html).toContain("LOCAL AUTOMATION AGENT"); expect(html).toContain("saved mappings");
     expect(html).not.toContain("Setup checklist"); expect(html).not.toContain("Keep the session honest");
     expect(html).not.toContain('href="/dashboard/posts/new"');
     expect(html).toContain("still gated");
@@ -55,7 +55,7 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     mocks.getContext.mockResolvedValue({ organization, isStaff: false });
     const html = renderToStaticMarkup(await Home());
     expect(mocks.getOperationsData).not.toHaveBeenCalled();
-    expect(html).not.toContain("LOCAL LAPTOP"); expect(html).toContain("View results");
+    expect(html).not.toContain("LOCAL AUTOMATION AGENT"); expect(html).toContain("View results");
   });
   it("offers only executable browser tasks and names what stays gated", async () => {
     mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });

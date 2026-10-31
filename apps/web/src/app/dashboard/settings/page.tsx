@@ -14,7 +14,7 @@ export default async function Settings() {
     </section>
     {isStaff && <section id="connections"><Panel title="One-time connection setup">
       <div className="workflow-links">
-        <Link href="/dashboard/automation"><strong>Pair laptop / worker</strong><small>Save the private credential locally; register once, not every day.</small></Link>
+        <Link href="/dashboard/automation"><strong>Automation agent setup</strong><small>One device, one private credential — save it locally and register once, not every day.</small></Link>
         <Link href="/dashboard/profiles"><strong>Map profiles to customers</strong><small>Saved exact-UUID mappings are reused by Sheet sync and monitoring.</small></Link>
         <Link href="/dashboard/settings/sheet-setup"><strong>Connect Master Sheet — step-by-step</strong><small>{connected ? "Connection configured. Test it or open the copy-and-paste setup guide." : "Copy connector code, create settings and test the connection here."}</small></Link>
         <Link href="/dashboard/customers"><strong>Customers</strong><small>Customer setup and business timezones.</small></Link>
