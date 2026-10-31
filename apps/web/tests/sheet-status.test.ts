@@ -4,7 +4,7 @@ import { buildSyncView, classifyStatus, parseSyncEndpoint, sheetResponseSchema, 
 const link = (id: string) => `https://nextdoor.com/p/${id}`;
 const row = (rowNumber: number, overrides: Partial<SheetRow> = {}): SheetRow => ({ rowNumber, profileName: `Profile ${rowNumber}`, title: `Post number ${rowNumber}`, postLink: link(`AAA${rowNumber}`), status: "Posted", ...overrides });
 
-describe("classifyStatus uses the values the desktop tool really writes", () => {
+describe("classifyStatus uses the values the Sheet automation really writes", () => {
   it("recognises posted with and without a usable link", () => {
     expect(classifyStatus("Posted", link("abc123"))).toBe("posted");
     expect(classifyStatus("Posted", "")).toBe("posted_no_link");

@@ -20,11 +20,14 @@ def task(kind, payload, **overrides):
 
 
 class FakeIncogniton:
-    def __init__(self):
+    def __init__(self, profiles=None):
         self.created = []
         self.cookie_writes = []
         self.deleted_cookies = []
         self.proxy_writes = []
+        self.listed = list(profiles) if profiles is not None else [
+            {"profile_id": "44444444-4444-4444-8444-444444444444", "name": "Plumber Pat", "group_name": "Team A"},
+        ]
 
     def create(self, name, operating_system="windows", group=""):
         self.created.append((name, operating_system, group))
@@ -32,6 +35,9 @@ class FakeIncogniton:
 
     def inventory(self):
         return {"profiles": 7, "groups": 2, "launched": 1}
+
+    def list_profiles(self):
+        return list(self.listed)
 
     def add_cookies(self, profile_id, cookies):
         self.cookie_writes.append((profile_id, cookies))
@@ -153,6 +159,25 @@ class ExecutionTests(unittest.TestCase):
     def test_preset_snapshot_is_counts_only(self):
         self.assertEqual(tasks.execute(task("preset_snapshot", {}), FakeIncogniton()),
                          {"profiles": 7, "groups": 2, "launched": 1})
+
+    def test_scan_task_kind_is_valid_and_ignores_extra_payload(self):
+        self.assertEqual(tasks.validate_task(task("inventory_scan", {}))["kind"], "inventory_scan")
+        self.assertEqual(tasks.validate_task(task("inventory_scan", {"note": "initiated from Profiles"}))["kind"],
+                         "inventory_scan")
+
+    def test_inventory_scan_returns_uuid_name_and_group_only(self):
+        result = tasks.execute(task("inventory_scan", {}), FakeIncogniton())
+        self.assertEqual(result, {"profiles": [{"profile_id": "44444444-4444-4444-8444-444444444444",
+                                                 "name": "Plumber Pat", "group_name": "Team A"}],
+                                  "total": 1, "truncated": False})
+
+    def test_inventory_scan_reports_truncation_honestly_at_the_cap(self):
+        listed = [{"profile_id": f"44444444-4444-4444-8444-{i:012d}", "name": f"P {i}", "group_name": "G"}
+                  for i in range(tasks.MAX_SCAN_ENTRIES + 1)]
+        result = tasks.execute(task("inventory_scan", {}), FakeIncogniton(listed))
+        self.assertEqual(len(result["profiles"]), tasks.MAX_SCAN_ENTRIES)
+        self.assertEqual(result["total"], tasks.MAX_SCAN_ENTRIES + 1)
+        self.assertTrue(result["truncated"])
 
     def test_cookie_import_reads_a_local_file(self):
         path = write(".nextdoor.com\tTRUE\t/\tTRUE\t1999999999\ts\tv\n")

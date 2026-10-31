@@ -3,9 +3,11 @@ import { requireWorkspace, getDashboardData } from "@/lib/data";
 import { getOperationsData } from "@/lib/operations-data";
 import { isMissingSchemaError } from "@/lib/checks";
 import { heartbeatState } from "@/lib/workflow";
+import { formatTime } from "@/lib/time";
 import type { InventoryProfile } from "@/lib/profiles";
 import { ActionForm } from "@/components/action-form";
 import { ProfileImport } from "@/components/profile-import";
+import { ScanImport, type LatestScanSummary } from "@/components/scan-import";
 import { ProfileAssignment } from "@/components/profile-assignment";
 import { setProfileArchived } from "@/app/actions/profiles";
 import { PageHeader, Panel } from "@/components/ui";
@@ -21,6 +23,17 @@ export default async function Profiles() {
   const enabledWorkers = operations.workers.filter((worker) => worker.enabled);
   const assignedIds = new Set(operations.bindings.map((binding) => binding.profile_id));
   const choices = profiles.filter((profile) => profile.status === "active" && !assignedIds.has(profile.profile_id));
+  // The operations list carries the newest 20 tasks; the newest completed scan is the import source.
+  const scanTask = operations.tasks.find((task) => task.kind === "inventory_scan" && task.status === "succeeded");
+  const scannedList = scanTask?.result && Array.isArray(scanTask.result.profiles) ? (scanTask.result.profiles as unknown[]) : null;
+  const latestScan: LatestScanSummary = scanTask && scannedList
+    ? {
+        total: typeof scanTask.result?.total === "number" ? scanTask.result.total : scannedList.length,
+        stored: scannedList.length,
+        truncated: scanTask.result?.truncated === true,
+        completedText: scanTask.completed_at ? formatTime(scanTask.completed_at, organization.time_zone) : "an unknown time",
+      }
+    : null;
   return <>
     <PageHeader title="Profiles" description="Select existing profiles and map each to its customer once. Master Sheet sync and monitoring reuse these saved mappings." actions={<Link className="button secondary" href="/dashboard/run">Run checks</Link>} />
     <Panel title="Saved customer mappings" hint={`${operations.bindings.length} loaded assignments`}>
@@ -35,8 +48,8 @@ export default async function Profiles() {
       {!result.error && choices.length && enabledWorkers.length && data.customers.length ? <ProfileAssignment profiles={choices} workers={enabledWorkers} customers={data.customers} /> : <p>{choices.length === 0 ? "No unassigned active inventory profiles are loaded. " : ""}{!data.customers.length ? "Add your customer in Settings / More. " : ""}{!enabledWorkers.length ? "Register this device's automation agent in connection setup. " : ""}<Link href="/dashboard/settings#connections">Open setup</Link>. Inventory import is available below.</p>}
     </Panel>
     <details className="workflow-details"><summary>Inventory setup & advanced tools</summary>
-      <p className="muted small">Live inventory discovery is not connected yet. Import an authorized UUID/name/group CSV once as a fallback. It never creates or launches profiles. Archive affects inventory suggestions only, not saved assignments.</p>
-      {!result.error ? <><ProfileImport /><div className="table-wrap"><table><thead><tr><th>Inventory profile</th><th>Group</th><th>Status</th><th>Advanced</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.profile_id}><td>{profile.name}<small>{profile.profile_id}</small></td><td>{profile.group_name}</td><td>{profile.status}</td><td><ActionForm action={setProfileArchived} label={profile.status === "active" ? "Archive inventory" : "Reactivate inventory"} secondary><input type="hidden" name="profile" value={profile.profile_id} /><input type="hidden" name="archived" value={profile.status === "active" ? "true" : "false"} /><label className="check"><input type="checkbox" name="confirmed" required />Change this inventory claim only.</label></ActionForm></td></tr>)}</tbody></table></div></> : <p>Inventory setup is unavailable. Ask your administrator to complete the database setup.</p>}
+      <p className="muted small">Profiles are detected from Incogniton on this device: the automation agent reads the UUID/name/group list (no cookies, proxies or account details), and the result imports here in one click. A CSV export remains available as a fallback. Neither path launches, creates or verifies profiles. Archive affects inventory suggestions only, not saved assignments.</p>
+      {!result.error ? <><ScanImport latest={latestScan} /><ProfileImport /><div className="table-wrap"><table><thead><tr><th>Inventory profile</th><th>Group</th><th>Status</th><th>Advanced</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.profile_id}><td>{profile.name}<small>{profile.profile_id}</small></td><td>{profile.group_name}</td><td>{profile.status}</td><td><ActionForm action={setProfileArchived} label={profile.status === "active" ? "Archive inventory" : "Reactivate inventory"} secondary><input type="hidden" name="profile" value={profile.profile_id} /><input type="hidden" name="archived" value={profile.status === "active" ? "true" : "false"} /><label className="check"><input type="checkbox" name="confirmed" required />Change this inventory claim only.</label></ActionForm></td></tr>)}</tbody></table></div></> : <p>Inventory setup is unavailable. Ask your administrator to complete the database setup.</p>}
       <p><Link href="/dashboard/automation">Worker replacement, manual UUID assignment & diagnostics</Link></p>
     </details>
   </>;

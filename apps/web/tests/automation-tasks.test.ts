@@ -17,9 +17,9 @@ const base: AutomationTask = {
 const task = (overrides: Partial<AutomationTask>): AutomationTask => ({ ...base, ...overrides });
 
 describe("task kinds", () => {
-  it("lists only the six executable kinds", () => {
-    expect(automationKinds).toEqual(["profile_create", "preset_snapshot", "cookie_import", "proxy_import", "cookie_write", "proxy_write"]);
-    expect(isAutomationKind("profile_create")).toBe(true);
+  it("lists only the seven executable kinds", () => {
+    expect(automationKinds).toEqual(["profile_create", "preset_snapshot", "inventory_scan", "cookie_import", "proxy_import", "cookie_write", "proxy_write"]);
+    expect(isAutomationKind("inventory_scan")).toBe(true);
     expect(isAutomationKind("publish_post")).toBe(false);
     expect(isAutomationKind("cookie_write_all")).toBe(false);
     expect(isAutomationKind(null)).toBe(false);
@@ -98,6 +98,15 @@ describe("honest outcome wording", () => {
   it("reports counts for the preset snapshot", () => {
     expect(describeResult(base)).toBe("7 profile(s), 2 group(s), 1 open.");
     expect(describeResult(task({ result: { profiles: null, groups: 2 } }))).toMatch(/without counts/);
+  });
+
+  it("reports detected profiles and never hides truncation", () => {
+    const row = { profile_id: "44444444-4444-4444-8444-444444444444", name: "ND 001", group_name: "Team A" };
+    expect(describeResult(task({ kind: "inventory_scan", result: { profiles: [row], total: 1, truncated: false } })))
+      .toBe("Detected 1 profile(s): UUID, name and group only.");
+    expect(describeResult(task({ kind: "inventory_scan", result: { profiles: Array(500).fill(row), total: 3220, truncated: true } })))
+      .toBe("Detected 3220 profiles in Incogniton; the stored scan keeps the first 500 (list capped at 500). Re-run the scan to refresh.");
+    expect(describeResult(task({ kind: "inventory_scan", result: { total: 4 } }))).toMatch(/without a profile count/);
   });
 
   it("reports cookie and proxy counts with a short redacted sample", () => {

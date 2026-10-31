@@ -1,4 +1,4 @@
-export type AutomationKind = "profile_create" | "preset_snapshot" | "cookie_import" | "proxy_import" | "cookie_write" | "proxy_write";
+export type AutomationKind = "profile_create" | "preset_snapshot" | "inventory_scan" | "cookie_import" | "proxy_import" | "cookie_write" | "proxy_write";
 export type AutomationStatus = "pending" | "leased" | "succeeded" | "failed" | "cancelled";
 
 /** Incogniton profiles staff recorded in the dashboard inventory. */
@@ -18,11 +18,12 @@ export type AutomationTask = {
   lease_expires_at: string | null;
 };
 
-export const automationKinds: AutomationKind[] = ["profile_create", "preset_snapshot", "cookie_import", "proxy_import", "cookie_write", "proxy_write"];
+export const automationKinds: AutomationKind[] = ["profile_create", "preset_snapshot", "inventory_scan", "cookie_import", "proxy_import", "cookie_write", "proxy_write"];
 
 export const kindLabels: Record<AutomationKind, string> = {
   profile_create: "Create Incogniton profile",
   preset_snapshot: "Read preset inventory",
+  inventory_scan: "Detect Incogniton profiles",
   cookie_import: "Check a local cookie file",
   proxy_import: "Check a local proxy file",
   cookie_write: "Import cookies into a profile",
@@ -32,9 +33,10 @@ export const kindLabels: Record<AutomationKind, string> = {
 export const kindDescriptions: Record<AutomationKind, string> = {
   profile_create: "Asks this device's automation agent to create one blank Incogniton profile. No proxy, cookie, password or account label is sent or stored here.",
   preset_snapshot: "Reads how many profiles and groups exist and how many are open. Counts only; no names, cookies or proxies are returned.",
+  inventory_scan: "Reads the Incogniton profile list on this device and returns UUID, name and group only, capped at 500 entries with an honest truncation flag. Cookies, proxies and account details are dropped, never parsed.",
   cookie_import: "Validates a Netscape cookies.txt file already on the worker machine. Counts entries and domains; never stores or uploads cookie values.",
   proxy_import: "Validates a host:port or host:port:user:pass list already on the worker machine. Reports counts; credentials are never returned.",
-  cookie_write: "Writes a Netscape cookies.txt file from this device into one Incogniton profile, using the same local API call the desktop importer uses. One profile at a time, with your confirmation per task.",
+  cookie_write: "Writes a Netscape cookies.txt file from this device into one Incogniton profile, through Incogniton's local API on this same device. One profile at a time, with your confirmation per task.",
   proxy_write: "Applies the first valid host:port(:user:pass) line of a local file to one Incogniton profile. Never echoes username or password back to the dashboard.",
 };
 
@@ -109,6 +111,15 @@ export function describeResult(task: AutomationTask, workerName?: string, profil
     const profiles = number(result.profiles), groups = number(result.groups), launched = number(result.launched);
     if (profiles === null || groups === null) return "The worker reported success without counts.";
     return `${profiles} profile(s), ${groups} group(s)${launched === null ? "" : `, ${launched} open`}.`;
+  }
+  if (task.kind === "inventory_scan") {
+    const found = Array.isArray(result.profiles) ? result.profiles.length : null;
+    const total = number(result.total);
+    if (found === null || total === null) return "The agent reported success without a profile count.";
+    const truncated = result.truncated === true;
+    return truncated
+      ? `Detected ${total} profiles in Incogniton; the stored scan keeps the first ${found} (list capped at 500). Re-run the scan to refresh.`
+      : `Detected ${total} profile(s): UUID, name and group only.`;
   }
   if (task.kind === "cookie_write" || task.kind === "proxy_write") {
     const targetProfile = typeof task.payload?.profile_id === "string" ? task.payload.profile_id : null;

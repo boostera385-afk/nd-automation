@@ -44,7 +44,7 @@ export function SheetSetupWizard({ workspaceId, configured, connectorSource }: {
     </Panel>
     <Panel title="2. Create the separate Apps Script project">
       <ol><li>Open <a href="https://script.google.com/home/start" target="_blank" rel="noreferrer">Google Apps Script</a> and choose New project.</li><li>Name it ND Dev Dashboard Connector — Read Only.</li><li>Copy the complete code below, replace the starter myFunction code in Code.gs, and save with Ctrl+S.</li></ol>
-      <p>Do not replace the existing desktop or Fudge script. No extra libraries or Sheet menu actions are needed.</p>
+      <p>Do not replace your existing Fudge script. No extra libraries or Sheet menu actions are needed.</p>
       <details><summary>Connector code — ready to copy</summary><CopyBlock label="connector code" value={connectorSource} rows={12} /></details>
     </Panel>
     <Panel title="3. Add Script properties">

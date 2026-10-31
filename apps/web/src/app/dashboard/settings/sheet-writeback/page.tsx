@@ -49,7 +49,7 @@ export default async function SheetWriteback() {
   }
   return <>
     <PageHeader title="Sheet writeback queue" description="Explicit, ordered and replay-safe Sheet write intents. Delivery to any real Sheet stays inactive." />
-    <Panel title="Delivery is not active"><p>Intents queue durably in the shared backend only. No connector, worker or Edge Function writes any Sheet through this queue yet; your existing Sheets, Fudge writeback, desktop behavior and release gates are unchanged. Activating delivery requires separate live acceptance and the configuration-ownership decision.</p></Panel>
+    <Panel title="Delivery is not active"><p>Intents queue durably in the shared backend only. No connector, worker or Edge Function writes any Sheet through this queue yet; your existing Sheets, Fudge writeback and release gates are unchanged. Activating delivery requires separate live acceptance and the configuration-ownership decision.</p></Panel>
     <Panel title="Queue intents and review exact status"><p>Each intent is bounded, confirmed and replay-safe: the same request or stable key never produces a second copy, and changed values under the same key are refused. Timeouts stay unconfirmed — reconcile the queue below rather than re-queueing with new IDs.</p><SheetWritebackQueue items={items} total={total} /></Panel>
     <Link className="text-link" href="/dashboard/settings">Back to settings</Link>
   </>;

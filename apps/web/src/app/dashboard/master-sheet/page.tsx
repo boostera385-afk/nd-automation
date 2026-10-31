@@ -28,7 +28,7 @@ export default async function MasterSheet({ searchParams }: { searchParams: Prom
   return <>
     <PageHeader eyebrow="YOUR EXISTING WORKFLOW" title="Master Sheet" description="Keep cleaning your data in the same Sheet. See its task tabs here without retyping posts or importing credentials." actions={<LiveRefresh />} />
     <nav className="workflow-tabs" aria-label="Master Sheet tabs">{MASTER_TABS.map((item) => <Link key={item} href={`/dashboard/master-sheet?tab=${encodeURIComponent(item)}`} prefetch={false} aria-current={item === tab ? "page" : undefined}>{item}</Link>)}</nav>
-    {!configured && <Panel title="Connect your master Sheet once"><p>The dashboard connection has not been configured. Your existing desktop and Fudge connections are unchanged.</p><p><Link className="button" href="/dashboard/settings/sheet-setup">Step-by-step connection setup</Link> <Link className="text-link" href="/dashboard/sheet-sync">CSV fallback</Link></p></Panel>}
+    {!configured && <Panel title="Connect your master Sheet once"><p>The dashboard connection has not been configured. Your existing Fudge connection is unchanged.</p><p><Link className="button" href="/dashboard/settings/sheet-setup">Step-by-step connection setup</Link> <Link className="text-link" href="/dashboard/sheet-sync">CSV fallback</Link></p></Panel>}
     {error && <p className="notice error" role="alert">{error}</p>}
     {optionalProxyTabMissing && <Panel title="Optional proxy-import tab not configured">
       <p>The connected Sheet does not contain a separate Bulk proxies import tab. No tab was created or renamed, and no proxy task was queued.</p>

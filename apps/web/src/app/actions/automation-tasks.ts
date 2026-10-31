@@ -40,6 +40,9 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
     payload = { profile_id: profile.trim().toLowerCase(), path: path.trim() };
     if (kind === "cookie_write" && form.get("replace") === "on") payload.replace = true;
     summary = kind === "cookie_write" ? "Import cookies into a profile" : "Set a profile proxy";
+  } else if (kind === "inventory_scan") {
+    payload = {};
+    summary = "Detect Incogniton profiles";
   } else {
     payload = {};
     summary = "Read preset inventory";

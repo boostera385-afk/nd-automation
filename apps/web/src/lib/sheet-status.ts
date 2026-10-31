@@ -24,8 +24,8 @@ export type StatusKind = "pending" | "claimed" | "posted" | "alive" | "deleted" 
 export type Tone = "ok" | "warn" | "bad" | "neutral";
 
 export const statusKinds: Record<StatusKind, { label: string; hint: string; tone: Tone }> = {
-  pending: { label: "Waiting in queue", hint: "Status is empty; the desktop tool has not picked this row up.", tone: "neutral" },
-  claimed: { label: "In progress or interrupted", hint: "Claimed by the desktop tool. If it stays like this, a run was probably interrupted.", tone: "warn" },
+  pending: { label: "Waiting in queue", hint: "Status is empty; no automation has picked this row up yet.", tone: "neutral" },
+  claimed: { label: "In progress or interrupted", hint: "Claimed by an automation run. If it stays like this, a run was probably interrupted.", tone: "warn" },
   posted: { label: "Posted, link saved", hint: "The tool reported a submission and saved a link. Not yet confirmed by a person.", tone: "ok" },
   alive: { label: "Alive (per sheet)", hint: "Someone marked this post Alive in the sheet. The dashboard treats that as a claim until a check is recorded here.", tone: "ok" },
   deleted: { label: "Deleted from Nextdoor (per sheet)", hint: "Someone marked this post as removed from Nextdoor. Confirm it and record the evidence in the dashboard.", tone: "bad" },
@@ -45,7 +45,7 @@ export function validPostUrl(value: string): string | null {
   return result.success ? result.data : null;
 }
 
-// Mirrors the values the desktop tool writes (see profile_worker.py) without assuming exact wording.
+// Mirrors the values the Sheet automation writes (see profile_worker.py) without assuming exact wording.
 export function classifyStatus(status: string, postLink: string): StatusKind {
   const text = status.trim().toLowerCase();
   if (!text || text === "pending") return "pending";

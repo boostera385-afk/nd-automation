@@ -37,6 +37,35 @@ export async function confirmProfileImport(_previous: FormState, form: FormData)
   return { success: `Imported ${counts.received}: ${counts.inserted} new, ${counts.updated} updated${archiveMissing ? `, ${counts.archived} archived as missing` : ""}.` };
 }
 
+export async function importScannedProfiles(_previous: FormState, form: FormData): Promise<FormState> {
+  const { db, organization } = await requireWorkspace(true, form);
+  if (form.get("confirmed") !== "on") return { error: "Confirm importing the latest detected profiles into this workspace's inventory." };
+  const { data, error } = await db.from("reporting_automation_tasks")
+    .select("id,result,completed_at")
+    .eq("organization_id", organization.id)
+    .eq("kind", "inventory_scan")
+    .eq("status", "succeeded")
+    .order("completed_at", { ascending: false })
+    .limit(1);
+  if (error) return { error: "Completed scans could not be read. Refresh and try again." };
+  const scan = data?.[0];
+  const scanned = Array.isArray((scan?.result as Record<string, unknown> | null)?.profiles)
+    ? (scan!.result as { profiles: unknown[] }).profiles
+    : null;
+  if (!scan || !scanned) return { error: "No completed device scan is stored yet. Queue a profile detection task from Run automation first." };
+  if (scanned.length === 0) return { error: "The latest scan found no profiles in Incogniton. Nothing to import; confirm the profiles exist locally." };
+  const parsed = z.array(profileRowSchema).min(1).max(500).safeParse(scanned);
+  if (!parsed.success) return { error: "The stored scan does not match the inventory row contract. Queue a fresh detection task." };
+  const truncated = (scan.result as Record<string, unknown>).truncated === true;
+  if (truncated && form.get("truncated_confirmed") !== "on") return { error: "This scan was capped at 500 profiles. Also confirm importing the capped list." };
+  const imported = await db.rpc("reporting_import_profiles", { org: organization.id, rows: parsed.data, archive_missing: false });
+  if (imported.error) return { error: "Import failed validation or organization checks. No partial import was committed." };
+  const counts = imported.data as { received: number; inserted: number; updated: number };
+  refresh();
+  revalidatePath("/dashboard/automation");
+  return { success: `Inventory updated from the device scan: ${counts.received} received, ${counts.inserted} new, ${counts.updated} updated.${truncated ? " The scan was capped at 500; more profiles exist in Incogniton." : ""} Nothing was launched or verified.` };
+}
+
 export async function setProfileArchived(_previous: FormState, form: FormData): Promise<FormState> {
   const { db, organization } = await requireWorkspace(true, form);
   const profile = z.uuid().safeParse(form.get("profile"));

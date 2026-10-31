@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
 
 // Exercises the browser task queue exactly as the hosted database would: staff
-// enqueue, the paired laptop claims with its scoped credential, and results are
-// written only through the RPC. Nothing here touches a browser.
+// enqueue, this device's automation agent claims with its scoped credential,
+// and results are written only through the RPC. Nothing here touches a browser.
 const db = new PGlite();
 const owner = randomUUID(), operator = randomUUID(), client = randomUUID();
 const token = "c".repeat(64);
@@ -44,6 +44,7 @@ beforeAll(async () => {
   }
   await db.exec(await readFile(new URL("../../../supabase/migrations/20261031093000_automation_tasks_v1.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../../supabase/migrations/20261031120000_cookie_proxy_write_v1.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/20261031150000_inventory_scan_v1.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   org = String(await rpc(owner, "select public.reporting_create_workspace('Automation fixture')"));
   await db.query("insert into public.reporting_memberships values ($1,$2,'operator'),($1,$3,'customer')", [org, operator, client]);
@@ -163,6 +164,54 @@ it("runs a cookie write then a proxy write through claim and completion, without
   await expect(complete(proxyTask, claimedProxy.lease_token, "succeeded", { applied: "jdbc://bad" })).rejects.toThrow();
   expect(await complete(proxyTask, claimedProxy.lease_token, "succeeded", { entries: 2, applied: "1.2.3.4:1080" })).toBe(true);
   expect(await scalar("select result->>'applied' from public.reporting_automation_tasks where id=$1", [proxyTask])).toBe("1.2.3.4:1080");
+});
+
+it("only one open task per laptop remains the rule while a scan is queued", async () => {
+  const scan = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles',$3)",
+    [org, worker, JSON.stringify({})]));
+  expect(await scalar("select kind from public.reporting_automation_tasks where id=$1", [scan])).toBe("inventory_scan");
+  await expect(rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'preset_snapshot','Second',$3)",
+    [org, worker, JSON.stringify({})])).rejects.toThrow();
+});
+
+it("validates a scan result shape and refuses smuggled row fields", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles',$3)",
+    [org, worker, JSON.stringify({})]));
+  const claimed = await claimTask() as { kind: string; lease_token: string };
+  expect(claimed.kind).toBe("inventory_scan");
+  const row = { profile_id: randomUUID(), name: "ND 001", group_name: "Team A" };
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [row], total: 1 })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [row], total: 1, truncated: "no" })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ ...row, cookies: "SECRET" }], total: 1, truncated: false })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: "not-a-uuid", name: "x", group_name: "g" }], total: 1, truncated: false })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: row.profile_id, name: "x", group_name: "g" }], total: 501, truncated: false })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: row.profile_id, name: "x", group_name: "g" }], total: 4, truncated: true, secret: "x" })).rejects.toThrow();
+});
+
+it("stores a full capped scan, then feeds it straight into the inventory import", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles',$3)",
+    [org, worker, JSON.stringify({})]));
+  const claimed = await claimTask() as { lease_token: string };
+  // 300 rows is far over the general 8000-byte result cap: only the scan allowance accepts it.
+  const rows = Array.from({ length: 300 }, (_, i) => ({
+    profile_id: randomUUID(), name: `Detected Profile ${String(i + 1).padStart(3, "0")}`, group_name: "Team A",
+  }));
+  expect(await complete(task, claimed.lease_token, "succeeded", { profiles: rows, total: 3220, truncated: true })).toBe(true);
+  expect(await scalar("select jsonb_array_length(result->'profiles') from public.reporting_automation_tasks where id=$1", [task])).toBe(300);
+  expect(await scalar("select count(*) from public.reporting_profile_inventory where organization_id=$1", [org])).toBe(0);
+  // The stored rows flow into the same inventory import the CSV path uses, without archiving.
+  await rpc(operator, "select public.reporting_import_profiles($1, (select result->'profiles' from public.reporting_automation_tasks where id=$2), false)", [org, task]);
+  expect(await scalar("select count(*) from public.reporting_profile_inventory where organization_id=$1 and status='active'", [org])).toBe(300);
+});
+
+it("still refuses a scan result past its own 64,000-byte allowance", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles',$3)",
+    [org, worker, JSON.stringify({})]));
+  const claimed = await claimTask() as { lease_token: string };
+  const huge = Array.from({ length: 500 }, () => ({
+    profile_id: randomUUID(), name: "n".repeat(200), group_name: "Team A",
+  }));
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: huge, total: 500, truncated: true })).rejects.toThrow("Invalid task result");
 });
 
 it("allows only one open task per laptop and lets staff cancel a pending one", async () => {

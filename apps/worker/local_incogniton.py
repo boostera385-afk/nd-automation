@@ -73,6 +73,47 @@ class Incogniton:
                     launched += 1
         return {"profiles": len(profiles), "groups": len(groups), "launched": launched}
 
+    def list_profiles(self):
+        """Live profile discovery for this device: UUID, name and group only.
+
+        The extraction is the desktop manager's field-for-field (it worked
+        against the installed build): the list sits under profileData or
+        profiles, some builds hand back a JSON string, and identity fields may
+        be nested in general_profile_information. Cookie, proxy, account and
+        every other detail the API returns are dropped here, never parsed.
+        """
+        data = self.request("/profile/all", timeout=60)
+        if isinstance(data, dict):
+            raw = data.get("profileData", data.get("profiles"))
+        else:
+            raw = data
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except ValueError:
+                raise ValueError("Local API did not return a profile list")
+        if not isinstance(raw, list):
+            raise ValueError("Local API did not return a profile list")
+        seen = set()
+        found = []
+        for profile in raw:
+            if not isinstance(profile, dict):
+                continue
+            info = profile.get("general_profile_information")
+            if not isinstance(info, dict):
+                info = {}
+            profile_id = str(info.get("browser_id") or profile.get("profile_browser_id") or "").strip().lower()
+            name = " ".join(str(info.get("profile_name") or profile.get("profile_name") or "").split())
+            if not profile_id or not _UUID.fullmatch(profile_id) or not name:
+                continue
+            if profile_id in seen:
+                continue
+            seen.add(profile_id)
+            group = str(profile.get("group") or info.get("profile_group") or "").strip()
+            found.append({"profile_id": profile_id, "name": name[:200],
+                          "group_name": (group or "Unassigned")[:200]})
+        return found
+
     def create(self, name, operating_system="windows", group=""):
         """Create one profile. The response shape is validated before it is trusted.
 

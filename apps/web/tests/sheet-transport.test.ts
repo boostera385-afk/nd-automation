@@ -53,7 +53,7 @@ describe("workspace-scoped Sheet transport", () => {
   });
   it("handles older connector versions with an upgrade notice, never replaces a live script", async () => {
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ ok: false, error: "invalid_action" })));
-    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("desktop and Fudge scripts should not be replaced");
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("Fudge script should not be replaced");
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
   it("distinguishes a missing tab from invalid headers without treating either as empty success", async () => {

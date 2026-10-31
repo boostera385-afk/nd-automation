@@ -28,18 +28,18 @@ function Callout({ tone, icon, title, children }: { tone: Tone; icon: "info" | "
 export default async function SetupGuide() {
   await requireWorkspace();
   return <>
-    <PageHeader eyebrow="START HERE · SETUP + DAILY USE" title="First-time setup & how-to guide" description="Follow the colored phases once, then use the daily rhythm. This guide keeps dashboard features, Fudge behaviour and desktop-only work clearly separate. Opening this page starts no browser, upload, post or Sheet write." />
+    <PageHeader eyebrow="START HERE · SETUP + DAILY USE" title="First-time setup & how-to guide" description="Follow the colored phases once, then use the daily rhythm. The whole stack is one and the same device: this dashboard, the Fudge Chrome extension and Incogniton. Nothing here is a desktop app. Opening this page starts no browser, upload, post or Sheet write." />
 
     <section className="guide-banner guide-tone-blue">
       <div>
-        <h2>Two apps, three jobs, one honest workflow</h2>
-        <p><strong>Fudge</strong> collects reviews. <strong>Your Sheet</strong> stays the working list. <strong>ND dashboard</strong> saves profile mappings, syncs known post links and records read-only monitoring results. Posting, listing and account creation still belong to the desktop app.</p>
+        <h2>One device, three tools, one honest workflow</h2>
+        <p><strong>Fudge</strong> collects reviews. <strong>Your Sheet</strong> stays the working list. <strong>ND dashboard</strong> saves profile mappings, syncs known post links and records read-only monitoring results, and its automation agent runs on this same device next to Incogniton. Automated posting, listing and account creation are not in this stack yet.</p>
       </div>
       <Link className="button" href="/dashboard/settings/sheet-setup">Sheet setup wizard</Link>
     </section>
 
     <div className="guide-phases">
-      <article className="guide-phase guide-tone-blue"><span aria-hidden>1</span><strong>One-time setup</strong><small>Account, customers, worker, profile mappings, Master Sheet.</small></article>
+      <article className="guide-phase guide-tone-blue"><span aria-hidden>1</span><strong>One-time setup</strong><small>Account, customers, automation agent, detected profiles, Master Sheet.</small></article>
       <article className="guide-phase guide-tone-violet"><span aria-hidden>2</span><strong>Fudge intake</strong><small>Collect reviews, save the source Sheet, clean rows.</small></article>
       <article className="guide-phase guide-tone-green"><span aria-hidden>3</span><strong>ND automations</strong><small>Sync the master Sheet, confirm a batch, review Results.</small></article>
       <article className="guide-phase guide-tone-amber"><span aria-hidden>4</span><strong>Daily + fixes</strong><small>Six-step work session and the troubleshooting cards.</small></article>
@@ -51,8 +51,9 @@ export default async function SetupGuide() {
         <Step title="Confirm the business timezone">Open <Link href="/dashboard/customers">Customers</Link> and check the customer record. The default business timezone is <code>America/Los_Angeles</code>. Timestamps are stored in UTC and shown in the business timezone; do not change the timezone just to make an unknown date look known.</Step>
         <Step title="Create only real customer records">Add the customers you are authorized to report on. Never create a placeholder, competitor or test customer to explore a page.</Step>
         <Step title="Register this device&apos;s automation agent once">Open <Link href="/dashboard/automation">Automation agent setup</Link> and register the agent. Save its private credential locally on this same device as the agent asks. A credential is revocable; if it is exposed, revoke it and register again. There is no service-role key in the web app or agent.</Step>
-        <Step title="Map the exact profile, not a guessed name">Open <Link href="/dashboard/profiles">Profiles</Link> or <Link href="/dashboard/automation">Automation control</Link>. Choose the existing Incogniton profile by exact UUID, its customer, its worker and the account label used on post records. Duplicate names are never resolved by guessing. A saved mapping is reused by Sheet sync and monitoring.</Step>
-        <Step title="Connect the Master Sheet if you use Sheet sync">Open <Link href="/dashboard/master-sheet">Master Sheet</Link> → Connect Master Sheet — step-by-step. The server needs <code>SHEET_SYNC_URL</code>, <code>SHEET_SYNC_TOKEN</code> and <code>SHEET_SYNC_ORGANIZATION_ID</code> (the workspace ID is shown in the wizard). Deploy the separate read-only connector; never replace the Fudge or desktop Apps Script with it. Test the saved connection — a saved setting alone does not prove the Sheet is reachable.</Step>
+        <Step title="Detect your Incogniton profiles automatically">Open <Link href="/dashboard/run">Run automation</Link> and queue <strong>Detect Incogniton profiles</strong>; the agent on this device reads the UUID/name/group list from Incogniton on this same laptop. Then open <Link href="/dashboard/profiles">Profiles</Link> and press <strong>Use latest device scan</strong> to load them. A CSV import remains available as a fallback.</Step>
+        <Step title="Map the exact profile, not a guessed name">Open <Link href="/dashboard/profiles">Profiles</Link> or <Link href="/dashboard/automation">Automation control</Link>. Choose the existing Incogniton profile by exact UUID, its customer, its automation agent and the account label used on post records. Duplicate names are never resolved by guessing. A saved mapping is reused by Sheet sync and monitoring.</Step>
+        <Step title="Connect the Master Sheet if you use Sheet sync">Open <Link href="/dashboard/master-sheet">Master Sheet</Link> → Connect Master Sheet — step-by-step. The server needs <code>SHEET_SYNC_URL</code>, <code>SHEET_SYNC_TOKEN</code> and <code>SHEET_SYNC_ORGANIZATION_ID</code> (the workspace ID is shown in the wizard). Deploy the separate read-only connector; never replace your existing Fudge Apps Script with it. Test the saved connection — a saved setting alone does not prove the Sheet is reachable.</Step>
         <Step title="Check the Home setup cards">Open <Link href="/dashboard">Home</Link> and confirm Master Sheet, local automation agent and profile mappings show as configured or seen. A heartbeat means the agent checked in; it is not proof that Incogniton or the browser profile is ready.</Step>
       </ol>
       <Callout tone="amber" icon="warn" title="Skipping a step is safe — the dashboard will not improvise">Without a worker or a saved profile mapping, no monitoring batch is planned. The dashboard never guesses a profile, customer or publication link.</Callout>
@@ -65,7 +66,7 @@ export default async function SetupGuide() {
         <Step title="Resolve local pending or blocked items inside Fudge">The dashboard cannot see a device-local queue. If Fudge reports pending or blocked work, finish or clear it in Fudge. A backend receipt is not proof that every local record was delivered.</Step>
         <Step title="Save to the Fudge source Sheet">Fudge writes its source Sheet. Keep that Sheet as your working copy; it is not the Master Sheet the dashboard previews.</Step>
         <Step title="Clean up before the master Sheet">Remove duplicates, correct business names and fix dates you can actually verify. Leave an unknown date unknown instead of inventing one. Keep the column layout your Master Sheet expects.</Step>
-        <Step title="Copy the cleaned rows into the ND master Sheet">Use the same tabs and columns the dashboard reads. Do not rename or delete the existing Sheet, and do not replace the desktop or Fudge Apps Script with the read-only dashboard connector.</Step>
+        <Step title="Copy the cleaned rows into the ND master Sheet">Use the same tabs and columns the dashboard reads. Do not rename or delete the existing Sheet, and do not replace your existing Fudge Apps Script with the read-only dashboard connector.</Step>
       </ol>
       <Callout tone="red" icon="danger" title="Upload release is off in this Fudge build">The <Link href="/dashboard/fudge">Fudge intake receipts</Link> page is read-only. It shows received-record and revision counts; it cannot upload, approve, publish or write to a Sheet. An empty backend count does not mean the local Fudge library is empty. Intake upload, live acceptance and an approved pilot remain separate gates.</Callout>
     </GuideSection>
@@ -80,7 +81,7 @@ export default async function SetupGuide() {
         <Step title="Read comments honestly">A stored sample can be incomplete. When the page does not expose a comment total or an expansion path, the run is marked incomplete instead of claiming completeness. Authors and bodies are saved only when read from the page; when only a relative label exists, the platform creation time stays “unknown” and is never invented.</Step>
         <Step title="Pause or end the session when you stop">Pause/End work stops new claims; an in-flight read may finish. Pending jobs are not retried automatically after an expired lease — reconcile only after stopping the old agent.</Step>
       </ol>
-      <Callout tone="blue" icon="info" title="What the buttons do not do">Sync, monitoring and Results never publish, upload, create profiles, change cookies or proxies, or write back to the Sheet. Those actions remain gated or belong to the desktop app.</Callout>
+      <Callout tone="blue" icon="info" title="What the buttons do not do">Sync, monitoring and Results never publish, upload, create profiles, change cookies or proxies, or write back to the Sheet. Those actions remain gated; none is automated in this stack yet.</Callout>
     </GuideSection>
 
     <GuideSection tone="amber" step="4" label="PHASE 4 · EVERY WORKING DAY" title="Daily rhythm and troubleshooting" hint="If something looks wrong, stop and read the matching card before retrying.">
@@ -95,7 +96,7 @@ export default async function SetupGuide() {
       <div className="guide-cards">
         <article className="guide-card guide-tone-amber"><h3>Login required</h3><p>The profile is signed out or challenged. Sign in by hand in that exact profile, finish any verification, then run again.</p><p>Never automate a login challenge or retry it in a loop.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Verification / checkpoint</h3><p>Human handoff. Stop the run, complete the check yourself in the browser, and record the real outcome.</p></article>
-        <article className="guide-card guide-tone-amber"><h3>Proxy issue</h3><p>Stop the run. Check the proxy in the desktop app or Incogniton profile. Never paste proxy passwords into a dashboard form or a Sheet.</p></article>
+        <article className="guide-card guide-tone-amber"><h3>Proxy issue</h3><p>Stop the run. Check the proxy inside Incogniton on this device. Never paste proxy passwords into a dashboard form or a Sheet.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Profile busy</h3><p>Another agent or tab is using the profile. Close it and wait. Run one profile at a time; reconcile an expired lease only after the old agent is stopped.</p></article>
         <article className="guide-card guide-tone-red"><h3>Account disabled / needs review</h3><p>Nextdoor redirected to its Account Disabled page. Everything stops for a person to review the account.</p><p>Never use another profile or technique to evade a suspension.</p></article>
         <article className="guide-card guide-tone-amber"><h3>Waiting for agent / offline</h3><p>Start the automation agent on this device and confirm the heartbeat. A heartbeat still is not proof that Incogniton or the browser profile is ready.</p></article>
@@ -107,12 +108,12 @@ export default async function SetupGuide() {
     <section className="guide-section guide-tone-red">
       <header className="guide-section-head">
         <span className="guide-step-num" aria-hidden><Laptop size={17} /></span>
-        <div><p className="eyebrow">STILL DESKTOP OR GATED</p><h2>What this dashboard does not do yet</h2><p className="muted small">No pretend buttons. Use the preserved desktop app for these jobs and avoid overlapping work on the same profile.</p></div>
+        <div><p className="eyebrow">NOT IN THIS STACK YET OR GATED</p><h2>What this dashboard does not do yet</h2><p className="muted small">No pretend buttons. These jobs are not automated in this stack yet; nothing here pretends otherwise, and a first live test can fail honestly.</p></div>
       </header>
       <div className="guide-cards">
-        <article className="guide-card guide-tone-blue"><h3>Desktop app</h3><p>Auto Posting, Auto Listing, media work and bulk operations. Blank profile creation, cookie and proxy imports are queued from Run automation instead; the desktop app remains the fallback if a queued write fails.</p></article>
+        <article className="guide-card guide-tone-blue"><h3>Not in this stack yet</h3><p>Auto Posting, Auto Listing, media work and bulk operations. Blank profile creation, cookie import and proxy import are queued one profile at a time from Run automation instead, with your confirmation per task.</p></article>
         <article className="guide-card guide-tone-red"><h3>Not implemented or validated</h3><p>Dashboard publishing and listings, scheduling, account creation, automatic Sheet writeback, Fudge intake upload and unattended ingestion.</p></article>
-        <article className="guide-card guide-tone-amber"><h3>Labelled honestly</h3><p>Run automation marks posting, listings, account creation and presets <strong>Desktop only</strong>. There is no Start button that pretends otherwise.</p></article>
+        <article className="guide-card guide-tone-amber"><h3>Labelled honestly</h3><p>Run automation marks posting, listings, account creation and presets <strong>Not in this stack yet</strong>. There is no Start button that pretends otherwise.</p></article>
       </div>
       <div className="guide-callout guide-tone-red"><TriangleAlert size={17} aria-hidden /><div><strong>Irreversible actions stay off</strong><p>Uploads, publishing, client-facing posts and real Sheet writes require a separate, explicit authorization. Do not enable them to “test” the guide.</p></div></div>
     </section>

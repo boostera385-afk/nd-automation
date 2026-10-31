@@ -54,12 +54,12 @@ describe("first-time setup guide", () => {
     expect(html).toContain("Profile busy");
   });
 
-  it("separates desktop-only work and keeps irreversible actions gated", async () => {
+  it("separates not-in-this-stack work and keeps irreversible actions gated", async () => {
     const html = renderToStaticMarkup(await SetupGuide());
-    expect(html).toContain("STILL DESKTOP OR GATED");
+    expect(html).toContain("NOT IN THIS STACK YET OR GATED");
     expect(html).toContain("Auto Posting, Auto Listing, media work");
     expect(html).toContain("Dashboard publishing and listings, scheduling, account creation, automatic Sheet writeback");
-    expect(html).toContain("Desktop only");
+    expect(html).toContain("Not in this stack yet");
     expect(html).toContain("Irreversible actions stay off");
     expect(html).not.toContain("Start posting");
   });

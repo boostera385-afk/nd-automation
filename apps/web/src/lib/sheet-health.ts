@@ -10,7 +10,7 @@ export type HealthReport = { totalRows: number; rowsNeedingAction: number; clean
 export const MAX_HEALTH_ROWS = 500;
 
 const definitions: Record<HealthCode, { severity: Severity; title: string; why: string; fix: string }> = {
-  reprocess_risk: { severity: "high", title: "Link filled in but Status is empty", why: "The desktop tool treats an empty Status as “not posted yet”, so it may post this row again.", fix: "If it was really posted, set Status to Posted. Otherwise clear the Post link." },
+  reprocess_risk: { severity: "high", title: "Link filled in but Status is empty", why: "Whatever automation fills this Sheet treats an empty Status as “not posted yet”, so it may post this row again.", fix: "If it was really posted, set Status to Posted. Otherwise clear the Post link." },
   posted_no_link: { severity: "high", title: "Marked Posted but no link saved", why: "Without the exact link the post cannot be checked or reported on.", fix: "Find the post on Nextdoor and paste its own share link into Post link." },
   posted_bad_link: { severity: "high", title: "Post link is not an exact Nextdoor share link", why: "Profile pages, shortened or edited links cannot be matched to one post.", fix: "Replace it with the post’s own link (nextdoor.com/p/… or /for_sale_and_free/…)." },
   duplicate_link: { severity: "medium", title: "Same link on more than one row", why: "One post would be counted more than once in reports.", fix: "Keep one row for the post; correct or clear the others." },

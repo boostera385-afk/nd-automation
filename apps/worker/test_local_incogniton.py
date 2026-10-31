@@ -70,5 +70,67 @@ class StopTests(unittest.TestCase):
             FakeApi({"status": "Launched"}, stop={"status": "error"}).stop("p")
 
 
+class FakeProfileApi(Incogniton):
+    """Replies to /profile/all with a canned body. No network."""
+
+    def __init__(self, reply):
+        super().__init__()
+        self.reply = reply
+        self.calls = []
+
+    def request(self, path, timeout=10, body=None):
+        self.calls.append(path)
+        if path == "/profile/all":
+            return self.reply
+        raise AssertionError("Unexpected endpoint " + path)
+
+
+UUID_A = "44444444-4444-4444-8444-444444444444"
+UUID_B = "55555555-5555-4555-8555-555555555555"
+
+
+class ListProfilesTests(unittest.TestCase):
+    def test_desktop_build_shape_with_nested_information(self):
+        body = {"status": "done", "profileData": [
+            {"general_profile_information": {"browser_id": UUID_A.upper(),
+                                             "profile_name": "  Plumber   Pat ",
+                                             "profile_group": "Team A"},
+             "cookie_description": "must be dropped", "account": "must be dropped"},
+        ]}
+        found = FakeProfileApi(body).list_profiles()
+        self.assertEqual(found, [{"profile_id": UUID_A, "name": "Plumber Pat",
+                                 "group_name": "Team A"}])
+        found_json = str(found)
+        self.assertNotIn("cookie", found_json.lower())
+        self.assertNotIn("must be dropped", found_json)
+
+    def test_flat_profiles_shape_is_also_accepted(self):
+        body = {"profiles": [{"profile_browser_id": UUID_A, "profile_name": "Fixture", "group": "G1"}]}
+        self.assertEqual(FakeProfileApi(body).list_profiles(),
+                         [{"profile_id": UUID_A, "name": "Fixture", "group_name": "G1"}])
+
+    def test_a_json_string_list_is_decoded(self):
+        body = {"profileData": '[{"general_profile_information": {"browser_id": "' + UUID_B
+                               + '", "profile_name": "Slow   Drain", "profile_group": ""}}]'}
+        self.assertEqual(FakeProfileApi(body).list_profiles(),
+                         [{"profile_id": UUID_B, "name": "Slow Drain", "group_name": "Unassigned"}])
+
+    def test_entries_without_a_uuid_or_name_are_skipped_not_guessed(self):
+        body = {"profiles": [
+            {"profile_browser_id": "not-a-uuid", "profile_name": "Bad id"},
+            {"profile_browser_id": UUID_A},
+            {"profile_browser_id": UUID_B, "profile_name": "Real"},
+            {"profile_browser_id": UUID_B, "profile_name": "Duplicate"},
+            "not-a-dict",
+        ]}
+        found = FakeProfileApi(body).list_profiles()
+        self.assertEqual(found, [{"profile_id": UUID_B, "name": "Real", "group_name": "Unassigned"}])
+
+    def test_unusable_shapes_are_refused(self):
+        for body in ({"unexpected": []}, {"profileData": "not json"}, {"profileData": {"nested": True}}, "list"):
+            with self.assertRaises(ValueError):
+                FakeProfileApi(body).list_profiles()
+
+
 if __name__ == "__main__":
     unittest.main()

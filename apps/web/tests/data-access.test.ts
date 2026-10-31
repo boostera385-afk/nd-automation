@@ -16,7 +16,7 @@ import { registerWorker } from "@/app/actions/workers";
 import { stageServiceCatalog } from "@/app/actions/service-catalog";
 import { enqueueSheetWriteback } from "@/app/actions/sheet-writeback";
 import { sessionAction, confirmImport } from "@/app/actions/reporting";
-import { confirmProfileImport } from "@/app/actions/profiles";
+import { confirmProfileImport, importScannedProfiles } from "@/app/actions/profiles";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/operations-data", () => ({ getOperationsData: vi.fn(() => { throw new Error("Unexpected operational read"); }) }));
 vi.mock("@/lib/sheet-sync", () => ({ fetchSheetRows: vi.fn(), SheetSyncError: Error }));
@@ -133,7 +133,7 @@ describe("real central dashboard data-access guard", () => {
     await expect(requireWorkspace(true, form)).rejects.toThrow("redirect:/workspaces?notice=context-changed");
     await expect(requireWorkspace(false, expected)).rejects.toThrow("redirect:/workspaces?notice=context-changed");
   });
-  it.each([setBatchMonitoring, registerWorker, stageServiceCatalog, enqueueSheetWriteback, sessionAction, confirmImport, confirmProfileImport])("blocks real mutation entrypoint %s before dispatch after an old-tab submission", async (action) => {
+  it.each([setBatchMonitoring, registerWorker, stageServiceCatalog, enqueueSheetWriteback, sessionAction, confirmImport, confirmProfileImport, importScannedProfiles])("blocks real mutation entrypoint %s before dispatch after an old-tab submission", async (action) => {
     const form = new FormData(); form.set("workspaceContext", workspaceContext(userId, orgB));
     await expect(action({}, form)).rejects.toThrow("redirect:/workspaces?notice=context-changed");
     expect(mocks.from.mock.calls.map(([table]) => table)).toEqual(["reporting_memberships", "reporting_organizations"]);

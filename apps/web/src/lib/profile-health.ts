@@ -2,7 +2,7 @@ import type { LocalWorker, MonitoringJob, ProfileBinding } from "./workflow";
 
 // The registered agent reports a heartbeat when it polls. These thresholds describe
 // that report only: nothing here probes Incogniton, opens a browser or starts a
-// job. A profile can look healthy while its desktop app is still unusable.
+// job. A profile can look healthy while Incogniton itself is not running.
 export const HEARTBEAT_LIVE_MS = 5 * 60_000;
 export const HEARTBEAT_STALE_MS = 30 * 60_000;
 

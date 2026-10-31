@@ -15,7 +15,7 @@ import { formatTime } from "@/lib/time";
 export default async function Home() {
   const { organization, isStaff } = await getContext();
   if (!organization) return <>
-    <PageHeader eyebrow="WELCOME" title="Finish your account setup" description="Your verified email works in Fudge and this dashboard. Keep your existing Sheet and desktop setup unchanged." />
+    <PageHeader eyebrow="WELCOME" title="Finish your account setup" description="Your verified email works in Fudge and this dashboard. Keep your existing Sheet and Fudge setup unchanged." />
     <Panel title="Your business account"><p>If you belong to an existing team, ask its owner for access instead of creating a duplicate. Otherwise, the button below creates your empty private business account. No reviews are imported and no automation starts.</p><ActionForm action={createWorkspace} label="Set up my private business account"><input type="hidden" name="name" value="My business" /></ActionForm></Panel>
   </>;
   const data = await getDashboardData();

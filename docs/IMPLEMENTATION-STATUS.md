@@ -1787,3 +1787,83 @@ Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS
 (0 warnings), `npm.cmd test` **870 tests / 64 files** PASS, `npm.cmd run build`
 PASS. No migration, worker code, deployment or live action was involved; the
 local dev server serves the reworded UI immediately for operator review.
+
+## Fresh hosted start + Incogniton auto-detect (2026-10-31)
+
+The operator directed a fresh setup ("remove account comments etc we will new
+setup (accounts, tasks, profiles, comments)") with auto-detected profiles and
+a stack of dashboard + Fudge extension + Incogniton on one and the same
+laptop, with no desktop-app dependency. Two actions follow.
+
+### Approved full data wipe (hosted, irreversible)
+
+After an explicit confirmation with the exact row counts per table, the hosted
+workspace data was deleted in one atomic transaction, child tables first so no
+foreign key blocked it. Deleted: 2 test customers, 2 publications, 21
+comments, 5 post checks + 5 check jobs, 0 cohorts, 3,220 profile-inventory
+rows, 1 profile binding, 4 work sessions (1 stale-active), both workers
+("offive laptop", "Kashif PC"), the 1 unrecoverable worker credential, 3
+observations, 5 notifications, and the empty draft/revision, fudge,
+service-catalog and sheet-writeback rows. Kept: the 2 organizations and 2
+memberships (logins — deleting them would lock the operator out). This
+supersedes the planned "disable Kashif PC / close the stale session" cleanup:
+those records no longer exist. Post-wipe verification confirmed every data
+table at 0 rows. The operator must now re-register the automation agent in
+`/dashboard/automation` and save the new credential before any queued task
+(including the first scan) can run.
+
+### `inventory_scan`: one-click profile auto-detect
+
+- Migration `20261031150000_inventory_scan_v1.sql` (applied hosted as
+  `inventory_scan_v1`, the 17th): 7-kind task constraint, enqueue accepts the
+  new read-only kind, and `reporting_complete_automation_task` gains a scan
+  branch — result keys exactly `{profiles,total,truncated}`, ≤ 500 rows each
+  validated by the same `private_reporting.valid_profile_row` the CSV import
+  uses, and truncation mandatory when `total` exceeds 500. Scan results get
+  their own 64,000-byte allowance; every other result keeps the 8,000-byte
+  cap. No posting/listing/account-creation kind was added.
+- Worker: `local_incogniton.list_profiles()` mirrors the desktop manager's
+  `/profile/all` extraction field-for-field (accepts `profileData`/`profiles`
+  keys, JSON-string lists, nested `general_profile_information`; dedupes;
+  drops entries without a canonical UUID or name) and returns UUID, name and
+  group only — cookies, proxies and account details are never parsed.
+  `automation_tasks` caps the returned list at `MAX_SCAN_ENTRIES = 500` with
+  an honest `truncated` flag and the true `total`.
+- Web: `inventory_scan` added to the kind registry (label "Detect Incogniton
+  profiles", honest `describeResult` that reports the truncation), an enqueue
+  branch, and `importScannedProfiles` in `actions/profiles.ts` — reads the
+  latest succeeded scan, re-validates rows with `profileRowSchema`, and feeds
+  them to `reporting_import_profiles` with `archive_missing: false`. The
+  Profiles page replaces "Live inventory discovery is not connected yet"
+  with a `<ScanImport />` panel ("Use latest device scan") that shows the last
+  scan's total/cap and adds a truncation confirmation when capped. CSV import
+  stays as the fallback.
+- Setup guide: rewritten to the single-device stack — "One device, three
+  tools", a Phase-1 step "Detect your Incogniton profiles automatically", and
+  the closing section retitled **NOT IN THIS STACK YET OR GATED** with
+  "Not in this stack yet" replacing "Desktop only". Every user-facing
+  "desktop app" reference was removed (run, automation, home, content,
+  master-sheet, settings, sheet wizard/writeback/sync/status/health copy and
+  the cookie_write task description); profile launch/stop now points at
+  Incogniton on this device. The generated Apps Script connector source was
+  deliberately left untouched to avoid connector-redeploy churn, and the
+  roadmap's "Desktop source" column stays historical.
+- Gated rows are unchanged: posting, listings, account creation and presets
+  remain off with per-row reasons; nothing claims them.
+
+Tests: new worker cases (both response shapes, dedupe/refusal, the 500 cap
+with honest truncation) bring the worker suite to **122 PASS**; web adds
+describeResult/kind cases, 4 PGlite scan cases (shape refusal, the
+≥ 8,000-byte scan acceptance feeding `reporting_import_profiles`, the
+64,000-byte refusal, one-task-per-device), the `importScannedProfiles`
+stale-context guard, the workspace-source guard now expecting 32 guarded
+actions plus `scan-import` in the form-context list.
+
+Validation on 2026-10-31: `npm.cmd run typecheck` PASS, `npm.cmd run lint`
+PASS (0 warnings), `npm.cmd test` **876 tests / 64 files** PASS, `npm.cmd run
+build` PASS; worker `python -m unittest discover` **122 tests** PASS (exit
+0). Migration applied hosted and verified in the migration list. Still
+unverified against a live Incogniton install: profile creation, cookie/proxy
+writes and now the first real scan — each would surface an honest failure.
+Production still serves the pre-slice build; deploy only on explicit
+approval.

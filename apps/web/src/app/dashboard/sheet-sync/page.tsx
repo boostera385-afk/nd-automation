@@ -10,7 +10,7 @@ export default async function SheetSync() {
   const { customers } = await getDashboardData();
   return <>
     <PageHeader title="Import & export" description="Bring posts and clients in from your sheet, either by reading the connected sheet or by uploading a CSV, and send current statuses back out. Nothing here writes to the sheet or posts anything." />
-    <div className="notice subtle"><strong>What leaves your sheet or computer</strong><p>Only Profile Name, Post link, Status and a one-line title. Email, Password, Proxy and every other column are removed in your browser for uploads, and never read for the connected sheet. “Posted” is the desktop tool’s own report; it is not proof the post is live.</p></div>
+    <div className="notice subtle"><strong>What leaves your sheet or computer</strong><p>Only Profile Name, Post link, Status and a one-line title. Email, Password, Proxy and every other column are removed in your browser for uploads, and never read for the connected sheet. “Posted” is whatever automation filled that row; it is not proof the post is live.</p></div>
     <Panel title="Check for new posts and clients" hint="Read-only"><SheetSyncPanel customers={customers} liveConfigured={sheetSyncConfigured(organization.id)} /></Panel>
     <Panel title="Export" hint="CSV in your sheet’s own column names">
       <p className="muted">Download what the dashboard knows. The <strong>Status update</strong> column uses your sheet’s wording (Alive, Post Deleted from ND, Proxy Issue) so whoever maintains the sheet can paste it in. Other results appear in <strong>Last check result</strong>. The file can be uploaded back here later.</p>

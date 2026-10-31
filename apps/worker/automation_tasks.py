@@ -1,8 +1,10 @@
-"""Bounded browser tasks the dashboard may queue on a paired laptop.
+"""Bounded browser tasks the dashboard may queue on this device's agent.
 
-This module deliberately cannot post, create accounts, publish listings, write
-cookies or write proxies. It creates an Incogniton profile, reads a preset
-inventory, and validates local cookie/proxy files without changing them.
+This module deliberately cannot post, create accounts, publish listings or
+reply. It creates an Incogniton profile, reads a preset inventory, detects the
+local profile list (UUID/name/group only), validates local cookie/proxy files,
+and writes cookies or a proxy into one named profile with the dashboard's
+explicit confirmation.
 """
 
 import json
@@ -10,7 +12,8 @@ import re
 from datetime import datetime, timezone
 
 KINDS = {"profile_create", "preset_snapshot", "cookie_import", "proxy_import",
-         "cookie_write", "proxy_write"}
+         "cookie_write", "proxy_write", "inventory_scan"}
+MAX_SCAN_ENTRIES = 500
 SYSTEMS = {"windows", "mac", "linux"}
 MAX_FILE_BYTES = 5_000_000
 MAX_ENTRIES = 50_000
@@ -224,6 +227,12 @@ def execute(task, incogniton):
         if set(payload) - {"note"}:
             raise TaskError("Unexpected snapshot field")
         return incogniton.inventory()
+    if kind == "inventory_scan":
+        if set(payload) - {"note"}:
+            raise TaskError("Unexpected scan field")
+        profiles = incogniton.list_profiles()
+        return {"profiles": profiles[:MAX_SCAN_ENTRIES], "total": len(profiles),
+                "truncated": len(profiles) > MAX_SCAN_ENTRIES}
     if kind == "cookie_import":
         return parse_cookies(_read_text(local_path(payload)))
     if kind == "proxy_import":
