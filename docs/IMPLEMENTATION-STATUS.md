@@ -36,7 +36,41 @@ Targeted validation completed: **94 publishing/workflow SQL tests PASS**,
 workflow fixtures PASS**, including wrong-account/target, stale content,
 concurrent edit change, challenge handoff, pre-existing result and missing-result
 reconciliation. These fixtures intercepted all traffic; zero platform requests.
-Final whole-project checks are recorded below when completed.
+
+Final whole-project checks (2026-11-03, commit `60dfe28`): web **typecheck PASS,
+lint PASS (zero warnings), 1,053 tests / 76 files PASS, production build PASS**
+(includes `/dashboard/workflows`). **234 worker unittest cases PASS**, four
+package-safety tests PASS and `git diff --check` PASS (line-ending notices only).
+These are development checks, not live acceptance.
+
+### Migration status (2026-11-03)
+
+| Source migration | Hosted |
+|---|---|
+| `202611020001_automation_session_gate.sql` | Yes, as `20261102152910` |
+| `202611020002_publish_dispatch_guard.sql` | Yes, as `20261102154039` |
+| `202611020003_publish_scheduling.sql` | **No** |
+| `202611020004_automatic_sheet_mapping.sql` | **No** |
+| `202611020005_approved_media.sql` | **No** |
+| `202611020006_browser_task_receipts.sql` | **No** |
+| `202611020007_supervised_workflows.sql` | **No** |
+
+Hosted history remains **23 migration records**. 003–007 were not applied: this
+session had no Supabase MCP connection or database credentials, and the directory
+must not be blindly `db push`ed (hosted versions differ from source names). The
+0.1.4 web code depends on 003–007 RPCs, so it must not be deployed before they
+are applied in order with their smoke tests. Production remains **0.1.1**.
+
+### Remaining gaps (2026-11-03)
+
+The items below remain **open and unimplemented** at this checkpoint:
+
+- Attachment-preserving post/listing edit variants (F19).
+- Protected evidence storage and retention (F32).
+- Bulk cookie/proxy intake (F09) and preset/random posting and warmup.
+- Desktop launch/install/update parity for the worker.
+- Hosting migrations 003–007 and deploying 0.1.4.
+- Live acceptance, isolation/recovery checks and F01–F36 sign-off.
 
 Source is **0.1.4**; last verified hosted web production remains **0.1.1**.
 Migrations 003–007 remain **local, not hosted** at this checkpoint. No live

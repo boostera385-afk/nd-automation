@@ -1,6 +1,6 @@
 # Master automation delivery tracker
 
-Updated: 2026-11-02. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
+Updated: 2026-11-03. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
 
 Source **0.1.3**, code-first follow-up: automatic result-to-outbox mapping,
 business-time scheduling, explicit selected-revision bulk authorization, bounded
@@ -18,6 +18,11 @@ exact-target delete/block operations. Normal agents never claim them. New
 migrations 006–007 remain local. No real accounts/actions or yesterday-cohort
 checks were performed. Protected evidence, bulk intake, attachment-preserving
 edits, deployment/update parity and all live acceptance remain open.
+
+2026-11-03 checkpoint: whole-project checks PASS (web typecheck/lint/1,053 tests/
+build; 234 worker tests). Hosted migrations stop at 002 (23 records); 003–007 are
+**not hosted** and production stays 0.1.1. Remaining gaps stay open; see the
+migration status and remaining-gaps tables in `IMPLEMENTATION-STATUS.md`.
 
 Source 0.1.2 follow-up: the missing one-intent Sheet deliverer and separate
 atomic Apps Script connector are now implemented, with safe-column/stable-ID/
