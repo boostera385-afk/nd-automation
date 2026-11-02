@@ -33,3 +33,28 @@ export const writebackReceiptSchema = z.record(z.string().max(100), z.unknown())
 );
 export type WritebackIntent = z.infer<typeof writebackIntentSchema>;
 export type WritebackAckOutcome = z.infer<typeof writebackOutcomeSchema>;
+
+/** Safe subset implemented by the separate v1 connector; legacy intents remain readable. */
+export const sheetDeliveryIntentSchema = writebackIntentSchema.superRefine((intent, context) => {
+  const issue = (message: string) => context.addIssue({ code: "custom", message });
+  const columns = new Set(["Profile Name", "Post link", "Status", "Post Text", "Title"]);
+  const uuid = (value: unknown) => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
+  if (!["Auto Posting", "Auto Listing"].includes(intent.tab)) issue("The v1 deliverer supports Auto Posting and Auto Listing only.");
+  if (intent.action === "update_cells" && (intent.values.length !== 1 || !intent.rowRef?.startsWith("id:") || !uuid(intent.rowRef.slice(3)))) {
+    issue("Updates require one stable row reference id:UUID, never an A1 row number.");
+  }
+  const ids = new Set<string>();
+  for (const value of intent.values) {
+    const special = intent.action === "append" ? "ND Row ID" : "__expected_revision";
+    if (!Object.keys(value).some((key) => columns.has(key)) || Object.keys(value).some((key) => key !== special && !columns.has(key))) {
+      issue("Only approved non-secret columns plus row identity/revision may be queued for delivery.");
+    }
+    if (intent.action === "append") {
+      if (!uuid(value[special]) || ids.has(value[special]!)) issue("Each appended row requires a unique ND Row ID UUID.");
+      else ids.add(value[special]!);
+    } else if (typeof value[special] !== "string" || !/^[1-9][0-9]{0,8}$/.test(value[special]!)) {
+      issue("Updates require __expected_revision matching the current ND Revision cell.");
+    }
+    if (Object.values(value).some((cell) => typeof cell === "string" && /[\ud800-\udfff]/u.test(cell))) issue("Text must not contain unpaired Unicode surrogates.");
+  }
+});

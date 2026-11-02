@@ -2,6 +2,31 @@
 
 ## Direction and current status
 
+Source **0.1.4** adds durable browser-task recovery and explicit one-task genuine
+registration first-step/human handoff, local login, account inspection, bounded
+browsing and approved text-edit/exact-target delete/block workflows. These are
+separate from default monitoring and require their reviewed local plans and new
+migrations. Protected evidence, bulk intake, attachment-preserving edit variants,
+desktop device/deployment parity and live acceptance remain open. Committing or
+pushing this code does not deploy/enable it. See `SUPERVISED-WORKFLOWS.md`.
+
+Source **0.1.3** follow-up: explicit bulk/schedule authorization, bounded
+sequential publishing/delivery, automatic exact result-to-outbox mapping,
+approved images and private local/HTTPS/authorized Drive image import are now
+implemented locally. New migrations are not hosted and all live configuration/
+acceptance is deferred. The user requested finishing remaining code first,
+without changing the working fudge flow. Onboarding, edit/delete/moderation,
+remaining profile/device tools and full feature sign-off remain open; see the
+newest implementation-status entry rather than older historical rows below.
+
+Source 0.1.2 / 2026-11-02 update: separate supervised text publishing and opt-in
+one-intent Sheet delivery are implemented with local fixtures. The Sheet runner
+uses a new standalone atomic connector, stable IDs/revisions and receipt-only
+recovery; it does not replace read-only sync or fudge. Automatic monitoring-to-
+outbox mapping, media/schedules/onboarding and live acceptance remain open. This
+supersedes the corresponding historical "missing code" entries below only for
+those narrow pilots; see `IMPLEMENTATION-STATUS.md` and `SHEET-WRITEBACK-SETUP.md`.
+
 Sheet-first UI follow-up (2026-10-27): five daily destinations replace the long
 staff menu; advanced routes remain available through Settings / More. Master Sheet
 has safe all-tab metadata previews and explicit mapped post-link sync. Profiles

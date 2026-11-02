@@ -24,7 +24,7 @@ const itemShape = z.object({
 export default async function SheetWriteback() {
   const { db, organization, user } = await requireWorkspace(true);
   if (!user.email_confirmed_at) return <>
-    <PageHeader title="Sheet writeback queue" description="Explicit, ordered and replay-safe Sheet write intents. Delivery to any real Sheet stays inactive." />
+    <PageHeader title="Sheet writeback queue" description="Explicit, replay-safe write intents. Delivery requires a separately authorized local runner." />
     <p role="alert">Verify your email before viewing or queueing Sheet writeback intents.</p>
     <Link className="text-link" href="/dashboard/settings">Back to settings</Link>
   </>;
@@ -42,14 +42,16 @@ export default async function SheetWriteback() {
     total = counted.count;
   } catch {
     return <>
-      <PageHeader title="Sheet writeback queue" description="Explicit, ordered and replay-safe Sheet write intents. Delivery to any real Sheet stays inactive." />
+      <PageHeader title="Sheet writeback queue" description="Explicit, replay-safe write intents. Delivery requires a separately authorized local runner." />
       <p role="alert">The writeback queue could not be verified. Nothing was queued, cancelled or changed; reload to retry the read.</p>
       <Link className="text-link" href="/dashboard/settings">Back to settings</Link>
     </>;
   }
   return <>
-    <PageHeader title="Sheet writeback queue" description="Explicit, ordered and replay-safe Sheet write intents. Delivery to any real Sheet stays inactive." />
-    <Panel title="Delivery is not active"><p>Intents queue durably in the shared backend only. No connector, worker or Edge Function writes any Sheet through this queue yet; your existing Sheets, Fudge writeback and release gates are unchanged. Activating delivery requires separate live acceptance and the configuration-ownership decision.</p></Panel>
+    <PageHeader title="Sheet writeback queue" description="Explicit, replay-safe write intents. Delivery requires a separately authorized local runner." />
+    <p><Link href="/dashboard/settings/sheet-mapping">Manage future-result mappings and publication policies</Link></p>
+    <Panel title="Delivery requires a separately configured local runner"><p>The opt-in one-intent deliverer and separate atomic Apps Script connector are implemented in source; they are not enabled by this page. Live configuration and acceptance are unverified. Existing read-only sync, fudge writeback and release gates are unchanged. This page cannot detect whether an operator has started a local runner; queue statuses are the recorded evidence.</p></Panel>
+    <Panel title="Private operator setup"><p>Use <code>docs/SHEET-WRITEBACK-SETUP.md</code>, <code>integrations/sheets/reporting-writeback.gs</code> and <code>apps/worker/sheet-writeback.example.json</code> from the current source. Deploy a new standalone project on an authorized test Sheet; never replace the existing read-only or fudge script. Add ND Row ID and ND Revision headers, and stop competing writers during the pilot.</p><p>Owning workspace ID: <code>{organization.id}</code>. Your operator user ID: <code>{user.id}</code>. These identifiers are not credentials. Keep WRITE_TOKEN and your local configuration private; sign in only at the local runner prompt, never in this form or chat.</p></Panel>
     <Panel title="Queue intents and review exact status"><p>Each intent is bounded, confirmed and replay-safe: the same request or stable key never produces a second copy, and changed values under the same key are refused. Timeouts stay unconfirmed — reconcile the queue below rather than re-queueing with new IDs.</p><SheetWritebackQueue items={items} total={total} /></Panel>
     <Link className="text-link" href="/dashboard/settings">Back to settings</Link>
   </>;

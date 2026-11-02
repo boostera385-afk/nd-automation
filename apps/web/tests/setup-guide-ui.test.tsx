@@ -60,7 +60,7 @@ describe("first-time setup guide", () => {
     const html = renderToStaticMarkup(await SetupGuide());
     expect(html).toContain("NOT IN THIS STACK YET OR GATED");
     expect(html).toContain("Auto Posting, Auto Listing, media work");
-    expect(html).toContain("Dashboard publishing and listings, scheduling, account creation, automatic Sheet writeback");
+    expect(html).toContain("Unattended publishing and listings, scheduling, account creation, automatic Sheet writeback");
     expect(html).toContain("Not in this stack yet");
     expect(html).toContain("Irreversible actions stay off");
     expect(html).not.toContain("Start posting");
@@ -70,5 +70,21 @@ describe("first-time setup guide", () => {
     const html = renderToStaticMarkup(await Settings());
     expect(html).toContain("Open the colored setup &amp; how-to guide");
     expect(html).toContain('href="/dashboard/settings/guide"');
+  });
+  it("explains the actual local startup and one-task pilot instead of claiming readiness from a saved file", async () => {
+    const html = renderToStaticMarkup(await SetupGuide());
+    expect(html).toContain("Check Incogniton and the local agent before dispatch");
+    expect(html).toContain("preflight.py");
+    expect(html).toContain("worker.py health");
+    expect(html).toContain("still revoked");
+    expect(html).toContain("--execute --confirm-authorized --once");
+    expect(html).toContain("until the supervised pilot passes");
+    expect(html).toContain("A new session does not inherit an old task");
+  });
+  it("keeps Google collection separate from Nextdoor monitoring and explicit mutation tasks", async () => {
+    const html = renderToStaticMarkup(await SetupGuide());
+    expect(html).toContain("Fudge collects Google reviews, not Nextdoor posts");
+    expect(html).toContain("separate, explicitly confirmed Browser tasks");
+    expect(html).not.toContain("confirm you are on the right Nextdoor account");
   });
 });

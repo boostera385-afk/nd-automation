@@ -12,7 +12,8 @@ import { formatTime } from "@/lib/time";
 export default async function RunAutomation() {
   const { organization } = await requireWorkspace(true);
   const [operations, data] = await Promise.all([getOperationsData(), getDashboardData()]);
-  const activeSession = data.session?.status === "active" && operations.loadedAt - Date.parse(data.session.started_at) < 10 * 3600_000;
+  const sessionAge = data.session ? operations.loadedAt - Date.parse(data.session.started_at) : Number.NaN;
+  const activeSession = data.session?.status === "active" && sessionAge >= 0 && sessionAge < 10 * 3600_000;
   const profiles = operations.bindings.map((binding) => {
     const worker = operations.workers.find((item) => item.id === binding.worker_id);
     return { id: binding.id, label: binding.account_label, customer: data.customers.find((customer) => customer.id === binding.customer_id)?.name ?? "Assigned customer", worker: worker?.name ?? "Assigned device", enabled: Boolean(worker?.enabled), monitoring: Boolean(activeSession && binding.monitoring_session_id === data.session?.id && worker?.enabled), posts: data.publications.filter((post) => post.customer_id === binding.customer_id && post.account_label === binding.account_label).length };
@@ -39,7 +40,7 @@ export default async function RunAutomation() {
       <p className="small"><Link href="/dashboard/results?view=checks">Saved check results</Link> · <Link href="/dashboard/automation">Advanced recovery</Link></p>
     </Panel>
     <Panel title="Browser tasks" hint="Queued for this device's automation agent — nothing runs in this tab">
-      <BrowserTasks workers={operations.workers} tasks={operations.tasks} profiles={operations.profiles} timeZone={organization.time_zone} available={operations.automationAvailable} />
+      <BrowserTasks workers={operations.workers} tasks={operations.tasks} profiles={operations.profiles} timeZone={organization.time_zone} available={operations.automationAvailable} activeSession={Boolean(activeSession)} />
       {operations.tasksLimited && <p className="notice">Showing the 20 most recent tasks only.</p>}
     </Panel>
     <Panel title="Still gated" hint="Deliberately not executable from the dashboard"><div className="task-list">{gatedTasks.map((task) => <div className="task-row" key={task.label}><div><strong>{task.label}</strong><small className="muted">{task.reason}</small></div><span className="badge">Gated</span></div>)}</div><p className="muted small">These rows are not coming soon: each needs its own approval and a live test before any Start button exists. Cookie and proxy imports above are the real thing now — one profile per task, confirmed by you each time, and not yet verified against a live Incogniton install, so a first run may report a failure honestly.</p></Panel>

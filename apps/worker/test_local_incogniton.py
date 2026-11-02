@@ -1,6 +1,7 @@
 """Offline tests for the local Incogniton adapter. No network, no browser."""
 
 import unittest
+from unittest.mock import Mock
 
 from local_incogniton import Incogniton, ProfileUnavailable
 
@@ -70,6 +71,29 @@ class StopTests(unittest.TestCase):
             FakeApi({"status": "Launched"}, stop={"status": "error"}).stop("p")
 
 
+class CookieClearTests(unittest.TestCase):
+    def test_clear_requires_an_explicit_success(self):
+        for reply in ({"status": "ok"}, {"success": True}, "ok"):
+            api = Incogniton()
+            api.request = Mock(return_value=reply)
+            api.delete_cookies("fixture")
+            api.request.assert_called_once()
+
+    def test_clear_failure_and_network_errors_are_not_swallowed(self):
+        for reply in ({"status": "error"}, "not ok", "unsuccessful", {}, None):
+            api = Incogniton()
+            api.request = Mock(return_value=reply)
+            with self.assertRaises(ValueError):
+                api.delete_cookies("fixture")
+        api.request = Mock(side_effect=OSError("offline"))
+        with self.assertRaises(OSError):
+            api.delete_cookies("fixture")
+
+    def test_negative_text_is_never_a_successful_write_confirmation(self):
+        for reply in ("not ok", "unsuccessful", "error: cookie rejected"):
+            self.assertFalse(Incogniton._confirmed(None, reply))
+
+
 class FakeProfileApi(Incogniton):
     """Replies to /profile/all with a canned body. No network."""
 
@@ -90,6 +114,11 @@ UUID_B = "55555555-5555-4555-8555-555555555555"
 
 
 class ListProfilesTests(unittest.TestCase):
+    def test_inventory_snapshot_accepts_the_same_desktop_profile_shape_as_detection(self):
+        api = FakeProfileApi({"profileData": '[{"status":"Launched"},{"status":"Ready"}]'})
+        api.all_groups = Mock(return_value=[{"name": "Fixture group"}])
+        self.assertEqual(api.inventory(), {"profiles": 2, "groups": 1, "launched": 1})
+
     def test_desktop_build_shape_with_nested_information(self):
         body = {"status": "done", "profileData": [
             {"general_profile_information": {"browser_id": UUID_A.upper(),

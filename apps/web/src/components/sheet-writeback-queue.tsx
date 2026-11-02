@@ -17,6 +17,7 @@ const statusClass: Record<WritebackItem["status"], string> = { pending: "unknown
 function EnqueueForm() {
   const [requestId] = useState(() => crypto.randomUUID());
   const [stableKey] = useState(() => `web-${crypto.randomUUID()}`);
+  const [rowId] = useState(() => crypto.randomUUID());
   const [state, action, pending] = useActionState(enqueueSheetWriteback, {});
   if (state.success) return <p role="status">{state.success}</p>;
   return <form action={action} className="form-grid">
@@ -29,13 +30,14 @@ function EnqueueForm() {
       </select>
     </label>
     <label>Sheet tab name<input name="tab" maxLength={80} required disabled={pending} placeholder="Exact tab name, for example Auto Posting" /></label>
-    <label>Row reference (update_cells only)<input name="rowRef" maxLength={300} disabled={pending} placeholder="for example A2 — leave empty for append" /></label>
+    <label>Stable row reference (update_cells only)<input name="rowRef" maxLength={300} disabled={pending} placeholder="id:UUID from ND Row ID — never A2; empty for append" /></label>
     <label>Row values (JSON array of column/value objects)
-      <textarea name="rows" rows={5} required disabled={pending} placeholder={'[{"Profile Name": "Fixture profile", "Status": "Filled"}]'} />
+      <textarea name="rows" rows={5} required disabled={pending} placeholder={JSON.stringify([{ "ND Row ID": rowId, Status: "Filled" }])} />
     </label>
+    <p className="small muted">Append requires a new ND Row ID UUID per row. Update accepts one row with __expected_revision, for example <code>{JSON.stringify([{ Status: "Checked", __expected_revision: "1" }])}</code>. Only Profile Name, Post link, Status, Post Text and Title are supported, further restricted by the connector owner. Never queue passwords, cookies or proxies.</p>
     <input type="hidden" name="requestId" value={requestId} />
     <input type="hidden" name="stableKey" value={stableKey} />
-    <label><input type="checkbox" name="confirmed" required disabled={pending} /> I reviewed this exact intent and authorize queueing it in the shared backend. Delivery is inactive; no Sheet cell is touched.</label>
+    <label><input type="checkbox" name="confirmed" required disabled={pending} /> I reviewed this exact intent and authorize queueing it for delivery by the separately configured local runner. This form itself makes no Sheet write.</label>
     {state.error && <p role="alert">{state.error}</p>}
     <button type="submit" disabled={pending} aria-busy={pending}>{pending ? <><LoaderCircle className="spin" size={15} aria-hidden /> Queueing…</> : "Queue write intent"}</button>
   </form>;

@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 KINDS = {"profile_create", "preset_snapshot", "cookie_import", "proxy_import",
          "cookie_write", "proxy_write", "inventory_scan"}
 MAX_SCAN_ENTRIES = 500
+# Leave room under the database's 64,000-byte JSONB result allowance, including
+# JSONB per-field overhead. Long/non-ASCII names may hit this before 500 rows.
+MAX_SCAN_RESULT_BYTES = 45_000
 SYSTEMS = {"windows", "mac", "linux"}
 MAX_FILE_BYTES = 5_000_000
 MAX_ENTRIES = 50_000
@@ -45,21 +48,23 @@ def _timestamp(value):
     return parsed.astimezone(timezone.utc)
 
 
-def validate_task(task):
+def validate_task(task, check_lease=True, extra_kinds=frozenset()):
     required = {"task_id", "kind", "payload", "lease_token", "lease_expires_at"}
     if not isinstance(task, dict) or set(task) != required:
         raise TaskError("Unexpected browser task contract")
-    if not re.fullmatch(r"[0-9a-f-]{36}", str(task["task_id"]).lower()):
+    if not isinstance(task["task_id"], str) or not _UUID.fullmatch(task["task_id"]):
         raise TaskError("A canonical task UUID is required")
-    if not re.fullmatch(r"[0-9a-f-]{36}", str(task["lease_token"]).lower()):
+    if not isinstance(task["lease_token"], str) or not _UUID.fullmatch(task["lease_token"]):
         raise TaskError("A canonical lease UUID is required")
-    if task["kind"] not in KINDS:
+    if task["kind"] not in KINDS | set(extra_kinds):
         raise TaskError("This task type is not executable by the worker")
     if not isinstance(task["payload"], dict):
         raise TaskError("The task payload must be an object")
-    if len(json.dumps(task["payload"]).encode("utf-8")) > _MAX_BYTES:
+    if len(json.dumps(task["payload"]).encode("utf-8")) > (16000 if task["kind"] == "supervised_workflow" else _MAX_BYTES):
         raise TaskError("The task payload is too large")
-    _timestamp(task["lease_expires_at"])
+    remaining = (_timestamp(task["lease_expires_at"]) - datetime.now(timezone.utc)).total_seconds()
+    if check_lease and not 360 <= remaining <= 900:
+        raise TaskError("The task lease is expired, too short or beyond the allowed window")
     return task
 
 
@@ -231,14 +236,22 @@ def execute(task, incogniton):
         if set(payload) - {"note"}:
             raise TaskError("Unexpected scan field")
         profiles = incogniton.list_profiles()
-        return {"profiles": profiles[:MAX_SCAN_ENTRIES], "total": len(profiles),
-                "truncated": len(profiles) > MAX_SCAN_ENTRIES}
+        result = {"profiles": [], "total": len(profiles), "truncated": False}
+        for profile in profiles[:MAX_SCAN_ENTRIES]:
+            result["profiles"].append(profile)
+            if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > MAX_SCAN_RESULT_BYTES:
+                result["profiles"].pop()
+                break
+        result["truncated"] = len(result["profiles"]) < len(profiles)
+        return result
     if kind == "cookie_import":
         return parse_cookies(_read_text(local_path(payload)))
     if kind == "proxy_import":
         return parse_proxies(_read_text(local_path(payload)))
     if kind == "cookie_write":
         target = profile_target(payload)
+        if not incogniton.stopped(target["profile_id"]):
+            raise TaskError("The target profile is active or its state is unknown; stop it before importing")
         cookies = parse_cookie_entries(_read_text(target["path"]))
         if not cookies:
             raise TaskError("The file has no cookies.txt rows to import")
@@ -248,6 +261,8 @@ def execute(task, incogniton):
         return {"entries": len(cookies), "written": written, "replaced": target["replace"]}
     # proxy_write: the first valid line in the file is applied to this profile.
     target = profile_target(payload)
+    if not incogniton.stopped(target["profile_id"]):
+        raise TaskError("The target profile is active or its state is unknown; stop it before importing")
     text = _read_text(target["path"])
     proxy = first_proxy(text)
     applied = incogniton.set_proxy(target["profile_id"], proxy)

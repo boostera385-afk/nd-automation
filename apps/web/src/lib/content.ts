@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { approvedMediaSchema } from "./approved-media";
 
 export const audiences = { anyone: "Anyone", nearby: "Nearby neighborhoods", neighborhood: "Your neighborhood" } as const;
-const common = { title: z.string().trim().min(3).max(200), body: z.string().trim().min(1).max(5000), audience: z.enum(["anyone", "nearby", "neighborhood"]) };
+const common = { title: z.string().trim().min(3).max(200), body: z.string().trim().min(1).max(5000), audience: z.enum(["anyone", "nearby", "neighborhood"]), media: approvedMediaSchema.optional() };
 export const contentSchema = z.discriminatedUnion("kind", [
   z.object({ ...common, kind: z.literal("post"), price_cents: z.null(), category: z.null() }).strict(),
   z.object({ ...common, kind: z.literal("listing"), price_cents: z.number().int().min(0).max(1000000000), category: z.string().trim().min(1).max(120) }).strict(),
@@ -19,7 +20,17 @@ export function priceCents(value: string): number | null {
 }
 
 export function contentFromForm(form: FormData) {
-  return contentSchema.safeParse({ kind: form.get("kind"), title: form.get("title"), body: form.get("body"), audience: form.get("audience"),
+  const rawMedia = form.get("media");
+  let media: unknown;
+  try {
+    if (rawMedia !== null && typeof rawMedia !== "string") throw new Error();
+    if (typeof rawMedia === "string" && rawMedia.trim()) {
+      if (rawMedia.length > 16384) throw new Error(); media = JSON.parse(rawMedia);
+      if (Array.isArray(media) && media.length === 0) media = undefined;
+    }
+  }
+  catch { media = "invalid-media"; }
+  return contentSchema.safeParse({ kind: form.get("kind"), title: form.get("title"), body: form.get("body"), audience: form.get("audience"), ...(media !== undefined ? { media } : {}),
     price_cents: form.get("kind") === "listing" ? priceCents(String(form.get("price") ?? "")) : null,
     category: form.get("kind") === "listing" ? form.get("category") : null });
 }

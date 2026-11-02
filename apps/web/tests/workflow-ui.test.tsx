@@ -94,4 +94,28 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     expect(responses).toContain("Open thread");
     expect(responses).toContain("Not enabled in the dashboard yet");
   });
+  it("requires an active session for browser tasks and defaults to read-only profile detection", async () => {
+    mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });
+    const html = renderToStaticMarkup(await RunAutomation());
+    expect(html).toContain("Start or resume an active work session before queuing a browser task");
+    expect(html).toMatch(/<option value="inventory_scan" selected=""/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Queue detect incogniton profiles<\/button>/);
+  });
+  it("offers the detection queue when this operator has a fresh active session", async () => {
+    const now = Date.now();
+    mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: now });
+    mocks.getDashboardData.mockResolvedValueOnce({ publications: [], customers: [], comments: [], session: { id: "s1", status: "active", started_at: new Date(now - 60_000).toISOString() }, truncated: false });
+    const html = renderToStaticMarkup(await RunAutomation());
+    expect(html).not.toContain("Start or resume an active work session before queuing a browser task");
+    expect(html).toContain('<button class="button" type="submit">Queue detect incogniton profiles</button>');
+  });
+  it("does not offer dispatch for future-dated or expired active sessions", async () => {
+    const now = Date.now();
+    for (const started of [now + 60_000, now - 11 * 3600_000]) {
+      mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: now });
+      mocks.getDashboardData.mockResolvedValueOnce({ publications: [], customers: [], comments: [], session: { id: "s1", status: "active", started_at: new Date(started).toISOString() }, truncated: false });
+      const html = renderToStaticMarkup(await RunAutomation());
+      expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Queue detect incogniton profiles<\/button>/);
+    }
+  });
 });

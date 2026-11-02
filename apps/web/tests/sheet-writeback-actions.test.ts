@@ -5,14 +5,15 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 import { cancelPendingSheetWriteback, enqueueSheetWriteback } from "@/app/actions/sheet-writeback";
 const org = "11111111-1111-4111-8111-111111111111", requestId = "22222222-2222-4222-8222-222222222222", itemId = "33333333-3333-4333-8333-333333333333";
 const stable = "web-44444444-4444-4444-8444-444444444444";
-const row = { "Profile Name": "Fixture profile", Status: "Filled" };
+const row = { "ND Row ID": "66666666-6666-4666-8666-666666666666", "Profile Name": "Fixture profile", Status: "Filled" };
+const updateRow = { Status: "Checked", __expected_revision: "1" };
 function form() {
   const data = new FormData();
   data.set("action", "append"); data.set("tab", "Auto Posting"); data.set("rows", JSON.stringify([row]));
   data.set("requestId", requestId); data.set("stableKey", stable); data.set("confirmed", "on");
   return data;
 }
-function updateForm() { const data = form(); data.set("action", "update_cells"); data.set("rowRef", "A2"); return data; }
+function updateForm() { const data = form(); data.set("action", "update_cells"); data.set("rowRef", `id:${row["ND Row ID"]}`); data.set("rows", JSON.stringify([updateRow])); return data; }
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.requireWorkspace.mockResolvedValue({ db: { rpc: mocks.rpc }, organization: { id: org }, user: { email_confirmed_at: "2026-10-29T00:00:00Z" }, membership: { role: "operator" } });
@@ -27,13 +28,13 @@ it("requires staff and a verified email before any backend request", async () =>
 it("binds the intent to the server-authorized business, stable key and request only", async () => {
   const data = form(); data.set("organizationId", "forged-business");
   const result = await enqueueSheetWriteback({}, data);
-  expect(result.success).toContain("nothing was written to any Sheet");
+  expect(result.success).toContain("This dashboard action writes no Sheet cells");
   expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reporting_enqueue_sheet_writeback_v1", { org, intent: { action: "append", tab: "Auto Posting", rowRef: null, values: [row] }, stable_key: stable, request_id: requestId });
   expect(mocks.revalidate).toHaveBeenCalledWith("/dashboard/settings/sheet-writeback");
 });
 it("pins update_cells intents to the exact reviewed row reference", async () => {
   await enqueueSheetWriteback({}, updateForm());
-  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reporting_enqueue_sheet_writeback_v1", { org, intent: { action: "update_cells", tab: "Auto Posting", rowRef: "A2", values: [row] }, stable_key: stable, request_id: requestId });
+  expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reporting_enqueue_sheet_writeback_v1", { org, intent: { action: "update_cells", tab: "Auto Posting", rowRef: `id:${row["ND Row ID"]}`, values: [updateRow] }, stable_key: stable, request_id: requestId });
 });
 it.each(["confirmation", "json", "cells", "request", "size", "rowref"])("rejects an invalid %s before any backend request", async (kind) => {
   const data = form();

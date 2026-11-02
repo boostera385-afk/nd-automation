@@ -14,6 +14,10 @@ export async function saveContentDraft(_previous: FormState, form: FormData): Pr
   const input = identity.safeParse({ draft: form.get("draft"), expected_revision: form.get("expected_revision"), binding: form.get("binding") });
   const content = contentFromForm(form);
   if (!input.success || !content.success) return { error: "Check the assigned profile, title, content, audience and listing fields. Price must be a nonnegative USD amount with at most two decimal places." };
+  if (content.data.media?.length) {
+    const protocol = await db.rpc("reporting_media_publisher_version");
+    if (protocol.error || protocol.data !== 1) return { error: "The reviewed approved-media migration is not available. No draft or attachment was saved." };
+  }
   const { error } = await db.rpc("reporting_save_content_draft", { org: organization.id, ...input.data, value: content.data });
   if (error) return { error: "Draft was not saved. It may have changed in another tab, require return to draft, or use an unavailable assignment. Refresh before trying again." };
   revalidatePath("/dashboard/content");

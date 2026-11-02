@@ -42,6 +42,10 @@ beforeAll(async () => {
   for (const file of ["202610260001_reporting_foundation.sql", "202610270001_post_checks_and_notifications.sql", "202610270002_monitoring_worker_bridge.sql", "202610270003_worker_bridge_indexes.sql", "202610270004_content_drafts.sql", "202610270006_publish_jobs.sql"]) {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8"));
   }
+  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql"]) {
+    try { await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8")); }
+    catch (error) { console.error("Fixture migration failed", file, (error as { position?: string }).position); throw error; }
+  }
   await db.exec("begin");
   org = String(await owner(() => scalar("select public.reporting_create_workspace('Publish workspace')")));
   const otherOrg = await as("authenticated", other, () => scalar("select public.reporting_create_workspace('Other workspace')"));
@@ -92,7 +96,301 @@ describe("enqueue guards", () => {
   });
 });
 
+describe("durable browser-task receipts and explicit supervised workflows", () => {
+  const request = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const manifest = (changes = {}) => ({ version: 1, operation: "account_inspect", binding_id: binding, profile_id: profile, customer_id: customer,
+    account_label: "Profile A", account_url: "https://nextdoor.com/profile/exact-fixture", target_url: null, expected_body_sha256: null,
+    draft_id: null, draft_revision: null, consent: true, ...changes });
+  const queue = (value: unknown = manifest(), confirmed = false, key = request) => owner(() => scalar("select public.reporting_enqueue_supervised_workflow($1,$2,$3::jsonb,$4)", [org, key, JSON.stringify(value), confirmed]));
+  const workflowClaim = () => agent(() => scalar("select public.reporting_claim_supervised_workflow($1)", [token])) as Promise<{ task_id: string; lease_token: string; payload: unknown } | null>;
+  const result = (changes = {}) => ({ operation: "account_inspect", outcome: "verified", action_attempted: false, cleanup_confirmed: true,
+    adapter_sha256: "a".repeat(64), observed_at: new Date().toISOString(), ...changes });
+  const finish = (task: { task_id: string; lease_token: string }, value: unknown) => agent(() => scalar(
+    "select public.reporting_complete_automation_task($1,$2,$3,'succeeded',$4::jsonb,null)", [token, task.task_id, task.lease_token, JSON.stringify(value)]));
+  const addPost = () => owner(() => scalar("select public.reporting_add_publications($1,$2,$3::jsonb,'manual_entry')", [org, customer,
+    JSON.stringify([{ title: "Exact fixture", url: "https://nextdoor.com/p/owned-fixture", account_label: "Profile A" }])]));
+  it("normal agents skip supervised work and only the separate claimant leases it", async () => {
+    expect(await queue()).toBe(request);
+    expect(await agent(() => scalar("select public.reporting_claim_automation_task($1)", [token]))).toBeNull();
+    const task = await workflowClaim(); expect(task?.payload).toEqual({ manifest: manifest(), content: null });
+    expect(await workflowClaim()).toBeNull(); expect(await claim()).toBeNull();
+  });
+  it("replays an exact enqueue but refuses changed target under its request ID", async () => {
+    await queue(); expect(await queue()).toBe(request);
+    await expect(queue(manifest({ operation: "profile_browse" }))).rejects.toThrow("replay conflict");
+    expect(await scalar("select count(*) from public.reporting_automation_tasks")).toBe(1);
+  });
+  it("only identical completion receipts replay and no cancelled lease implies delivery", async () => {
+    await queue(); const task = (await workflowClaim())!; const receipt = result();
+    expect(await finish(task, receipt)).toBe(true); expect(await finish(task, receipt)).toBe(false);
+    await expect(finish(task, { ...receipt, outcome: "handoff_required" })).rejects.toThrow("replay conflict");
+    await db.query("update public.reporting_automation_tasks set status='cancelled' where id=$1", [request]);
+    await expect(finish(task, receipt)).rejects.toThrow("receipt not recorded");
+  });
+  it("only active verified staff can authorize and another tenant cannot read it", async () => {
+    await queue();
+    expect(await as("authenticated", other, () => scalar("select count(*) from public.reporting_automation_tasks"))).toBe(0);
+    await expect(as("authenticated", other, () => scalar("select public.reporting_enqueue_supervised_workflow($1,$2,$3::jsonb,false)", [org, request, JSON.stringify(manifest())]))).rejects.toThrow("Verified staff");
+    await expect(agent(() => scalar("select public.reporting_enqueue_supervised_workflow($1,$2,$3::jsonb,false)", [org, request, JSON.stringify(manifest())]))).rejects.toThrow("permission denied");
+  });
+  it.each([{ password: "PRIVATE" }, { consent: false }, { account_url: "https://elsewhere.invalid/profile/x" }, { target_url: "https://nextdoor.com/p/unrelated" }, { draft_revision: 1 }])("rejects malformed/secret manifest %#", async (changes) => {
+    await expect(queue(manifest(changes))).rejects.toThrow("Invalid workflow manifest");
+  });
+  it("requires exact assignment and cancels when that assignment changes before claim", async () => {
+    await expect(queue(manifest({ account_label: "Wrong person" }))).rejects.toThrow("Exact workflow target");
+    await queue(); await db.query("update public.reporting_worker_profiles set account_label='Changed' where id=$1", [binding]);
+    expect(await workflowClaim()).toBeNull(); expect(await scalar("select status from public.reporting_automation_tasks")).toBe("cancelled");
+  });
+  it("pauses dispatch and cannot carry an old authorization into a new work session", async () => {
+    await queue(); await owner(() => scalar("select public.reporting_session_action($1,'pause','America/Los_Angeles')", [org]));
+    expect(await workflowClaim()).toBeNull();
+    await owner(() => scalar("select public.reporting_session_action($1,'end','America/Los_Angeles')", [org]));
+    await owner(() => scalar("select public.reporting_session_action($1,'start','America/Los_Angeles')", [org]));
+    expect(await workflowClaim()).toBeNull();
+  });
+  it("registration records handoff, cannot assert a verified new account and cannot blindly repeat", async () => {
+    const input = manifest({ operation: "account_register", account_url: null });
+    await queue(input); const task = (await workflowClaim())!;
+    await expect(finish(task, result({ operation: "account_register", action_attempted: true }))).rejects.toThrow("human identity handoff");
+    await finish(task, result({ operation: "account_register", action_attempted: true, outcome: "handoff_required" }));
+    await expect(queue(input, false, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")).rejects.toThrow("reconcile rather than repeat");
+  });
+  it("delete requires exact tracked ownership, body fingerprint and destructive confirmation", async () => {
+    const input = manifest({ operation: "post_delete", target_url: "https://nextdoor.com/p/owned-fixture", expected_body_sha256: "d".repeat(64) });
+    await expect(queue(input)).rejects.toThrow("destructive target");
+    await expect(queue(input, true)).rejects.toThrow("Exact workflow target");
+    await addPost(); expect(await queue(input, true)).toBe(request);
+  });
+  it("edit requires an approved exact text revision and invalidates on later changes", async () => {
+    await addPost(); const input = manifest({ operation: "post_edit", target_url: "https://nextdoor.com/p/owned-fixture", expected_body_sha256: "d".repeat(64), draft_id: draftId, draft_revision: 2 });
+    await expect(queue(input)).rejects.toThrow("approved text-edit");
+    await approveDraft(); await queue(input);
+    await owner(() => scalar("select public.reporting_review_content_draft($1,$2,2,'return',true)", [org, draftId]));
+    expect(await workflowClaim()).toBeNull();
+  });
+  it("rejects leaked fields and forged observation times in results", async () => {
+    await queue(); const task = (await workflowClaim())!;
+    await expect(finish(task, result({ password: "PRIVATE" }))).rejects.toThrow("Invalid supervised");
+    await expect(finish(task, result({ observed_at: "2000-01-01T00:00:00Z" }))).rejects.toThrow("outside lease");
+  });
+  it("does not expose private claim/receipt bypass helpers", async () => {
+    for (const signature of ["private_reporting.claim_browser_task(text,boolean)", "private_reporting.reporting_claim_automation_task(text)", "private_reporting.reporting_complete_automation_task(text,uuid,uuid,text,jsonb,text)"]) {
+      expect(await scalar("select has_function_privilege('anon',$1,'execute')", [signature])).toBe(false);
+      expect(await scalar("select has_function_privilege('authenticated',$1,'execute')", [signature])).toBe(false);
+    }
+  });
+});
+
+describe("explicit bounded scheduling and bulk authorization", () => {
+  const request = "77777777-7777-4777-8777-777777777777";
+  const entry = () => ({ draftId, revision: 2, notBefore: new Date(Date.now() + 30 * 60000).toISOString(), windowMinutes: 10 });
+  const batch = (entries: unknown, key = request) => owner(() => scalar("select public.reporting_enqueue_publish_batch($1,$2,$3::jsonb)", [org, key, JSON.stringify(entries)]));
+  it("does not dispatch before due and claims exactly the approved snapshot once due", async () => {
+    await approveDraft(); await batch([entry()]); expect(await claim()).toBeNull();
+    await db.exec("update public.reporting_publish_jobs set not_before=clock_timestamp()-interval '1 second',dispatch_until=clock_timestamp()+interval '5 minutes'");
+    expect(await claim()).toMatchObject({ draft_id: draftId, body: content.body });
+  });
+  it("expires missed windows without catch-up and leaves the exact revision blocked from requeue", async () => {
+    await approveDraft(); await batch([entry()]);
+    await db.exec("update public.reporting_publish_jobs set not_before=clock_timestamp()-interval '20 minutes',dispatch_until=clock_timestamp()-interval '1 minute'");
+    expect(await claim()).toBeNull(); expect(await scalar("select status from public.reporting_publish_jobs")).toBe("cancelled");
+    expect(await scalar("select failure_notes from public.reporting_publish_jobs")).toContain("no automatic catch-up");
+    await expect(batch([entry()], "88888888-8888-4888-8888-888888888888")).rejects.toThrow("already exists");
+  });
+  it("idempotently replays the exact batch even after a result, without creating another job", async () => {
+    await approveDraft(); const entries = [{ ...entry(), notBefore: null }];
+    const first = await batch(entries); const job = (await claim())!; await complete(job);
+    expect(await batch(entries)).toEqual(first);
+    expect(await scalar("select count(*) from public.reporting_publish_jobs")).toBe(1);
+  });
+  it("refuses changed values under a prior request ID", async () => {
+    await approveDraft(); const entries = [entry()]; await batch(entries);
+    await expect(batch([{ ...entries[0], windowMinutes: 20 }])).rejects.toThrow("replay conflict");
+  });
+  it("bulk validation is atomic: a bad second revision queues nothing", async () => {
+    await approveDraft();
+    await expect(batch([entry(), { ...entry(), draftId: "88888888-8888-4888-8888-888888888888" }])).rejects.toThrow("approved revision");
+    expect(await scalar("select count(*) from public.reporting_publish_jobs")).toBe(0);
+    expect(await scalar("select count(*) from public.reporting_publish_batches")).toBe(0);
+  });
+  it("queues two separately approved immutable revisions without dispatching either before due", async () => {
+    await approveDraft(); const second = "88888888-8888-4888-8888-888888888888";
+    await owner(() => scalar("select public.reporting_save_content_draft($1,$2,0,$3,$4::jsonb)", [org, second, binding, JSON.stringify({ ...content, title: "Second authorized draft" })]));
+    await owner(() => scalar("select public.reporting_review_content_draft($1,$2,1,'approve',true)", [org, second]));
+    const result = await batch([entry(), { ...entry(), draftId: second }]) as unknown[];
+    expect(result).toHaveLength(2); expect(await claim()).toBeNull();
+    expect(await scalar("select count(*) from public.reporting_publish_jobs where status='pending'")).toBe(2);
+  });
+  it("rejects duplicate drafts and bounds batches without partial mutations", async () => {
+    await approveDraft();
+    await expect(batch([entry(), entry()])).rejects.toThrow("Duplicate draft");
+    await expect(batch(Array.from({ length: 21 }, entry))).rejects.toThrow("Invalid publish batch");
+    await expect(batch([])).rejects.toThrow("Invalid publish batch");
+    expect(await scalar("select count(*) from public.reporting_publish_jobs")).toBe(0);
+  });
+  it.each(["2026-11-02T12:00:00", "infinity", "not-a-date"])("rejects non-zoned/invalid schedules %s", async (notBefore) => {
+    await approveDraft(); await expect(batch([{ ...entry(), notBefore }])).rejects.toThrow("explicit zoned");
+  });
+  it("refuses past/far-future schedules and time windows beyond the original work session", async () => {
+    await approveDraft();
+    for (const offset of [-60000, 9 * 3600000]) {
+      await expect(batch([{ ...entry(), notBefore: new Date(Date.now() + offset).toISOString() }])).rejects.toThrow("permitted range");
+    }
+    await db.query("update public.reporting_work_sessions set started_at=clock_timestamp()-interval '9 hours 45 minutes' where id=$1", [session]);
+    await expect(batch([{ ...entry(), notBefore: null }])).rejects.toThrow("current work session");
+  });
+  it("requires live verified staff and hides batch history from another tenant", async () => {
+    await approveDraft(); await batch([entry()]);
+    expect(await as("authenticated", other, () => scalar("select count(*) from public.reporting_publish_batches"))).toBe(0);
+    await expect(agent(() => scalar("select public.reporting_enqueue_publish_batch($1,$2,'[]')", [org, request]))).rejects.toThrow("permission denied");
+    await db.query("update auth.users set email_confirmed_at=null where id=$1", [user]);
+    await expect(batch([entry()])).rejects.toThrow("Verified staff");
+  });
+  it("pauses scheduled work and never transfers it into a new operator session", async () => {
+    await approveDraft(); await batch([{ ...entry(), notBefore: null }]);
+    await owner(() => scalar("select public.reporting_session_action($1,'pause','America/Los_Angeles')", [org]));
+    expect(await claim()).toBeNull();
+    await owner(() => scalar("select public.reporting_session_action($1,'end','America/Los_Angeles')", [org]));
+    await owner(() => scalar("select public.reporting_session_action($1,'start','America/Los_Angeles')", [org]));
+    expect(await claim()).toBeNull(); expect(await scalar("select status from public.reporting_publish_jobs")).toBe("cancelled");
+  });
+  it.each([0, 31, 5.5, null, "10"])("rejects invalid dispatch window %#", async (windowMinutes) => {
+    await approveDraft(); await expect(batch([{ ...entry(), windowMinutes }])).rejects.toThrow("Invalid scheduled");
+  });
+});
+
+describe("opt-in automatic result-to-Sheet mapping", () => {
+  const rowId = "99999999-9999-4999-8999-999999999999";
+  async function publication() {
+    await owner(() => scalar("select public.reporting_add_publications($1,$2,$3::jsonb,'manual_entry')", [org, customer, JSON.stringify([{ title: "Mapped exact post", url: "https://nextdoor.com/p/mapping-fixture", account_label: "Profile A" }])]));
+    return String(await scalar("select id from public.reporting_publications where url='https://nextdoor.com/p/mapping-fixture'"));
+  }
+  const map = (id: string, enabled = true, revision = 1) => owner(() => scalar("select public.reporting_set_publication_sheet_mapping($1,$2,'Auto Posting',$3,$4,$5)", [org, id, rowId, revision, enabled]));
+  const check = (id: string, outcome = "alive") => owner(() => scalar("select public.reporting_record_checks($1,$2::jsonb)", [org, JSON.stringify([{ publication_id: id, outcome }])]));
+  it("has no implicit mappings and never queues result writes by default", async () => {
+    const id = await publication(); await check(id); expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(0);
+  });
+  it("maps sourced checks to one exact stable row/revision and preserves technical failures", async () => {
+    const id = await publication(); await map(id); await check(id, "network_error");
+    const value = await scalar("select intent from public.reporting_sheet_writeback_outbox") as Record<string, unknown>;
+    expect(value).toEqual({ action: "update_cells", tab: "Auto Posting", rowRef: `id:${rowId}`, values: [{ Status: "network_error", "Post link": "https://nextdoor.com/p/mapping-fixture", __expected_revision: "1" }] });
+    expect(await scalar("select visibility from public.reporting_publications where id=$1", [id])).toBe("not_checked");
+    expect(await scalar("select next_revision from public.reporting_sheet_publication_mappings")).toBe(2);
+  });
+  it("reserves successive revisions atomically and records exact event/outbox links", async () => {
+    const id = await publication(); await map(id); await check(id); await check(id, "needs_review");
+    expect(await scalar("select count(*) from public.reporting_sheet_delivery_events where disposition='queued'")).toBe(2);
+    const rows = (await db.query<{ revision: string }>("select intent->'values'->0->>'__expected_revision' revision from public.reporting_sheet_writeback_outbox order by seq")).rows;
+    expect(rows.map((row) => row.revision)).toEqual(["1", "2"]);
+  });
+  it("can pause without deleting pending writes, but refuses rebasing while writes are outstanding", async () => {
+    const id = await publication(); await map(id); await check(id);
+    await expect(map(id, true, 20)).rejects.toThrow("Reconcile outstanding");
+    await map(id, false, 20); await check(id);
+    expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(1);
+    expect(await scalar("select next_revision from public.reporting_sheet_publication_mappings")).toBe(2);
+  });
+  it("skips writes after the author loses verified staff access while retaining the sourced result", async () => {
+    const id = await publication(); await map(id);
+    await db.query("update auth.users set email_confirmed_at=null where id=$1", [user]);
+    await db.query("insert into public.reporting_post_checks(organization_id,publication_id,outcome,tone,message,source) values($1,$2,'alive','positive','Fixture check','auto_check')", [org, id]);
+    expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(0);
+    expect(await scalar("select disposition from public.reporting_sheet_delivery_events")).toBe("skipped_authorization");
+    expect(await scalar("select count(*) from public.reporting_post_checks")).toBe(1);
+  });
+  it("automatically appends a newly submitted exact publication and then maps its checks", async () => {
+    await owner(() => scalar("select public.reporting_set_publish_sheet_target($1,$2,true,true)", [org, binding]));
+    await approveDraft(); await enqueue(); const job = (await claim())!; await complete(job);
+    const pid = String(await scalar("select id from public.reporting_publications"));
+    const value = await scalar("select intent from public.reporting_sheet_writeback_outbox") as Record<string, unknown>;
+    expect(value).toEqual({ action: "append", tab: "Auto Posting", rowRef: null, values: [{ "ND Row ID": pid, "Profile Name": "Profile A", "Post link": "https://nextdoor.com/p/exact-fixture-link", Status: "not_checked" }] });
+    expect(await complete(job)).toBe(false); expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(1);
+    await check(pid);
+    expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(2);
+  });
+  it("an ambiguous/failed submission never manufactures a Sheet publication", async () => {
+    await owner(() => scalar("select public.reporting_set_publish_sheet_target($1,$2,true,true)", [org, binding]));
+    await approveDraft(); await enqueue(); const job = (await claim())!;
+    await complete(job, { ...ok(), outcome: "needs_reconciliation", post_url: null, published_at: null });
+    expect(await scalar("select count(*) from public.reporting_sheet_writeback_outbox")).toBe(0);
+  });
+  it("does not grant another tenant, unverified user or anonymous caller mapping access", async () => {
+    const id = await publication(); await map(id);
+    expect(await as("authenticated", other, () => scalar("select count(*) from public.reporting_sheet_publication_mappings"))).toBe(0);
+    await expect(as("authenticated", other, () => scalar("select public.reporting_set_publication_sheet_mapping($1,$2,'Auto Posting',$3,1,true)", [org, id, rowId]))).rejects.toThrow("Verified staff");
+    await expect(agent(() => scalar("select public.reporting_set_publish_sheet_target($1,$2,true,true)", [org, binding]))).rejects.toThrow("permission denied");
+    await expect(owner(() => scalar("update public.reporting_sheet_publication_mappings set next_revision=100"))).rejects.toThrow("permission denied");
+  });
+  it("serialized claims cannot skip an in-flight dependency and return exact stored lease data", async () => {
+    const id = await publication(); await map(id); await check(id); await check(id);
+    const firstRequest = "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa", secondRequest = "aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const first = await owner(() => scalar("select public.reporting_claim_sheet_writeback_v1($1,1,$2)", [org, firstRequest])) as Array<{ id: string; leaseToken: string; expiresAt: string; attempts: number }>;
+    expect(first).toHaveLength(1); expect(first[0].attempts).toBe(1);
+    expect(Date.parse(first[0].expiresAt)).toBe(Date.parse(String(await scalar("select lease_expires_at::text from public.reporting_sheet_writeback_outbox where id=$1", [first[0].id]))));
+    expect(await owner(() => scalar("select public.reporting_claim_sheet_writeback_v1($1,1,$2)", [org, secondRequest]))).toEqual([]);
+    expect(await owner(() => scalar("select public.reporting_claim_sheet_writeback_v1($1,1,$2)", [org, firstRequest]))).toEqual(first);
+    await owner(() => scalar("select public.reporting_ack_sheet_writeback_v1($1,$2,$3,'delivered','{}',null,$4)", [org, first[0].id, first[0].leaseToken, "aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]));
+    const next = await owner(() => scalar("select public.reporting_claim_sheet_writeback_v1($1,1,$2)", [org, "aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaaa"])) as Array<{ id: string }>;
+    expect(next).toHaveLength(1); expect(next[0].id).not.toBe(first[0].id);
+  });
+});
+
+describe("immutable approved media and old-worker compatibility", () => {
+  const image = { id: "99999999-9999-4999-8999-999999999999", sha256: "b".repeat(64), bytes: 1024, mime: "image/png", name: "fixture.png", rightsConfirmed: true, privacyReviewed: true };
+  async function mediaDraft(media: unknown) {
+    await owner(() => scalar("select public.reporting_save_content_draft($1,$2,0,$3,$4::jsonb)", [org, draftId, binding, JSON.stringify({ ...content, media })]));
+    await owner(() => scalar("select public.reporting_review_content_draft($1,$2,1,'approve',true)", [org, draftId]));
+    await enqueue();
+  }
+  it("old claimants skip media jobs and a new capable claimant receives exact approved descriptors", async () => {
+    await mediaDraft([image]); expect(await claim()).toBeNull();
+    expect(await scalar("select status from public.reporting_publish_jobs")).toBe("pending");
+    const result = await agent(() => scalar("select public.reporting_claim_publish_v2($1)", [token]));
+    expect(result).toMatchObject({ body: content.body, media: [image], draft_revision: 2 });
+  });
+  it("empty optional media does not break a legacy text-only worker's exact contract", async () => {
+    await mediaDraft([]); const result = await claim(); expect(result).not.toHaveProperty("media");
+  });
+  it.each([null, [image, image], [{ ...image, rightsConfirmed: false }], [{ ...image, privacyReviewed: false }], [{ ...image, path: "C:/private.png" }],
+    [{ ...image, name: "../private.png" }], [{ ...image, mime: "image/svg+xml" }], [{ ...image, bytes: true }], [{ ...image, bytes: 8388609 }]])("refuses unsupported or unapproved image metadata %#", async (media) => {
+    await expect(mediaDraft(media)).rejects.toThrow("Invalid draft"); expect(await scalar("select count(*) from public.reporting_publish_jobs")).toBe(0);
+  });
+  it("requires fresh approval for changed image fingerprints just as for changed text", async () => {
+    await mediaDraft([image]);
+    await owner(() => scalar("select public.reporting_review_content_draft($1,$2,2,'return',true)", [org, draftId]));
+    await owner(() => scalar("select public.reporting_save_content_draft($1,$2,3,$3,$4::jsonb)", [org, draftId, binding, JSON.stringify({ ...content, media: [{ ...image, sha256: "c".repeat(64) }] })]));
+    expect(await agent(() => scalar("select public.reporting_claim_publish_v2($1)", [token]))).toBeNull();
+    expect(await scalar("select status from public.reporting_publish_jobs")).toBe("cancelled");
+  });
+});
+
 describe("claim and complete protocol", () => {
+  it("blocks publishing while a browser-task lease is held and permits it only after completion", async () => {
+    const task = await owner(() => scalar("select public.reporting_enqueue_automation_task($1,$2,'preset_snapshot','Read counts','{}')", [org, worker]));
+    const leased = await agent(() => scalar("select public.reporting_claim_automation_task($1)", [token])) as { lease_token: string };
+    await approveDraft(); await enqueue();
+    expect(await claim()).toBeNull();
+    await agent(() => scalar("select public.reporting_complete_automation_task($1,$2,$3,'succeeded',$4,null)", [token, task, leased.lease_token, JSON.stringify({ profiles: 0, groups: 0 })]));
+    expect(await claim()).not.toBeNull();
+  });
+  it("keeps the legacy claimant private and exposes only a harmless authenticated version check", async () => {
+    expect(await owner(() => scalar("select public.reporting_publisher_protocol_version()"))).toBe(1);
+    await expect(agent(() => scalar("select public.reporting_publisher_protocol_version()"))).rejects.toThrow();
+    await expect(agent(() => scalar("select private_reporting.reporting_claim_publish($1)", [token]))).rejects.toThrow();
+    await expect(owner(() => scalar("select private_reporting.reporting_claim_publish($1)", [token]))).rejects.toThrow();
+  });
+  it("revokes pending publishing when the session owner is unverified or the session is future-dated", async () => {
+    for (const invalidate of [
+      () => db.query("update auth.users set email_confirmed_at=null where id=$1", [user]),
+      () => db.query("update public.reporting_work_sessions set started_at=clock_timestamp()+interval '1 hour' where id=$1", [session]),
+    ]) {
+      await db.exec("savepoint invalid_publisher");
+      await approveDraft(); await enqueue(); await invalidate();
+      expect(await claim()).toBeNull();
+      expect(await scalar("select status from public.reporting_publish_jobs")).toBe("cancelled");
+      await db.exec("rollback to savepoint invalid_publisher; release savepoint invalid_publisher");
+    }
+  });
   it("withdrawn approval cancels pending work rather than publishing edited content", async () => {
     await approveDraft(); await enqueue();
     await owner(() => scalar("select public.reporting_review_content_draft($1,$2,2,'return',true)", [org, draftId]));

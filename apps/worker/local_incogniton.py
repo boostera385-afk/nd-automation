@@ -47,9 +47,14 @@ class Incogniton:
                 raise ValueError("Local API response too large")
             return json.loads(content)
 
-    def all_profiles(self):
-        data = self.request("/profile/all")
-        profiles = data.get("profiles") if isinstance(data, dict) else data
+    def all_profiles(self, timeout=10):
+        data = self.request("/profile/all", timeout=timeout)
+        profiles = data.get("profileData", data.get("profiles")) if isinstance(data, dict) else data
+        if isinstance(profiles, str):
+            try:
+                profiles = json.loads(profiles)
+            except ValueError:
+                raise ValueError("Local API did not return a profile list") from None
         if not isinstance(profiles, list):
             raise ValueError("Local API did not return a profile list")
         return profiles
@@ -82,18 +87,7 @@ class Incogniton:
         be nested in general_profile_information. Cookie, proxy, account and
         every other detail the API returns are dropped here, never parsed.
         """
-        data = self.request("/profile/all", timeout=60)
-        if isinstance(data, dict):
-            raw = data.get("profileData", data.get("profiles"))
-        else:
-            raw = data
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except ValueError:
-                raise ValueError("Local API did not return a profile list")
-        if not isinstance(raw, list):
-            raise ValueError("Local API did not return a profile list")
+        raw = self.all_profiles(timeout=60)
         seen = set()
         found = []
         for profile in raw:
@@ -176,8 +170,7 @@ class Incogniton:
             if status in {"ok", "success", "true"} or data.get("success") is True:
                 return True
             return False
-        lowered = (text or "").strip().lower()
-        return "ok" in lowered or "success" in lowered
+        return (text or "").strip().lower() in {"ok", "success", "true"}
 
     def add_cookies(self, profile_id, cookies):
         """Write cookies into one profile: POST /profile/addCookie, base64json,
@@ -193,18 +186,16 @@ class Incogniton:
             if not self._confirmed(data, text):
                 raise ValueError("Incogniton rejected the cookies: "
                                  + str(data.get("message") or data.get("error") or data)[:300])
-        elif not isinstance(data, str) or "ok" not in data.lower():
+        elif not isinstance(data, str) or not self._confirmed(None, data):
             raise ValueError("Incogniton rejected the cookies")
         return len(cookies)
 
     def delete_cookies(self, profile_id):
-        """Clear a profile's cookies before a replace-import. Failure is ignored:
-        the desktop ignores it the same way, because a profile with no cookies
-        yet has nothing to delete."""
-        try:
-            self.request("/profile/deleteCookie/" + profile_id, timeout=30)
-        except (OSError, ValueError):
-            pass
+        """Clear once, requiring confirmation before a replace-import proceeds."""
+        data = self.request("/profile/deleteCookie/" + profile_id, timeout=30)
+        text = data if isinstance(data, str) else json.dumps(data)
+        if not self._confirmed(data, text):
+            raise ValueError("Incogniton did not confirm clearing the profile's cookies")
 
     def set_proxy(self, profile_id, proxy):
         """Set one profile's proxy. The payload mirrors the desktop updater:

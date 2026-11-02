@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": false,
+  "supabase_url": "https://yourprojectreference.supabase.co",
+  "publishable_key": "sb_publishable_REPLACE_WITH_PUBLIC_APPLICATION_KEY",
+  "organization_id": "11111111-1111-4111-8111-111111111111",
+  "operator_id": "22222222-2222-4222-8222-222222222222",
+  "connector_url": "https://script.google.com/macros/s/REPLACE_WITH_YOUR_SEPARATE_WRITE_DEPLOYMENT/exec",
+  "connector_token": "REPLACE_WITH_A_PRIVATE_RANDOM_64_CHARACTER_TOKEN"
+}

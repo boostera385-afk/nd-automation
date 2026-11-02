@@ -1,5 +1,392 @@
 # Implementation status
 
+## Source 0.1.4 — durable browser tasks and supervised workflows
+
+The operator requested continuing implementation and authorized commits/pushes
+and reviewed hosted migrations. This entry supersedes older “no onboarding or
+edit/delete/moderation code” statements only for the explicit boundaries below.
+No full desktop parity or real platform acceptance is claimed.
+
+- `automation_journal.py` checkpoints browser tasks before execution, preserves
+  interrupted actions, replays only saved receipts and blocks uncertain local
+  mutations until inspected. Agent and publisher share these recovery checks.
+  Terminal checkpoints discard task payload/result; credentials remain local.
+- Migration `202611020006_browser_task_receipts.sql` accepts only identical
+  terminal completion replay, rejecting changed or cancelled/reconciled leases.
+- Migration `202611020007_supervised_workflows.sql`, `/dashboard/workflows` and
+  `supervised_workflows.py` add a separate, one-task authorized workflow path:
+  genuine-data registration first step/human handoff, login/account inspection,
+  bounded read-only browsing, approved text post/listing edits, exact-target
+  deletion and one-account blocking. Normal agents cannot claim these tasks.
+  Session, staff verification, unchanged assignments, edit approvals, exact
+  existing content hashes and separate destructive confirmations are enforced.
+- Local reviewed manifests/selectors must match the queued request exactly.
+  Passwords/identity inputs stay in a private local plan, not the dashboard,
+  journal or results. No synthetic birth dates/names/location, automatic identity
+  verification/OTP/consent/preference clicking, suspended-account reuse or random
+  engagement is implemented. Signup reports handoff, not a created account.
+- Exactly one mutation is attempted. Exact result evidence is required; ambiguous
+  actions and uncertain profile cleanup block further browser work. Profiles
+  already open/unknown are not borrowed or force-stopped. No visibility/Sheet/
+  yesterday-cohort success is fabricated from maintenance receipts.
+
+Targeted validation completed: **94 publishing/workflow SQL tests PASS**,
+**64 browser-task/agent recovery tests PASS**, **17 workflow/journal tests PASS**
+(overlapping subsets, not additive), and **13 isolated real-Chrome synthetic
+workflow fixtures PASS**, including wrong-account/target, stale content,
+concurrent edit change, challenge handoff, pre-existing result and missing-result
+reconciliation. These fixtures intercepted all traffic; zero platform requests.
+Final whole-project checks are recorded below when completed.
+
+Source is **0.1.4**; last verified hosted web production remains **0.1.1**.
+Migrations 003–007 remain **local, not hosted** at this checkpoint. No live
+account/post/delete/block/Google write, configuration restore or deployment was
+performed. Supabase inspection still found zero workers, assignments, customers
+and publications: yesterday's live checks cannot be called complete.
+
+Remaining implementation includes attachment-preserving edit variants, protected
+evidence storage/retention, bulk cookie/proxy intake, desktop launch/install/update
+parity and any supported destination/preset behavior requiring operator policy
+decisions. Full account onboarding intentionally requires genuine human steps.
+Live acceptance/isolation/recovery and F01–F36 sign-off remain open. See
+`SUPERVISED-WORKFLOWS.md`; keep the working fudge collection/rewrite path intact.
+
+## Source 0.1.3 — code-first scheduling, bulk, mapping and images (2026-11-02)
+
+The operator directed **implementation before configuration/live testing**, and
+explicitly said the working fudge collection flow must remain unchanged. This
+tranche changes ND source only. No request for credentials/configuration, hosted
+migration, production deployment, Google write, real platform operation, account
+creation or fudge release-gate change was made.
+
+Implemented:
+
+- `202611020003_publish_scheduling.sql`: explicit atomic authorization of 1–20
+  already-approved immutable revisions; stable request receipts, exact replay
+  checks, verified staff/workspace/session ownership, due times and 5–30 minute
+  claim windows. Schedules cannot extend beyond the original session's safe
+  start budget. Pauses defer, closed/expired/revoked authorizations cancel, and
+  missed windows cancel without next-session catch-up. Client business-local
+  times convert to UTC with DST gaps/ambiguity rejected. New Content selection
+  and Publishing due/deadline UI remain gated on the undeployed protocol.
+- `publisher_run.py` and the explicit publisher CLI: one job by default, separately
+  confirmed sequential runs capped at 20, optional polling capped at eight hours,
+  and stop-on-ambiguity/login/verification/failure. Every result and cleanup must
+  settle before another claim. No blind Submit retry, bulk approval, cron or
+  default publishing in the monitoring agent was introduced.
+- `202611020004_automatic_sheet_mapping.sql`: opt-in exact publication/row/revision
+  mappings and per-assignment future-publication policies. Sourced check results
+  and confirmed new publication outcomes enqueue their exact intents transactionally.
+  Technical failure remains its actual outcome, not fabricated removal. Immutable
+  event-to-outbox links, owner-verification revocation checks and serialized claims
+  preserve dependency order across one-intent deliverers. Rebase is blocked while
+  intents are outstanding; pause does not silently cancel or retarget old work.
+  `/dashboard/settings/sheet-mapping` exposes disabled-by-default explicit controls,
+  saved state and bounded event evidence without claiming queued means delivered.
+- The Sheet runner now supports separately confirmed bounded sequential draining
+  and bounded polling, still claiming one intent at a time and stopping on the
+  first conflict. Receipt-only recovery cannot run/watch a batch.
+- `202611020005_approved_media.sql`, strict UI/worker descriptors and local media
+  tools: immutable approved image IDs/order, SHA-256, size, MIME and explicit
+  rights/privacy attestations. Up to ten JPG/static PNG/static WebP images,
+  8 MiB each/30 MiB total. Actual local bytes, basic image structure/dimensions
+  and hashes are checked before profile launch. FilePayload buffers avoid
+  temporary-upload-file races and never delete operator originals. A separate
+  capable claimant prevents old/text-only workers from leasing image jobs.
+- A locally reviewed attachment adapter verifies browser-selected file bytes/order
+  through SHA-256, exact preview readiness/count, final content/account/audience,
+  and result-card attachment count. Changed/missing images never silently fall
+  back to text-only. Image resizing/transcoding by a real platform means result
+  thumbnail count is not proof of unchanged published image bytes; real visual
+  acceptance is still required. Signatures/dimensions are not a full decoder,
+  malware scan, EXIF scrubber or proof of content rights/privacy.
+- `stage_media.py` registers explicit operator-selected local originals privately.
+  `import_media.py` supports authorized HTTPS and Drive blob imports into the same
+  private registry: public-unicast DNS validation, IP-pinned TLS/SNI, no proxy,
+  bounded reads/redirects, no authenticated redirect forwarding, file signature/
+  MIME/size checks, exclusive creation and cleanup of only its own temporary files.
+  Drive tokens go only to its exact supported Google API endpoint, never a public
+  source URL, registry, descriptor, browser or backend. No Drive/API request was
+  made during tests; resolver/connections were mocked.
+
+Final validation: **217 worker unittest cases PASS** and **5 real isolated-Chrome
+synthetic DOM fixtures PASS** (text post/listing, image post/listing, changed-byte
+refusal), zero real platform requests. Web **typecheck PASS, lint PASS (zero
+warnings), 1,015 tests / 74 files PASS, production build PASS**. The build includes
+the new mapping route. Python compilation, four package-safety tests and
+`git diff --check` PASS (line-ending notices only). These are development
+fixtures, not client configuration/live acceptance. The application enforces
+39 guarded form-action entrypoints, including the new explicit batch/mapping
+actions; tests cover stale-context guards rather than relaxing that boundary.
+
+The three new migrations are **local source, not applied remotely**. Source is
+**0.1.3**; production remains the previously verified **0.1.1**. Older 0.1.1/0.1.2
+QA archives do not contain this tranche. No full-project completion or handover
+is claimed: onboarding/human-verification workflow, edit/delete/moderation tools,
+remaining profile/device operations and individual F01–F36 sign-off still need
+implementation/acceptance. Legacy onboarding currently invents a birth date and
+fallback names; that behavior was inspected read-only and is **not ported or run**.
+Genuine supplied identity data and human verification must replace it.
+
+## Source 0.1.2 — opt-in Sheet writeback implementation (2026-11-02)
+
+The user explicitly requested implementing the remaining code and offered to
+configure required connections. Implemented the previously missing Sheet
+deliverer as an explicit **one-intent pilot**, not an always-on/automatic mode:
+
+- `apps/worker/sheet_writeback.py`: stdlib-only offline preflight, private pinned
+  workspace/operator/project/connector config, verified staff Auth and replayed
+  claim authorization, bounded HTTPS/no proxy or arbitrary redirect forwarding,
+  durable claim/result checkpoints, exact receipt checks and result-only recovery.
+  Default invocation is offline; execution/recovery require explicit authorization.
+  Local password prompts never save password/refresh tokens and refuse an echoing
+  terminal fallback. Verified enrolled MFA requires an AAL2 user token. No
+  service-role/admin/management key is accepted.
+- `integrations/sheets/reporting-writeback.gs`: NEW standalone connector, disabled
+  unless privately enabled. Only approved non-secret columns on two exact tabs;
+  stable ND Row ID UUIDs, expected ND Revision, bounded reads/requests, no A1 row
+  targeting, no arbitrary range or formula execution. Atomic Sheets batch updates
+  include the durable operation/hash receipt in the same commit. Exact replay or
+  lookup cannot create a second append; conflicting IDs/revisions stop safely.
+- Dashboard enqueue validates the deliverable v1 subset; legacy generic intents
+  stay readable but are not silently executed. UI explains separate authorization,
+  unknown local-runner state, setup IDs and configuration ownership without
+  exposing tokens/passwords. `docs/SHEET-WRITEBACK-SETUP.md` gives complete
+  operator steps, private sign-in, pilot and lost-response recovery guidance.
+- The connector lock covers cooperating requests in ONE script project only.
+  Human/other-script edits must be excluded during the pilot; atomic batch update
+  is **not** cross-collaborator compare-and-swap. Metadata receipt quotas/retention,
+  OS ACLs, real Google permissions and interrupted-write recovery need acceptance.
+
+Worker validation: **181 unittest cases PASS**, including 30 new writeback
+transport/protocol/journal/CLI tests; Python compilation and Apps Script syntax
+PASS. Nineteen Apps Script fixtures passed before UI integration. The first full
+web run caught a stale empty-state wording assertion (934 passed, 1 failed);
+the assertion was corrected to check the actual no-automatic-dispatch boundary,
+not weakened into an invented readiness claim. Final full web validation:
+**typecheck PASS, lint PASS (zero warnings), 935 tests / 69 files PASS,
+production build PASS**. The 28 added web tests include 19 connector fixtures
+and 9 delivery-subset contract cases. A cross-runtime check also passed: the real
+Python and Apps Script canonical intent hashes match for Unicode and literal
+formula-looking text, with zero external requests. Packaging safety's four tests
+and `git diff --check` PASS (line-ending notices only).
+
+No remote migration, real Sheet write, credential setup, Incogniton operation,
+release-gate change, production deployment or external client delivery was
+performed in this tranche. Source package/lock are **0.1.2**; the previously
+verified production dashboard remains **0.1.1**. Earlier 0.1.1 QA archives predate
+this tranche and must not be presented as containing it. Rebuilt QA source
+archives under the outer workspace's `client-delivery/` identify version 0.1.2
+in `RELEASE-STATUS.json`, with per-file hashes and a SHA-256 sidecar; they remain
+explicitly not live-accepted.
+
+Still needs code: automatic monitoring/publication completion-to-outbox mapping,
+scheduled/bulk delivery, media/scheduled/bulk publishing, account onboarding,
+remaining edit/delete/moderation/profile workflows and full desktop parity. This
+tranche does not establish that only configuration/testing remains for the full
+product; it closes one concrete missing delivery component safely.
+
+## Frontend release identity and source QA archive (2026-11-02)
+
+Added a small public footer on every ND page: **nd v0.1.1**, host environment and
+an expandable deployment identity. It uses only a validated package version and
+whitelisted Vercel deployment ID/generated hostname; absent metadata is labelled
+unidentified/not exposed, not guessed. No private environment object, credentials,
+workspace or customer data is rendered. Build identity is explicitly not a live
+automation health check. Package/lock versions match. Final local web validation:
+**typecheck PASS, lint PASS, 907 tests / 67 files PASS, production build PASS**
+without the earlier named-JSON-import warning. Five new tests cover identity,
+unknown/malformed hosts, safe fallbacks, rendered values and secret exclusion.
+
+Latest production deployment **READY**: `dpl_HPLFL7yaXBykftgUvQhpBLGuxqVt`,
+generated host `nd-automation-dashboard-7f2r3xjfk-jelly-bean2.vercel.app`, aliased
+to **https://nd-automation-dashboard.vercel.app**. Post-deploy `/login` footer
+text was fetched and verified to contain **nd v0.1.1**, **production** and that
+exact deployment ID. `npm.cmd run check:deployment --
+https://nd-automation-dashboard.vercel.app` PASS: login 200 and expected 307
+login redirects for workspaces, verify-email, dashboard and run/cohorts.
+These anonymous checks do not establish authenticated or live-worker readiness.
+
+Added the standard-library-only `scripts/build_client_package.py`: tracked plus
+non-ignored working source from both repos, no git history, environments (except
+public examples), local pairing/profile state, tool config, dependencies, backups
+or customer exports. Targeted secret checks fail closed, with only one exact
+reviewed invalid negative-test fixture exception. The generated archive includes
+per-file hashes, source base commits/dirty indicators, versions, a SHA-256 sidecar
+and an explicit **QA candidate / liveAccepted false** status. Four packaging
+safety tests PASS; trial archive was integrity/hash-verified under the approved
+temporary directory. Final QA archives and their SHA-256 sidecars are generated
+in the outer workspace's `client-delivery/` directory, outside both repositories;
+each archive includes the final source and its per-file hash manifest. The package
+is not represented as a complete live client handover,
+and no recipient was supplied or external delivery performed.
+
+Fudge follow-up is now separately authorized by the operator: lowercase `fudge`
+2.0.1 / connector template 43, safer protected-connector copying/reconnect,
+model-selection/read-only access diagnostics, key-safe errors and observed
+connector-version UI. Its 132 smoke + 67 backend + 18 setup/version tests and
+isolated real-Chrome setup UI fixture pass. This does not deploy the client's
+Apps Script, approve its Google permissions or verify its real key/model. See
+the fudge repository's `docs/RELEASE-STATUS.md`; upload/catalog gates remain OFF.
+
+## Authorized ND production tranche (2026-11-02; supersedes the local-only entry below)
+
+The operator explicitly authorized migrations and production preparation. Applied
+`automation_session_gate` as hosted **20261102152910** and
+`publish_dispatch_guard` as hosted **20261102154039**: **23 migration records**.
+Pre-application checks found zero pending/leased browser tasks, zero workers and
+zero publish jobs, so no operator work was cancelled. Post-application inspection
+confirmed the new session column, publisher protocol version 1, denied anon and
+authenticated execution of the private legacy claim helper, no anon execution of
+the harmless version check, and all **29 public tables RLS-enabled**. No live job,
+customer, profile binding, worker or platform content was created by these checks.
+The previously missing automation-worker foreign-key index no longer appears in
+performance advisories; unused indexes are deliberately retained.
+
+Implemented a separate **opt-in, one-job text post/listing publisher**:
+
+- Approved-revision Content detail has an explicit supervised queue action,
+  guarded by verified staff/workspace context, exact revision/approval/binding,
+  session checks, the deployed safety version and durable no-duplicate-job rules.
+  Approval and page views alone never dispatch or submit. The regular agent does
+  not claim publishing; `publisher.py` requires separate explicit authorization.
+- A locally reviewed adapter pins the exact Incogniton UUID to the real signed-in
+  account href/name and explicit supported composer kind. Remote selectors, code,
+  credentials, media paths and implicit audience/group choices are not accepted.
+  Unknown identity, login, challenge, disabled account, composer or audience stops.
+- Reads back approved body/audience, plus listing title, decimal USD price and a
+  native selected category, again at the final submit boundary. A matching
+  existing card blocks publishing; success requires one new same-card exact body,
+  author and canonical kind-matching link (plus listing title), never the first
+  feed card. No exact result means reconciliation, not fabricated success.
+- Private atomic write-ahead state precedes launch and the single Submit attempt.
+  Recovery sends only saved result receipts; claimed/submit-intent ambiguity never
+  replays browser work. Acknowledged results clear customer text from the journal.
+  Profile cleanup uncertainty blocks subsequent work. Both runners share the
+  existing local lock; the hosted guard now excludes all three lease families.
+- `publishing-adapter.example.json` intentionally fails until actual local DOM
+  and account review. `docs/SUPERVISED-PUBLISHING.md` covers exact one-job startup,
+  recovery/attestation and remaining acceptance. No signed-in session was accessed
+  or real platform submission attempted during implementation.
+
+Final local validation: web **typecheck PASS, lint PASS (zero warnings), 902
+tests / 66 files PASS, production build PASS**. Worker **151 unittest cases PASS**
+(including interruption after durable submit intent without replay).
+Real installed Chrome, fresh
+isolated contexts, intercepted synthetic post and listing pages: **2 DOM integration
+cases PASS, zero real platform page requests**. This exercises real Playwright
+fill/readback/audience/submit/evidence behavior but mocks Incogniton/CDP transport;
+it is not Nextdoor/Incogniton live acceptance. The first full web run passed
+typecheck/lint but caught an outdated workspace-action count; the audit now covers
+36 guarded actions including all browser-task actions/forms, and was rerun.
+
+**Authorized production deployment completed:** Vercel deployment
+`dpl_6rCqXq9YEEqwK4RpecdkcajT2XBa`, build alias
+`nd-automation-dashboard-968554mp7-jelly-bean2.vercel.app`, returned **READY** and
+was aliased to **https://nd-automation-dashboard.vercel.app**. Deployed manually
+from `apps/web` (pushing still does not deploy). Added an explicit `.vercelignore`
+so local `.env*`, runtime state and build/dependency artifacts are not uploaded.
+No hosted environment variable was changed or old Sheet connector reactivated.
+`check:deployment` PASS after deploy; additional anonymous Content, Publishing,
+Run and setup-guide route requests each returned the expected same-origin 307
+login redirect. Signed-in content/queue/isolation acceptance remains unverified.
+The 24-hour backend HTTP breakdown contained 959 HTTP 200, 1 HTTP 204, 1 HTTP 303
+and four known login HTTP 400 rejections, with no HTTP 5xx in the returned data.
+No new worker or job was created. `git diff --check` PASS with line-ending notices;
+targeted secret-pattern scan found no private credential or live Sheet link in
+changed/untracked source. Changes remain uncommitted/unpushed; production web
+deployment and both schema migrations are complete, not a client parity sign-off.
+
+**Still not full client handover:** Incogniton health remains unavailable and
+production still has zero registered workers. The operator must register a new
+credential, configure/accept the actual authorized account/DOM adapter and run a
+specifically approved one-post/one-listing pilot, then verify monitoring/Results,
+access isolation, interruptions, cleanup and recovery/restore. Media, scheduling,
+bulk/unattended publishing, account onboarding, automatic Sheet writeback delivery
+and gated Fudge upload are not implemented/released by this tranche. No suspended
+account or challenge is bypassed. Production Sheet variables are not silently
+restored from the old development connector. Fudge remains owned by the other
+developer and unchanged by this delivery. Leaked-password protection remains an
+open hosted Auth advisory. No full feature-parity or "100% bug-free" sign-off is
+claimed.
+
+## ND-only launch hardening (2026-11-02; local, not deployed)
+
+The operator narrowed work to this dashboard; Fudge is maintained by another
+developer. No Fudge changes are part of this tranche. Earlier chat statements
+that the whole chain was "100% ready" were too broad: automated tests and
+signed-out route checks do not establish a usable live automation installation.
+
+Read-only checks on November 2 confirmed **0 workers, credentials, inventory,
+bindings, publications, browser tasks, check jobs and publish jobs** in production.
+There are **29 public tables, all RLS-enabled**. Anonymous production route checks
+pass; authenticated launch acceptance is unverified. The pinned local worker
+runtime, adapter and connection file pass structural preflight, but Incogniton's
+health probe returns **unavailable** and the hosted credential count is zero.
+The saved connection must not be treated as valid pairing after the reset.
+No profile or browser was opened and no job was dispatched for this check.
+
+Implemented locally:
+
+- Additive migration `202611020001_automation_session_gate.sql` ties each browser
+  task to the approving staff member's exact verified, active work session, under
+  ten hours old. Pause blocks new claims; resume permits them; closure/expiry or
+  authorization loss cancels pending tasks rather than carrying them into a new
+  session. Already-leased work may finish and still blocks overlapping claims.
+  The reviewed enqueue implementation is moved into a revoked private helper;
+  callers retain only the session-gated public RPC. Legacy unbound pending tasks
+  are cancelled on application, not silently authorized. Added covering worker
+  and session foreign-key indexes; no existing index or data history is deleted.
+- Run defaults to read-only profile detection and disables dispatch without a
+  current session. Missing session-gate schema fails closed. An empty write-target
+  list no longer removes the task selector and strands the user in that choice.
+- Worker browser tasks now reject expired/short/unbounded leases and malformed
+  UUIDs before local actions. Cookie/proxy changes require the target profile to
+  be stopped. Cookie replacement requires an explicit successful clear; failure
+  is no longer swallowed. Negative text such as "not ok" is not a confirmation.
+- Raw local API/file exceptions are no longer submitted to hosted task history
+  where they could expose cookies, proxies or private paths.
+- Profile scans honor both the 500-entry cap and a conservative UTF-8 result-byte
+  budget under the hosted JSONB allowance. Long names yield an explicit partial
+  scan instead of an oversized completion failure. The UI identifies CSV import
+  as the fallback for omitted profiles; repeated scans do not page through them.
+- Preset inventory understands the same nested/string profile-list response as
+  auto-detection. Reconciled leases no longer claim "cancelled before it ran."
+  Setup guide includes actual local preflight/health/one-poll startup, exact
+  session authorization and the separation between collection and monitoring.
+
+Hosted security review is **not clean**: leaked-password protection is disabled,
+and SECURITY DEFINER RPC notices require the existing scoped-token/membership
+controls, not blanket grant changes. See
+[password-security remediation](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+The missing automation-task worker-FK index is addressed by the pending migration;
+unused indexes are retained. The last 24-hour logs included four HTTP 400 login
+rejections (invalid credentials/email not confirmed), not zero errors. No HTTP 5xx
+was present in the returned status breakdown. No auth setting was changed.
+
+**Still not a full launch:** this migration and web changes need explicit hosted
+application/deploy approval; the agent must be registered again and Incogniton
+must be reachable. An authorized exact-profile inventory/binding and one bounded
+read-only monitoring pilot are required. Production Sheet-sync configuration was
+previously deliberately removed and has not been re-enabled by this work. Auto
+Posting/Listing handlers, scheduling, account creation, automatic Sheet writeback
+delivery, Fudge upload release and unattended operation remain absent or gated.
+The historical suspended pilot account must not be used until a person resolves
+its platform status. No production writes, deployment, commit or push occurred.
+
+Final-tree validation: web typecheck PASS, lint PASS (zero warnings), **889 tests
+/ 64 files PASS**, production build PASS. Worker **131 unittest cases PASS**;
+the isolated environment's `pip check` reports no broken requirements. New tests
+exercise legacy-task cancellation, absence/wrong-owner/paused/expired/future/
+revoked/unverified session authorization, protected helper grants, resumed claims,
+completion after pause, UTF-8/JSONB scan budgets, negative clear confirmations,
+busy-profile refusal, lease bounds, safe error receipts and rendered dispatch
+controls. `git diff --check` passes (line-ending warnings only); targeted secret
+patterns found no credentials or live Sheet links in changed/untracked files.
+`npm audit --omit=dev` reported zero known production dependency vulnerabilities.
+Anonymous production route checks passed against the existing deployment, **not**
+the new local build. No signed-in full-chain or live browser acceptance is claimed.
+
 ## Current milestone
 
 **Protocol deployment (2026-10-30): cohort and publish-job schemas are live;

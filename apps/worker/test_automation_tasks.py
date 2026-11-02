@@ -2,10 +2,14 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 from uuid import uuid4
 
 import automation_tasks as tasks
 from agent import poll_automation
+from automation_journal import AutomationJournal
+from pathlib import Path
 
 
 TASK_ID = "11111111-1111-4111-8111-111111111111"
@@ -14,7 +18,7 @@ LEASE_ID = "22222222-2222-4222-8222-222222222222"
 
 def task(kind, payload, **overrides):
     base = {"task_id": TASK_ID, "kind": kind, "payload": payload,
-            "lease_token": LEASE_ID, "lease_expires_at": "2099-01-01T00:00:00Z"}
+            "lease_token": LEASE_ID, "lease_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()}
     base.update(overrides)
     return base
 
@@ -32,6 +36,9 @@ class FakeIncogniton:
     def create(self, name, operating_system="windows", group=""):
         self.created.append((name, operating_system, group))
         return "33333333-3333-4333-8333-333333333333"
+
+    def stopped(self, profile_id):
+        return True
 
     def inventory(self):
         return {"profiles": 7, "groups": 2, "launched": 1}
@@ -95,6 +102,14 @@ class TaskContractTests(unittest.TestCase):
     def test_refuses_an_oversized_payload(self):
         with self.assertRaises(tasks.TaskError):
             tasks.validate_task(task("preset_snapshot", {"note": "x" * 9000}))
+
+    def test_expired_short_unbounded_leases_and_fake_uuids_are_refused(self):
+        for delta in (-60, 60, 3600):
+            expiry = (datetime.now(timezone.utc) + timedelta(seconds=delta)).isoformat()
+            with self.subTest(delta=delta), self.assertRaises(tasks.TaskError):
+                tasks.validate_task(task("preset_snapshot", {}, lease_expires_at=expiry))
+        with self.assertRaises(tasks.TaskError):
+            tasks.validate_task(task("preset_snapshot", {}, task_id="-" * 36))
 
 
 class ProfilePayloadTests(unittest.TestCase):
@@ -172,11 +187,21 @@ class ExecutionTests(unittest.TestCase):
                                   "total": 1, "truncated": False})
 
     def test_inventory_scan_reports_truncation_honestly_at_the_cap(self):
-        listed = [{"profile_id": f"44444444-4444-4444-8444-{i:012d}", "name": f"P {i}", "group_name": "G"}
+        listed = [{"profile_id": f"44444444-4444-4444-8444-{i:012d}", "name": "P", "group_name": "G"}
                   for i in range(tasks.MAX_SCAN_ENTRIES + 1)]
         result = tasks.execute(task("inventory_scan", {}), FakeIncogniton(listed))
         self.assertEqual(len(result["profiles"]), tasks.MAX_SCAN_ENTRIES)
         self.assertEqual(result["total"], tasks.MAX_SCAN_ENTRIES + 1)
+        self.assertTrue(result["truncated"])
+
+    def test_large_multibyte_names_respect_the_result_byte_budget(self):
+        listed = [{"profile_id": str(uuid4()), "name": "\u754c" * 200, "group_name": "\u754c" * 200}
+                  for _ in range(500)]
+        result = tasks.execute(task("inventory_scan", {}), FakeIncogniton(listed))
+        self.assertLess(len(result["profiles"]), 500)
+        self.assertGreater(len(result["profiles"]), 0)
+        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False).encode("utf-8")), tasks.MAX_SCAN_RESULT_BYTES)
+        self.assertEqual(result["total"], 500)
         self.assertTrue(result["truncated"])
 
     def test_cookie_import_reads_a_local_file(self):
@@ -216,6 +241,23 @@ class WritePayloadTests(unittest.TestCase):
 
 
 class WriteExecutionTests(unittest.TestCase):
+    def test_busy_or_unknown_profile_never_receives_cookie_or_proxy_writes(self):
+        for kind in ("cookie_write", "proxy_write"):
+            fake = FakeIncogniton()
+            with patch.object(fake, "stopped", return_value=False), patch("automation_tasks._read_text") as read:
+                with self.assertRaises(tasks.TaskError):
+                    tasks.execute(task(kind, {"profile_id": TARGET, "path": "C:\\Exports\\input.txt", "replace": True}), fake)
+                read.assert_not_called()
+            self.assertEqual(fake.cookie_writes + fake.deleted_cookies + fake.proxy_writes, [])
+
+    def test_unconfirmed_cookie_clear_never_adds_replacement_cookies(self):
+        fake = FakeIncogniton()
+        with patch("automation_tasks._read_text", return_value=".example.com\tTRUE\t/\tTRUE\t1999999999\tsid\tsecret"), \
+                patch.object(fake, "delete_cookies", side_effect=ValueError("not confirmed")):
+            with self.assertRaises(ValueError):
+                tasks.execute(task("cookie_write", {"profile_id": TARGET, "path": "C:\\Exports\\input.txt", "replace": True}), fake)
+        self.assertEqual(fake.cookie_writes, [])
+
     def test_cookie_write_sends_the_parsed_netscape_rows(self):
         text = "\n".join([
             "# Netscape HTTP Cookie File",
@@ -287,15 +329,20 @@ class WriteExecutionTests(unittest.TestCase):
 
 
 class PollTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.journal = AutomationJournal(Path(temporary.name) / "task.json", {"supabase_url": "https://example.supabase.co", "worker_token": "a" * 64})
+
     def test_idle_returns_none(self):
         bridge = FakeBridge(None)
-        self.assertIsNone(poll_automation(bridge, FakeIncogniton()))
+        self.assertIsNone(poll_automation(bridge, FakeIncogniton(), self.journal))
         self.assertEqual(bridge.calls, ["reporting_claim_automation_task"])
 
     def test_success_is_reported_without_repeating_the_action(self):
         bridge = FakeBridge(task("preset_snapshot", {}))
         fake = FakeIncogniton()
-        self.assertEqual(poll_automation(bridge, fake), "automation_succeeded")
+        self.assertEqual(poll_automation(bridge, fake, self.journal), "automation_succeeded")
         self.assertEqual(bridge.completions, [(TASK_ID, "succeeded", {"profiles": 7, "groups": 2, "launched": 1}, None)])
 
     def test_failure_is_reported_with_a_bounded_reason(self):
@@ -303,13 +350,24 @@ class PollTests(unittest.TestCase):
         class Broken(FakeIncogniton):
             def create(self, name, operating_system="windows", group=""):
                 raise ValueError("Incogniton is not running")
-        self.assertEqual(poll_automation(bridge, Broken()), "automation_failed")
-        self.assertEqual(bridge.completions, [(TASK_ID, "failed", None, "Incogniton is not running")])
+        with self.assertRaisesRegex(ValueError, "inspection"):
+            poll_automation(bridge, Broken(), self.journal)
+        self.assertEqual(bridge.completions[0][:3], (TASK_ID, "failed", None))
+        self.assertIn("raw errors are withheld", bridge.completions[0][3])
+
+    def test_local_api_exception_cannot_leak_credentials_or_private_paths(self):
+        bridge = FakeBridge(task("proxy_write", {"profile_id": TARGET, "path": "C:\\Private\\proxy.txt"}))
+        with patch("agent.execute_task", side_effect=ValueError("password=SECRET cookie=TOKEN C:\\Private\\proxy.txt")):
+            with self.assertRaisesRegex(ValueError, "inspection"):
+                poll_automation(bridge, FakeIncogniton(), self.journal)
+        stored = json.dumps(bridge.completions)
+        for private in ("SECRET", "TOKEN", "Private", "password="):
+            self.assertNotIn(private, stored)
 
     def test_a_malformed_task_is_refused_before_any_action(self):
         bridge = FakeBridge(task("publish_post", {}))
         with self.assertRaises(tasks.TaskError):
-            poll_automation(bridge, FakeIncogniton())
+            poll_automation(bridge, FakeIncogniton(), self.journal)
         self.assertEqual(bridge.completions, [])
 
 

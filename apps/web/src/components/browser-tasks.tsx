@@ -13,18 +13,19 @@ function CancelForm({ id }: { id: string }) {
   return <form action={action}><WorkspaceField /><input type="hidden" name="task" value={id} /><button className="button secondary" type="submit" disabled={pending}>Cancel</button>{state.error && <small role="alert">{state.error}</small>}</form>;
 }
 
-export function BrowserTasks({ workers, tasks, profiles, timeZone, available }: { workers: Worker[]; tasks: AutomationTask[]; profiles: InventoryProfile[]; timeZone: string; available: boolean }) {
-  const [kind, setKind] = useState<AutomationKind>("profile_create");
+export function BrowserTasks({ workers, tasks, profiles, timeZone, available, activeSession }: { workers: Worker[]; tasks: AutomationTask[]; profiles: InventoryProfile[]; timeZone: string; available: boolean; activeSession: boolean }) {
+  const [kind, setKind] = useState<AutomationKind>("inventory_scan");
   const [state, action, pending] = useActionState(enqueueBrowserTask, {});
   const usable = workers.filter((worker) => worker.enabled);
   const writes = kind === "cookie_write" || kind === "proxy_write";
-  if (!available) return <p className="notice">The browser task queue is not available on this deployment yet. The migration has not been applied, so no task can be queued.</p>;
+  if (!available) return <p className="notice">The browser task queue or its session-safety migration is not available on this deployment yet. No task can be queued.</p>;
   if (usable.length === 0) return <p>No automation agent is enabled yet. <a href="/dashboard/settings#connections">Register or re-enable the agent on this device</a> before queuing a browser task.</p>;
-  if (writes && profiles.length === 0) return <p className="notice">No Incogniton profiles are recorded yet. Add your profiles under Profiles first; an import targets one recorded profile.</p>;
   const confirmText = writes
     ? `I authorize this import into the chosen Incogniton profile on this device's automation agent. It writes cookies or a proxy into that one profile; it does not post, publish, browse Nextdoor or change any other profile.`
     : `I authorize this task on this device's automation agent. It creates or reads only; it does not post, publish, create an account or change cookies.`;
   return <>
+    {!activeSession && <p className="notice">Start or resume an active work session before queuing a browser task. Sessions expire after ten hours; paused or ended sessions cannot dispatch new tasks.</p>}
+    {writes && profiles.length === 0 && <p className="notice">No Incogniton profiles are recorded yet. Choose Detect Incogniton profiles first, then load the scan under Profiles before importing into one.</p>}
     <form action={action} className="form-grid">
       <WorkspaceField />
       <label>Device<select name="worker" defaultValue={usable[0].id} required>{usable.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
@@ -43,7 +44,7 @@ export function BrowserTasks({ workers, tasks, profiles, timeZone, available }: 
       </>}
       <label className="check"><input name="confirmed" type="checkbox" required />{confirmText}</label>
       {state.error && <p className="notice error" role="alert">{state.error}</p>}{state.success && <p className="notice success" role="status">{state.success}</p>}
-      <button className="button" type="submit" disabled={pending}>{pending ? "Queuing…" : `Queue ${kindLabels[kind].toLowerCase()}`}</button>
+      <button className="button" type="submit" disabled={pending || !activeSession || (writes && profiles.length === 0)}>{pending ? "Queuing…" : `Queue ${kindLabels[kind].toLowerCase()}`}</button>
     </form>
     <div className="table-wrap"><table><thead><tr><th>Task</th><th>Device</th><th>State</th><th>Outcome</th><th>Created</th><th></th></tr></thead><tbody>
       {tasks.length === 0 && <tr><td colSpan={6}>No browser task has been queued yet.</td></tr>}

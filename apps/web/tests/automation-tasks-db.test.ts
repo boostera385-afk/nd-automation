@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
 const db = new PGlite();
 const owner = randomUUID(), operator = randomUUID(), client = randomUUID();
 const token = "c".repeat(64);
-let org: string, worker: string;
+let org: string, worker: string, session: string, legacyTask: string;
 
 async function scalar(sql: string, params: unknown[] = []) {
   const { rows } = await db.query<Record<string, unknown>>(sql, params);
@@ -49,9 +49,14 @@ beforeAll(async () => {
   org = String(await rpc(owner, "select public.reporting_create_workspace('Automation fixture')"));
   await db.query("insert into public.reporting_memberships values ($1,$2,'operator'),($1,$3,'customer')", [org, operator, client]);
   worker = String(await rpc(owner, "select public.reporting_register_worker($1,'Automation laptop',$2)", [org, createHash("sha256").update(token).digest("hex")]));
+  legacyTask = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Legacy pending scan','{}')", [org, worker]));
   await db.exec("commit");
+  await db.exec(await readFile(new URL("../../../supabase/migrations/202611020001_automation_session_gate.sql", import.meta.url), "utf8"));
 }, 120000);
-beforeEach(async () => { await db.exec("begin"); });
+beforeEach(async () => {
+  await db.exec("begin");
+  session = String(await rpc(operator, "select public.reporting_session_action($1,'start','UTC')", [org]));
+});
 afterEach(async () => { await db.exec("reset role; rollback"); });
 afterAll(async () => { await db.close(); });
 
@@ -59,6 +64,61 @@ it("refuses task types the dashboard must never execute", async () => {
   for (const kind of ["publish_post", "publish_listing", "account_create", "shell", ""]) {
     await expect(rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,$3,$4,$5)",
       [org, worker, kind, "Attempt", JSON.stringify({})])).rejects.toThrow();
+  }
+});
+
+it("cancels legacy pending tasks instead of inheriting authorization", async () => {
+  expect(await scalar("select status from public.reporting_automation_tasks where id=$1", [legacyTask])).toBe("cancelled");
+  expect(await claimTask()).toBeNull();
+});
+
+it("requires a current, verified operator work session and keeps the bypass helper private", async () => {
+  await rpc(operator, "select public.reporting_session_action($1,'end','UTC')", [org]);
+  await expect(rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker])).rejects.toThrow("Start an active work session");
+  for (const role of ["anon", "authenticated"]) {
+    await expect(as(operator, () => scalar("select private_reporting.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker]), role)).rejects.toThrow();
+  }
+});
+
+it("does not substitute another staff member's active session", async () => {
+  await expect(rpc(owner, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker])).rejects.toThrow("Start an active work session");
+});
+
+it("pause blocks dispatch, resume permits it, and completion may finish after pause", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker]));
+  expect(await scalar("select session_id from public.reporting_automation_tasks where id=$1", [task])).toBe(session);
+  await rpc(operator, "select public.reporting_session_action($1,'pause','UTC')", [org]);
+  expect(await claimTask()).toBeNull();
+  expect(await scalar("select status from public.reporting_automation_tasks where id=$1", [task])).toBe("pending");
+  await expect(rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker])).rejects.toThrow("Start an active work session");
+  await rpc(operator, "select public.reporting_session_action($1,'resume','UTC')", [org]);
+  const claimed = await claimTask() as { task_id: string; lease_token: string };
+  expect(claimed.task_id).toBe(task);
+  await rpc(operator, "select public.reporting_session_action($1,'pause','UTC')", [org]);
+  expect(await complete(task, claimed.lease_token, "succeeded", { profiles: [], total: 0, truncated: false })).toBe(true);
+});
+
+it("ending a session cancels its pending task even after a new session starts", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker]));
+  await rpc(operator, "select public.reporting_session_action($1,'end','UTC')", [org]);
+  await rpc(operator, "select public.reporting_session_action($1,'start','UTC')", [org]);
+  expect(await claimTask()).toBeNull();
+  expect(await scalar("select status from public.reporting_automation_tasks where id=$1", [task])).toBe("cancelled");
+});
+
+it("expired, future-dated, unverified or revoked session authorizations never dispatch", async () => {
+  for (const invalidate of [
+    () => db.query("update public.reporting_work_sessions set started_at=clock_timestamp()-interval '11 hours' where id=$1", [session]),
+    () => db.query("update public.reporting_work_sessions set started_at=clock_timestamp()+interval '1 hour' where id=$1", [session]),
+    () => db.query("update auth.users set email_confirmed_at=null where id=$1", [operator]),
+    () => db.query("update public.reporting_memberships set role='customer' where organization_id=$1 and user_id=$2", [org, operator]),
+  ]) {
+    await db.exec("savepoint invalid_authorization");
+    const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Scan','{}')", [org, worker]));
+    await invalidate();
+    expect(await claimTask()).toBeNull();
+    expect(await scalar("select status from public.reporting_automation_tasks where id=$1", [task])).toBe("cancelled");
+    await db.exec("rollback to savepoint invalid_authorization; release savepoint invalid_authorization");
   }
 });
 
@@ -212,6 +272,19 @@ it("still refuses a scan result past its own 64,000-byte allowance", async () =>
     profile_id: randomUUID(), name: "n".repeat(200), group_name: "Team A",
   }));
   await expect(complete(task, claimed.lease_token, "succeeded", { profiles: huge, total: 500, truncated: true })).rejects.toThrow("Invalid task result");
+});
+
+it("accepts byte-budgeted scans with long multibyte names within the JSONB size cap", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles','{}')", [org, worker]));
+  const claimed = await claimTask() as { lease_token: string };
+  const result = { profiles: [] as { profile_id: string; name: string; group_name: string }[], total: 500, truncated: true };
+  for (let i = 0; i < 500; i++) {
+    result.profiles.push({ profile_id: randomUUID(), name: "界".repeat(200), group_name: "界".repeat(200) });
+    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 45_000) { result.profiles.pop(); break; }
+  }
+  expect(result.profiles.length).toBeGreaterThan(0);
+  expect(await complete(task, claimed.lease_token, "succeeded", result)).toBe(true);
+  expect(Number(await scalar("select pg_column_size(result) from public.reporting_automation_tasks where id=$1", [task]))).toBeLessThan(64_000);
 });
 
 it("allows only one open task per laptop and lets staff cancel a pending one", async () => {

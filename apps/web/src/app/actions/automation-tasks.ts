@@ -51,9 +51,9 @@ export async function enqueueBrowserTask(_previous: FormState, form: FormData): 
   const { error } = await db.rpc("reporting_enqueue_automation_task", {
     org: organization.id, worker: worker.data, kind, summary, payload,
   });
-  if (error) return { error: "Task could not be queued. Check that the automation agent is enabled, has no other queued task, and that the automation migration is applied." };
+  if (error) return { error: "Task could not be queued. Start an active work session, check that the agent is enabled with no other queued task, and confirm the session-safety migration is applied." };
   refresh();
-  return { success: "Task queued. The automation agent on this device runs it on its next poll; nothing runs in this browser tab." };
+  return { success: "Task queued for this work session. The agent may claim it while the session is active; nothing runs in this browser tab. Pause blocks new claims; ending the session revokes pending tasks." };
 }
 
 export async function cancelBrowserTask(_previous: FormState, form: FormData): Promise<FormState> {

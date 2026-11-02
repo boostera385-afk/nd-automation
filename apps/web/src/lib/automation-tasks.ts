@@ -1,4 +1,4 @@
-export type AutomationKind = "profile_create" | "preset_snapshot" | "inventory_scan" | "cookie_import" | "proxy_import" | "cookie_write" | "proxy_write";
+export type AutomationKind = "profile_create" | "preset_snapshot" | "inventory_scan" | "cookie_import" | "proxy_import" | "cookie_write" | "proxy_write" | "supervised_workflow";
 export type AutomationStatus = "pending" | "leased" | "succeeded" | "failed" | "cancelled";
 
 /** Incogniton profiles staff recorded in the dashboard inventory. */
@@ -21,6 +21,7 @@ export type AutomationTask = {
 export const automationKinds: AutomationKind[] = ["profile_create", "preset_snapshot", "inventory_scan", "cookie_import", "proxy_import", "cookie_write", "proxy_write"];
 
 export const kindLabels: Record<AutomationKind, string> = {
+  supervised_workflow: "Separately authorized supervised workflow",
   profile_create: "Create Incogniton profile",
   preset_snapshot: "Read preset inventory",
   inventory_scan: "Detect Incogniton profiles",
@@ -31,9 +32,10 @@ export const kindLabels: Record<AutomationKind, string> = {
 };
 
 export const kindDescriptions: Record<AutomationKind, string> = {
+  supervised_workflow: "Use the separate supervised workflow controls and local runner. A recorded receipt can require human handoff or reconciliation; it does not prove a completed account/content action.",
   profile_create: "Asks this device's automation agent to create one blank Incogniton profile. No proxy, cookie, password or account label is sent or stored here.",
   preset_snapshot: "Reads how many profiles and groups exist and how many are open. Counts only; no names, cookies or proxies are returned.",
-  inventory_scan: "Reads the Incogniton profile list on this device and returns UUID, name and group only, capped at 500 entries with an honest truncation flag. Cookies, proxies and account details are dropped, never parsed.",
+  inventory_scan: "Reads the Incogniton profile list on this device and returns UUID, name and group only, limited by 500 entries and result size with an honest truncation flag. Cookies, proxies and account details are dropped, never parsed.",
   cookie_import: "Validates a Netscape cookies.txt file already on the worker machine. Counts entries and domains; never stores or uploads cookie values.",
   proxy_import: "Validates a host:port or host:port:user:pass list already on the worker machine. Reports counts; credentials are never returned.",
   cookie_write: "Writes a Netscape cookies.txt file from this device into one Incogniton profile, through Incogniton's local API on this same device. One profile at a time, with your confirmation per task.",
@@ -99,9 +101,12 @@ const text = (value: unknown) => (typeof value === "string" && value.trim() ? va
 export function describeResult(task: AutomationTask, workerName?: string, profileNameOf?: (profileId: string) => string | undefined): string {
   if (task.status === "pending") return "Waiting for this device's automation agent to poll.";
   if (task.status === "leased") return `Running${workerName ? ` on ${workerName}` : ""}; the lease expires automatically.`;
-  if (task.status === "cancelled") return "Cancelled before it ran.";
+  if (task.status === "cancelled") return task.lease_expires_at
+    ? "Closed after a lease; the action may have run. Inspect Incogniton before queuing again."
+    : "Cancelled before it ran.";
   if (task.status === "failed") return task.error ? `Failed: ${task.error}` : "Failed without a stored reason.";
   const result = task.result ?? {};
+  if (task.kind === "supervised_workflow") return `Workflow result: ${text(result.outcome) ?? "unconfirmed"}. Review the exact request in Supervised workflows; a receipt is not proof of completed onboarding or post visibility.`;
   if (task.kind === "profile_create") {
     const name = text(result.name);
     const id = text(result.profile_id);
@@ -118,7 +123,7 @@ export function describeResult(task: AutomationTask, workerName?: string, profil
     if (found === null || total === null) return "The agent reported success without a profile count.";
     const truncated = result.truncated === true;
     return truncated
-      ? `Detected ${total} profiles in Incogniton; the stored scan keeps the first ${found} (list capped at 500). Re-run the scan to refresh.`
+      ? `Detected ${total} profiles in Incogniton; the stored scan keeps the first ${found} (limited by 500 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.`
       : `Detected ${total} profile(s): UUID, name and group only.`;
   }
   if (task.kind === "cookie_write" || task.kind === "proxy_write") {
@@ -143,8 +148,8 @@ export function describeResult(task: AutomationTask, workerName?: string, profil
 
 /** Rows that stay out of the browser until their own gate is opened. */
 export const gatedTasks = [
-  { label: "Auto Posting", reason: "Publishing writes to a live Nextdoor account. The worker has no publish handler and the pilot account is suspended." },
-  { label: "Auto Listing", reason: "Same live-publishing gate as Auto Posting; no listing handler exists in the worker." },
+  { label: "Auto Posting", reason: "Publishing uses separate Content authorization and the opt-in publisher, not this task queue. Scheduling, bounded batches and approved images require their reviewed migrations/adapters; live acceptance remains gated." },
+  { label: "Auto Listing", reason: "The opt-in listing publisher verifies title, price, category, audience, approved image bytes and exact result. Required migrations, local adapters and live acceptance remain separate gates." },
   { label: "ND Acc Creation", reason: "Account creation needs an authorized identity, human verification handoff and its own security review." },
   { label: "Content presets / warmup", reason: "Random engagement and unverified group selection need an explicit policy decision before any port." },
 ];

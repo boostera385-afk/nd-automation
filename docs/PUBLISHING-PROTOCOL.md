@@ -10,11 +10,15 @@
   `20261027200913`. Inventory is not a live readiness check.
 - `/dashboard/publishing`: staff-only protocol-job inspection, pending-job
   cancellation and expired-operation acknowledgement. Degrades to a setup notice
-  when its migration is absent. **No enqueue/publish server action or button.**
+  when its migration is absent. Approved draft detail now has a separate, explicit
+  supervised queue action, gated by the deployed publisher safety version check.
 - `202610270006_publish_jobs.sql`: publishing protocol applied to hosted staging
   as **`20261030164110 publish_jobs_v1`** (2026-10-30). The durable queue is live,
-  but **no submit adapter exists** and no enqueue action is exposed; the bundled
-  `agent.py` still allowlists monitoring RPCs only. See
+  with a separate opt-in, one-job text post/listing runner (`publisher.py`, added
+  2026-11-02). The normal monitoring agent still never claims publishing work.
+  The new claimant guard serializes against browser tasks too and validates the
+  exact verified session owner. Both November 2 safety migrations are applied.
+  Live adapter/account acceptance, media and scheduling remain open. See
   `docs/DB-DEPLOYMENT-20261030-COHORT.md`.
 
 ## Protocol rules implemented locally
@@ -44,18 +48,22 @@
    reassignment refuses outstanding publishing or monitoring leases. Human session
    pause/end prevents new claims but does not pretend to abort a submission.
 
-## Still required before live publishing
+## Still required before live acceptance
 
-- A bounded, explicit local publisher that refuses arbitrary code, unintended
-  audiences, implicit edits/deletes/blocks and legacy random engagement.
-- Verified browser identity/audience and exact-submit result capture; no first-post
-  fallback, no `Posted` result for a target that was merely found, no blind retry.
-- Durable local submit-intent/result recovery: a crash or lost HTTP response after
-  clicking submit must not cause a second submit.
+- The bounded local publisher and exact content/identity/audience/result checks
+  now exist with unit and isolated synthetic-browser fixtures. Review the real
+  authorized DOM and accept each supported account/composer before live execution.
+  It refuses arbitrary code, unintended audiences, implicit edits/deletes/blocks
+  and legacy random engagement; it never accepts a first-post fallback.
+- Durable local submit-intent/result recovery now exists; real filesystem/OS ACL,
+  cleanup and interrupted-result delivery acceptance still require an operator.
+  A crash or lost response after clicking submit must never cause a second submit.
 - Safe media support, approved local paths, verified attachments, scheduling and
   missed-window policy (none implemented by this milestone).
 - Explicit per-session user authorization and supervised fixture/live acceptance.
   Do not use the development Playwright MCP on customer profiles.
 
 The desktop app remains unchanged and available. No browser, account, cookie,
-proxy, Sheet or customer-content operation ran during this implementation.
+proxy, Sheet or customer-content operation ran against a real platform during
+this implementation. The isolated fixture browser used synthetic HTML only.
+See `SUPERVISED-PUBLISHING.md` for exact commands and the remaining handover gates.

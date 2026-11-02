@@ -49,6 +49,7 @@ __pycache__/
 .pytest_cache/
 .worker-state/
 .monitoring/
+*.private.json
 .idea/
 .vscode/
 .DS_Store

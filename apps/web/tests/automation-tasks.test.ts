@@ -23,7 +23,7 @@ describe("task kinds", () => {
     expect(isAutomationKind("publish_post")).toBe(false);
     expect(isAutomationKind("cookie_write_all")).toBe(false);
     expect(isAutomationKind(null)).toBe(false);
-    expect(Object.keys(kindLabels).sort()).toEqual([...automationKinds].sort());
+    expect(Object.keys(kindLabels).sort()).toEqual([...automationKinds, "supervised_workflow"].sort());
   });
 
   it("keeps posting, listings, account creation and presets gated with a reason each", () => {
@@ -88,6 +88,11 @@ describe("honest outcome wording", () => {
     expect(describeResult(task({ status: "failed", result: null, error: "Incogniton is not running" }))).toBe("Failed: Incogniton is not running");
     expect(describeResult(task({ status: "failed", result: null, error: null }))).toMatch(/without a stored reason/);
   });
+  it("never calls a reconciled leased task cancelled before it ran", () => {
+    const result = describeResult(task({ status: "cancelled", lease_expires_at: "2026-11-02T12:00:00Z" }));
+    expect(result).toContain("the action may have run");
+    expect(result).not.toContain("before it ran");
+  });
 
   it("reports a created profile without inventing details", () => {
     expect(describeResult(task({ kind: "profile_create", result: { profile_id: "33333333-3333-4333-8333-333333333333", name: "Fixture" } })))
@@ -105,7 +110,7 @@ describe("honest outcome wording", () => {
     expect(describeResult(task({ kind: "inventory_scan", result: { profiles: [row], total: 1, truncated: false } })))
       .toBe("Detected 1 profile(s): UUID, name and group only.");
     expect(describeResult(task({ kind: "inventory_scan", result: { profiles: Array(500).fill(row), total: 3220, truncated: true } })))
-      .toBe("Detected 3220 profiles in Incogniton; the stored scan keeps the first 500 (list capped at 500). Re-run the scan to refresh.");
+      .toBe("Detected 3220 profiles in Incogniton; the stored scan keeps the first 500 (limited by 500 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.");
     expect(describeResult(task({ kind: "inventory_scan", result: { total: 4 } }))).toMatch(/without a profile count/);
   });
 

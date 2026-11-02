@@ -1,6 +1,42 @@
 # Master automation delivery tracker
 
-Updated: 2026-10-30. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
+Updated: 2026-11-02. Execution companion to `MASTER-AUTOMATION-PLAN.md`, not a replacement for `IMPLEMENTATION-STATUS.md` or evidence of live acceptance. Role owners below are proposed responsibilities; assign named owners during P0. Every unaccepted browser workflow stays paused in the dashboard; legacy use requires non-overlapping ownership.
+
+Source **0.1.3**, code-first follow-up: automatic result-to-outbox mapping,
+business-time scheduling, explicit selected-revision bulk authorization, bounded
+sequential publisher/deliverer polling, approved images and private local/HTTPS/
+Drive asset import are implemented with local fixtures. Migrations 003–005 are
+not hosted. This supersedes earlier missing-code claims for these narrow features,
+not full desktop parity. No configuration/live testing or fudge changes were made.
+Onboarding, edit/delete/moderation, remaining device/profile operations and final
+feature sign-off remain development work. See the newest implementation status.
+
+Source **0.1.4** follow-up: browser-task durable recovery and separate supervised
+workflow queue/runner/UI implement genuine-data registration first-step handoff,
+login/identity inspection, bounded read-only browsing, approved text edits and
+exact-target delete/block operations. Normal agents never claim them. New
+migrations 006–007 remain local. No real accounts/actions or yesterday-cohort
+checks were performed. Protected evidence, bulk intake, attachment-preserving
+edits, deployment/update parity and all live acceptance remain open.
+
+Source 0.1.2 follow-up: the missing one-intent Sheet deliverer and separate
+atomic Apps Script connector are now implemented, with safe-column/stable-ID/
+revision validation, verified staff authorization, private write-ahead recovery
+and literal string cells. This supersedes older "no Sheet write path" statements
+for explicitly queued v1 pilot intents only. It does **not** implement automatic
+monitoring/publication-to-outbox mapping, a schedule/bulk deliverer or live setup.
+No Google/hosted write or production deploy was performed for this tranche.
+See `SHEET-WRITEBACK-SETUP.md` and the newest implementation-status entry.
+
+November 2 follow-up: operator-authorized safety migrations are applied as hosted
+`20261102152910 automation_session_gate` and `20261102154039 publish_dispatch_guard`
+(23 migration records). Browser tasks require exact work-session authorization;
+publishing now shares their lease exclusion. A separate opt-in, one-job text
+post/listing publisher and explicit approved-revision queue action are implemented
+with private write-ahead intent/result recovery. Real isolated-browser synthetic
+post/listing fixtures pass without real platform requests; this is not live
+acceptance. Media, scheduling, onboarding, Sheet delivery and full handover remain
+open. See `SUPERVISED-PUBLISHING.md` and the newest implementation-status entry.
 
 Readiness review (2026-10-29): all 44 feature IDs are present exactly once; no
 full desktop replacement sign-off. Fresh dashboard 649 tests/build/typecheck/lint,
@@ -77,9 +113,9 @@ User selected Fudge as the next owning repository; no cutover or release implied
 | P0 | In progress | Confirm Source/ND Master mapping and policy decisions in `P0-DISCOVERY.md`; feature inventory below |
 | P1 | Central app verification/workspace selection and additive verified SQL hardening implemented; security source applied as hosted `20261030155727`, 12 migration records | Current dashboard deployment, negative live Auth/isolation and selector/stale-tab acceptance, restore and operational Sheet setup remain |
 | P2 | Intake schema deployed; Auth/MV3 queue implemented; release off | Hosted `20261028203642`, rollback-only smoke PASS; see `DB-DEPLOYMENT-20261028.md`. Real-browser/REST/concurrency acceptance, retention/deletion and pilot remain; no real source uploaded |
-| P3 | Intake receipts, deployed catalog/review/activation and queue UI implemented; owner guided 2-rule catalog pass recorded; cache gated and Sheet delivery unwired | Full business rule matching/approval, operator/cross-business/concurrent live acceptance, cache/application/ownership acceptance, automated reconciliation, authenticated content approvals, writeback deliverer and real Sheet delivery/conflict acceptance |
+| P3 | Intake/catalog/queue foundations, exact automatic result mappings, serialized outbox claims and bounded opt-in Sheet deliverer/connector implemented; cache gated | Reviewed migration deployment later, rule approval, real ownership/isolation/concurrency/rights/delivery/conflict/recovery acceptance |
 | P4 | Monitoring source, deployed date-cohort protocol/UI, offline preflight and durable monitoring-result replay implemented; live acceptance pending | Real filesystem/worker recovery acceptance, latest-100 policy, pairing/selector/real concurrency and supervised pilot acceptance |
-| P5 | Durable publish-job queue applied as hosted `20261030164110`; browser publishing paused | Reviewed publisher/adapter, media, explicit release and live pilot |
+| P5 | Durable queue, immutable approved images, explicit bulk/schedule controls, bounded sequential publisher, exact identity/audience/byte/result checks and submit-intent recovery implemented | Reviewed additive migrations later; authorized DOM/account/asset rights, real post/listing/image/schedule/batch/recovery acceptance; managed cloud asset UI remains open |
 | P6 | Inventory foundation only | Controlled profile/onboarding/cookie/proxy adapters and local secret storage |
 | P7 | Not started | Approved linked reposts and bounded batching after correctness gates |
 | P8 | Not started | Full acceptance/recovery/rollback; individual feature sign-off |
@@ -99,30 +135,30 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | F07 | Cookie format import unconnected | P6 worker | Supported format fixtures, local secret protection |
 | F08 | Cookie replacement/readback unconnected | P6 worker | Exclusive lease, replace confirmation, verified result |
 | F09 | Automatic cookie/proxy intake unconnected | P6 worker | Authorized schedule, stable-ID deduplication; empty fields wait |
-| F10 | Account onboarding unconnected | P6 worker + operator | Genuine authorized onboarding, resumable stages |
-| F11 | Identity/location/OTP handoff unconnected | P6 worker + operator | No fabricated identity or challenge bypass |
-| F12 | Onboarding choices/consent unconnected | P6 worker + operator | Explicit genuine preferences and consent |
-| F13 | Credential/login recovery unconnected | P6 worker | Protected local references, truthful login-needed results |
-| F14 | Text draft/approval foundations; no publisher | P5 web + worker | Exact approved revision/target and captured publication |
-| F15 | Media publishing unconnected | P5 worker + web | Rights, actual bytes, allowed paths/origins/types |
-| F16 | Attachment fallback/cleanup unconnected | P5 worker | Verified order/attachments, bounded transient files |
-| F17 | Audience execution unconnected | P5 worker | Actual audience selection verified; unknown fails closed |
-| F18 | Legacy target-found behavior not accepted | P5 worker | Found != newly published; exact identity attribution |
-| F19 | Explicit post-edit workflow unconnected | P6/P7 web + worker | Selected exact post/revision, fresh approval |
-| F20 | Explicit post-delete workflow unconnected | P6/P7 web + worker | Exact target, permission, destructive confirmation |
-| F21 | Moderation/block workflow unconnected | P6/P7 web + worker | Explicit targets/confirmation; never implicit mass blocking |
+| F10 | Explicit genuine-data first-step registration queue/runner/UI implemented; handoff, not automatic completed account | P6 worker + operator | Actual permitted DOM, existing-profile human continuation and genuine identity acceptance |
+| F11 | Challenge detection stops for human handoff; never synthesizes identity/location/OTP or resumes registration blindly | P6 worker + operator | Human verification/inspect follow-up, real challenge variants |
+| F12 | Preferences/consent remain deliberate human actions; automated consent not ported | P6 worker + operator | Genuine operator choices and acceptance; no false parity |
+| F13 | Explicit private local login and exact account verification implemented; no hosted credentials or secrets-vault claim | P6 worker | Private OS ACLs, real login/OTP/challenge/recovery acceptance |
+| F14 | Text drafts/approval plus explicit supervised queue and one-job publisher implemented with fixtures | P5 web + worker | Live exact approved revision/target and captured publication; not signed off |
+| F15 | Approved-image publishing and private local/HTTPS/authorized Drive import implemented; hashes/size/type/order verified, no remote arbitrary paths | P5 worker + web | Actual platform upload/visual acceptance, rights/privacy/metadata review, approved asset storage/preview ownership; not signed off |
+| F16 | In-memory uploads, reviewed file input/preview/result-count controls and managed-import temporary cleanup implemented; no silent attachment-loss fallback | P5 worker | Real UI variants, transient cleanup/interrupt acceptance and alternate upload-control support if required |
+| F17 | Explicit audience selection and visible-label verification implemented in supervised text publisher | P5 worker | Real account/composer audience acceptance; unknown fails closed |
+| F18 | Exact same-card body/author/permalink capture; existing matching content blocks submission | P5 worker | Live found != newly published and exact identity attribution acceptance |
+| F19 | Exact owned-post fingerprint + approved immutable text revision, readback and same-card result implemented | P6/P7 web + worker | Attachment-preserving variants still need code; real text/listing edit approval/identity/recovery acceptance |
+| F20 | Exact tracked owned target, dashboard/local destructive confirmations, same-target dialog/result and no replay implemented | P6/P7 web + worker | Real permission/UI/ambiguous-result and recovery acceptance |
+| F21 | Separate one-account exact-target block workflow implemented; no implicit mass blocking | P6/P7 web + worker | Real permitted moderation UI/dialog/result/recovery acceptance |
 | F22 | Service-area ownership not signed off | P0/P3 web + operator | Approved mapping; area != verified residence |
-| F23 | Listing drafts exist; no publisher | P5 web + worker | Typed price/category/media and exact listing capture |
+| F23 | Text-listing publisher verifies title/body/decimal price/native category/audience with fixture result capture | P5 web + worker | Live typed fields/exact listing capture and media implementation; not signed off |
 | F24 | Operational listing evidence unconnected | P5 worker | Clean exact URL, scoped evidence, no appended metrics |
 | F25 | Legacy account unread badge not per-post comments | P4/P6 worker | Correct account-level label, no false association |
 | F26 | Preset/group flow unresolved; not enabled | P0/P7 operator + worker | Demonstrated permitted explicit destinations; user disposition |
-| F27 | Supervised browsing not dashboard-connected | P6 worker | Bounded session, stop/recovery; not visibility evidence |
+| F27 | Explicit account-inspected 30-second read-only review implemented through separate workflow runner | P6 worker | Real profile cleanup/session/identity acceptance; never engagement or visibility evidence |
 | F28 | Random/artificial engagement excluded from proposed automation | P0 operator | Explicit disposition recorded; no silent migration |
 | F29 | Legacy navigation preserved; live adapters unvalidated | P4/P5 worker | Known UI fixtures; unknown/challenge states stop safely |
 | F30 | Monitoring queue/session foundations only | P4–P7 backend + worker | Real contention, cross-type profile exclusion, pause/revoke recovery |
 | F31 | Partial job/check events and results | P4/P5 web + worker | Real counters, accurate skipped/failed states, redacted diagnostics |
 | F32 | Protected operational evidence not complete | P5 backend + worker | Access control, scoped capture, retention/deletion |
-| F33 | Deployed durable writeback outbox protocol + explicit dashboard queue/cancel UI (hosted `20261029180253` + `20261029180528`); delivery to any real Sheet unwired | P3 deliverer + connector | Stable IDs, conflicts, durable outbox and replay |
+| F33 | Outbox, queue/cancel/mapping UI, automatic check/publication-to-outbox triggers, serialized claims, bounded sequential deliverer and atomic connector implemented | P3 deliverer + connector | New mapping migration later; real setup/ownership, stable-ID row moves, conflicts, lost-response replay and full pipeline acceptance |
 | F34 | Setup guides/assets exist; acceptance pending | P3 connector | Non-destructive versioned setup; legacy aliases preserved |
 | F35 | Theme/settings foundations; connections unverified | P1/P4 web + worker | Real target/machine checks without exposing secrets |
 | F36 | Desktop launchers preserved; worker operations incomplete | P4/P8 worker | Versioned install/update/drain/restart/rollback |
@@ -133,6 +169,6 @@ All entries are **not signed off for end-to-end dashboard replacement**. Existin
 | N05 | Reporting foundations | P4/P8 web | Date cohorts, DST, true coverage and partial-data indicators |
 | N06 | Auth/RLS source and current shared hosted metadata verified; central app email/selection/stale-form guards implemented | P1 backend | Genuine negative tenant/customer access, multi-business/stale-tab browser acceptance, SQL defense-in-depth and recovery |
 | N07 | Explicit bounded refresh freshness, frozen membership and active-job reuse implemented locally | P4 web + backend | Real concurrent scheduler/refresh, worker result recovery and missing-link reconciliation acceptance |
-| N08 | Writeback outbox deployed and smoke-tested; no Sheet write path yet | P3 deliverer + connector | Independent retry, version conflict and row-move tests on a real Sheet |
+| N08 | Outbox deployed; automatic mappings, explicit intent delivery, bounded watch/drain and receipt-only recovery implemented locally | P3 deliverer + connector | New source migration later; real delivery/permissions/conflict/row-move/recovery and bounded watcher acceptance |
 
 For each completed item append: source change, exact test command/result, target environment, deployed migration/version if applicable, live pilot evidence if approved, operator acceptance, and remaining limits. Do not turn proposed ownership or a passing fixture into sign-off.

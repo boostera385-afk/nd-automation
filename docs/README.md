@@ -2,6 +2,11 @@
 
 ## Start here
 
+[Sheet writeback v1 setup](SHEET-WRITEBACK-SETUP.md) — source 0.1.2 opt-in
+one-intent local deliverer, separate atomic Apps Script connector, stable row
+identity/revision conflicts, private staff sign-in and receipt-only recovery.
+Configuration/live acceptance and automatic result-to-outbox mapping remain open.
+
 [P2 Fudge ingestion v1](FUDGE-INGESTION-V1.md) — locally tested workspace-scoped
 source/revision SQL draft, exact collector projection, safe retry receipts and
 remaining deployment/uploader gates. No live ingestion enabled.

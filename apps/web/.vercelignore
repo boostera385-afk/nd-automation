@@ -1,0 +1,10 @@
+# Deployment uses hosted environment settings, never local private configuration.
+.env*
+.vercel
+node_modules
+.next
+coverage
+*.log
+*.tsbuildinfo
+**/.monitoring/**
+**/.worker-state/**

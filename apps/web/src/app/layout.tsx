@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { themeInitScript } from "@/lib/theme-script";
+import { ReleaseBadge } from "@/components/release-badge";
 import "./globals.css";
 
 export const metadata: Metadata = { title: { default: "ND Automations", template: "%s · ND Automations" }, description: "A focused workspace for customer post records, conversations and daily reporting." };
@@ -10,5 +11,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head><body>{children}</body></html>;
+  return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head><body>{children}<footer className="release-strip"><ReleaseBadge /></footer></body></html>;
 }

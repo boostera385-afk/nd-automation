@@ -26,7 +26,7 @@ function makeDb(list: unknown, total: number, listError = false) {
   };
 }
 async function render(db: unknown, emailConfirmed = true) {
-  mocks.requireWorkspace.mockResolvedValue({ db, organization: { id: org }, user: { email_confirmed_at: emailConfirmed ? "2026-10-29T00:00:00Z" : undefined }, membership: { role: "operator" } });
+  mocks.requireWorkspace.mockResolvedValue({ db, organization: { id: org }, user: { id: "44444444-4444-4444-8444-444444444444", email_confirmed_at: emailConfirmed ? "2026-10-29T00:00:00Z" : undefined }, membership: { role: "operator" } });
   return renderToStaticMarkup(await SheetWritebackPage({}));
 }
 beforeEach(() => { vi.resetAllMocks(); });
@@ -39,11 +39,13 @@ it("fails closed when the queue read cannot be verified", async () => {
   expect(await render(makeDb([{ ...pending, intent: { action: "drop" } }], 1))).toContain("could not be verified");
   expect(await render(makeDb([{ ...pending, seq: "2" }], 1))).toContain("could not be verified");
 });
-it("renders the inactive-delivery boundary, bounded status and per-item exact intents", async () => {
+it("renders the opt-in delivery boundary, private setup identifiers and exact queue statuses", async () => {
   const html = await render(makeDb([pending, delivered], 2));
-  expect(html).toContain("Delivery is not active");
-  expect(html).toContain("No connector, worker or Edge Function writes any Sheet through this queue yet");
-  expect(html).toContain("no Sheet cell is touched");;
+  expect(html).toContain("Delivery requires a separately configured local runner");
+  expect(html).toContain("Live configuration and acceptance are unverified");
+  expect(html).toContain("This form itself makes no Sheet write");
+  expect(html).toContain("44444444-4444-4444-8444-444444444444");
+  expect(html).toContain("SHEET-WRITEBACK-SETUP.md");
   expect(html).toContain("Append row to Auto Posting");
   expect(html).toContain("newest 2 of 2");
   expect(html).toContain("1 delivered");
@@ -60,5 +62,5 @@ it("offers pending-only cancellation and never a cancel for terminal rows", asyn
 it("shows an explicit empty state without inventing queue activity", async () => {
   const html = await render(makeDb([], 0));
   expect(html).toContain("No writeback intents are recorded");
-  expect(html).toContain("active");
+  expect(html).toContain("Nothing is dispatched anywhere automatically");
 });

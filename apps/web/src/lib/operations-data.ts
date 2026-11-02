@@ -11,13 +11,13 @@ export const getOperationsData = cache(async () => {
     db.from("reporting_workers").select("id,name,enabled,last_seen_at").eq("organization_id", organization.id).order("name").limit(1001),
     db.from("reporting_worker_profiles").select("id,worker_id,customer_id,profile_id,account_label,monitoring_session_id").eq("organization_id", organization.id).order("account_label").limit(1001),
     db.from("reporting_check_jobs").select("id,publication_id,worker_id,status,outcome,created_at,lease_expires_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(101),
-    db.from("reporting_automation_tasks").select("id,worker_id,kind,status,summary,payload,result,error,created_at,completed_at,lease_expires_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(21),
+    db.from("reporting_automation_tasks").select("id,worker_id,kind,status,summary,payload,result,error,created_at,completed_at,lease_expires_at,session_id").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(21),
     db.from("reporting_profile_inventory").select("profile_id,name").eq("organization_id", organization.id).eq("status", "active").order("name").limit(1001),
   ]);
   const errors = [workers.error, bindings.error, jobs.error].filter(Boolean);
   if (errors.some((error) => !isMissingSchemaError(error))) throw new Error("Local automation status could not be loaded. No jobs were changed.");
   // The task queue arrives in its own migration. A missing table means this
-  // deployment predates it: hide the panel instead of failing the page or
+   // deployment predates it (including its session gate): hide the panel instead of failing the page or
   // implying a queue exists. Any other error is fatal. The profile inventory
   // feeds the write-task picker; if it is missing, no write task can be queued.
   if (tasks.error && !isMissingSchemaError(tasks.error)) throw new Error("Browser tasks could not be loaded. No task was changed.");

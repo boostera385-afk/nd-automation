@@ -17,6 +17,7 @@ from worker_protocol import (COMPLETION_RESERVE_SECONDS, completion_payload, rem
                              validate_completion, validate_job)
 from worker_lock import monitoring_lock
 from worker_connection import validate_connection
+from automation_journal import AutomationJournal, TASK_FAILURE, recover_automation
 
 
 class BridgeError(RuntimeError):
@@ -30,7 +31,8 @@ class WorkerBridge:
 
     def rpc(self, method, params=None):
         allowed = {"reporting_worker_heartbeat", "reporting_claim_check", "reporting_complete_check",
-                   "reporting_claim_automation_task", "reporting_complete_automation_task"}
+                    "reporting_claim_automation_task", "reporting_claim_supervised_workflow", "reporting_complete_automation_task",
+                    "reporting_claim_publish", "reporting_claim_publish_v2", "reporting_complete_publish"}
         if method not in allowed:
             raise BridgeError("Worker method is not allowed")
         body = {**(params or {}), "credential": self.connection["worker_token"]}
@@ -86,6 +88,20 @@ class WorkerBridge:
                     raise
                 time.sleep(2 ** attempt)
 
+    def complete_publish(self, job, result):
+        """Retry only the identical completion receipt, never a submit action."""
+        from publishing_protocol import validate_job as validate_publish_job, validate_result as validate_publish_result
+        validate_publish_job(job)
+        validate_publish_result(result, job["kind"])
+        params = {"job": job["job_id"], "lease": job["lease_token"], "result": result}
+        for attempt in range(3):
+            try:
+                return validate_completion(self.rpc("reporting_complete_publish", params))
+            except (BridgeError, ValueError):
+                if attempt == 2:
+                    raise BridgeError("Publishing completion was not acknowledged; preserve its journal") from None
+                time.sleep(2 ** attempt)
+
 
 def validate_claim(job):
     post = validate_job(job)
@@ -109,25 +125,34 @@ def recover_result(bridge, journal):
     return "recovered" if saved["state"] == "result_ready" else "settled"
 
 
-def poll_automation(bridge, incogniton):
+def poll_automation(bridge, incogniton, journal):
     """Run at most one queued browser task. Returns a state or None when idle."""
+    recover_automation(bridge, journal)
     task = bridge.rpc("reporting_claim_automation_task")
     if task is None:
         return None
     validate_task(task)
+    journal.begin(task)  # BEFORE profile creation, cookie clearing or proxy writes.
     try:
         result = execute_task(task, incogniton)
-    except Exception as error:
-        bridge.complete_task(task, "failed", None, str(error))
+    except Exception:
+        # Local APIs can echo cookie/proxy payloads and OS errors can expose
+        # private paths. Never upload raw exception text to the hosted history.
+        journal.record("failed", None, TASK_FAILURE,
+                       inspection_required=task["kind"] in {"profile_create", "cookie_write", "proxy_write"})
+        recover_automation(bridge, journal)
         return "automation_failed"
-    bridge.complete_task(task, "succeeded", result, None)
+    journal.record("succeeded", result)
+    recover_automation(bridge, journal)
     return "automation_succeeded"
 
 
-def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False, incogniton=None):
+def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False, incogniton=None, automation_journal=None):
+    automation_journal = automation_journal or AutomationJournal(journal.path.with_name("automation-journal.json"), scope=journal.scope)
+    recover_automation(bridge, automation_journal)
     recover_result(bridge, journal)  # Never claim another job while a result is unresolved.
     bridge.rpc("reporting_worker_heartbeat")
-    automation = poll_automation(bridge, incogniton or Incogniton())
+    automation = poll_automation(bridge, incogniton or Incogniton(), automation_journal)
     if automation is not None:
         return automation
     job = bridge.rpc("reporting_claim_check")
@@ -172,20 +197,36 @@ def main():
     parser.add_argument("--confirm-profile-cleanup", metavar="JOB_UUID", help="Attest operator-inspected cleanup for one already-acknowledged job; no dispatch")
     parser.add_argument("--confirm-lease-reconciled", metavar="JOB_UUID", help="Attest the exact claim-without-result lease was reconciled in the dashboard and its profile inspected; no dispatch")
     parser.add_argument("--acknowledge-observation-loss", action="store_true", help="Confirm there is no recoverable observation for the manually reconciled claim")
+    parser.add_argument("--recover-browser-results", action="store_true", help="Replay a durable browser-task receipt only; never execute its action")
+    parser.add_argument("--confirm-browser-inspection", metavar="TASK_UUID", help="Attest inspection after an acknowledged uncertain browser task")
+    parser.add_argument("--confirm-browser-reconciled", metavar="TASK_UUID", help="Attest server reconciliation and inspected local state for an exact claim without a result")
+    parser.add_argument("--acknowledge-action-ambiguity", action="store_true")
     args = parser.parse_args()
     from preflight import preflight, require_runtime
     connection = validate_connection(load_json(args.connection))
-    recovery_modes = sum(bool(mode) for mode in (args.recover_results, args.confirm_profile_cleanup, args.confirm_lease_reconciled))
+    recovery_modes = sum(bool(mode) for mode in (args.recover_results, args.confirm_profile_cleanup, args.confirm_lease_reconciled,
+                                                args.recover_browser_results, args.confirm_browser_inspection, args.confirm_browser_reconciled))
     if recovery_modes > 1 or (args.acknowledge_observation_loss and not args.confirm_lease_reconciled):
         parser.error("Choose exactly one recovery mode; observation-loss confirmation belongs only to lease reconciliation")
+    if args.acknowledge_action_ambiguity and not args.confirm_browser_reconciled:
+        parser.error("Action ambiguity confirmation belongs only to exact browser-task reconciliation")
     state = Path(__file__).resolve().parent / ".worker-state"
     journal = MonitoringJournal(state / "monitoring-journal.json", connection)
+    automation = AutomationJournal(state / "automation-journal.json", connection)
     lock = state / "monitor.lock"
     if recovery_modes:
         if not args.confirm_authorized or args.execute:
             parser.error("Recovery/cleanup requires --confirm-authorized, without --execute")
         with monitoring_lock(lock):
-            if args.confirm_lease_reconciled:
+            if args.recover_browser_results:
+                print(json.dumps({"state": recover_automation(WorkerBridge(connection), automation), "browser_operations": 0}))
+            elif args.confirm_browser_inspection:
+                automation.attest_inspected(args.confirm_browser_inspection)
+                print(json.dumps({"state": "operator_attested_inspection", "server_state_verified": False, "browser_operations": 0}))
+            elif args.confirm_browser_reconciled:
+                automation.reconcile_claim(args.confirm_browser_reconciled, args.acknowledge_action_ambiguity)
+                print(json.dumps({"state": "operator_attested_reconciliation", "actual_action_outcome_verified": False, "browser_operations": 0}))
+            elif args.confirm_lease_reconciled:
                 journal.confirm_reconciled(args.confirm_lease_reconciled, args.acknowledge_observation_loss)
                 print(json.dumps({"state": "operator_reconciled", "observation_recovered": False, "server_state_verified": False, "profiles_opened": 0}))
             elif args.confirm_profile_cleanup:
@@ -207,12 +248,17 @@ def main():
     from playwright.sync_api import sync_playwright
     bridge = WorkerBridge(connection)
     with monitoring_lock(lock):
+        recover_automation(bridge, automation)
         recover_result(bridge, journal)
+        from publishing_journal import PublishingJournal
+        publishing = PublishingJournal(state / "publishing-journal.json", connection).read()
+        if publishing and (publishing["state"] not in {"acknowledged", "operator_reconciled"} or publishing["cleanup_required"]):
+            raise BridgeError("Resolve the outstanding publishing journal with publisher.py before any new browser work")
         with sync_playwright() as playwright:
             deadline = time.monotonic() + 8 * 3600
             while time.monotonic() < deadline:
                 status = poll_once(bridge, adapter, Incogniton(), playwright.chromium, journal,
-                                   args.allow_comment_expansion)
+                                   args.allow_comment_expansion, automation_journal=automation)
                 print(json.dumps({"state": status}), flush=True)
                 if args.once:
                     break

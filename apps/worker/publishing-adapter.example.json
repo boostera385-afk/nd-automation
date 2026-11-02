@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "reviewed": false,
+  "account": "",
+  "login": "",
+  "verification": "",
+  "accounts": {},
+  "forms": {
+    "post": {
+      "open": "[data-testid=\"prompt-container\"]",
+      "root": "",
+      "body": "[data-testid=\"composer-text-field\"]",
+      "audience": "",
+      "submit": "button[data-testid=\"composer-submit-button\"]",
+      "result_root": "",
+      "result_link": "",
+      "result_body": "",
+      "result_author": "",
+      "title": "",
+      "price": "",
+      "category": "",
+      "result_title": "",
+      "audiences": { "anyone": "", "nearby": "", "neighborhood": "" },
+      "audience_labels": { "anyone": "", "nearby": "", "neighborhood": "" }
+    }
+  }
+}

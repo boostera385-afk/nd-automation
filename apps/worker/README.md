@@ -1,11 +1,82 @@
 # Local worker foundation
 
+Source **0.1.3** adds separately confirmed bounded sequential publishing/delivery
+and due-job polling (maximum 20 operations/eight hours, not a default daemon).
+`publisher.py --media-registry` opts into the new media-capable claimant; image
+bytes must match immutable approved descriptors on this device, then browser
+file hashes/order, preview readiness and final audience are rechecked. Text-only
+workers cannot lease image jobs. `stage_media.py` registers local originals;
+`import_media.py` imports approved public HTTPS or authorized Drive images with
+pinned public-address TLS, strict bounds and no token forwarding. Private paths,
+bytes, URLs and credentials are never part of draft descriptors. These are source
+implementations; do not enable/configure them before the later acceptance stage.
+The working fudge extension is not modified by this code.
+
 The new outbound dashboard agent is `agent.py`. See `docs/WORKER-BRIDGE.md`
 from the project root for the applied staging migrations, private pairing
 configuration, session authorization and staged acceptance requirements. Actual
 worker pairing and live browser acceptance remain deferred.
 
+## Separate Sheet writeback runner (source 0.1.2)
+
+`sheet_writeback.py` is a stdlib-only, opt-in one-intent deliverer, independent of
+Incogniton and the monitoring/publishing agent. See
+`docs/SHEET-WRITEBACK-SETUP.md` at the project root for exact private configuration,
+the separate atomic Apps Script deployment, stable row IDs/revisions and recovery.
+Default invocation is offline. Execution requires explicit authorization, a verified
+staff session, enabled private configuration and an enabled connector. Password
+sign-in prompts locally without saving passwords/refresh tokens; enrolled MFA
+requires an MFA-verified token instead. Service/admin keys are forbidden.
+
+The runner journals before claim/acknowledgment, resolves lost commits by receipt
+lookup and never writes during `--recover-results`. Literal-string cell updates
+and the replay receipt commit together. It does not automatically create outbox
+intents from monitoring, run a schedule or deliver a batch. No real Sheet was
+written during development; live setup/ownership/permissions/acceptance are pending.
+
 ## Durable monitoring recovery (source implementation)
+
+### Separate supervised text publisher (2026-11-02)
+
+`publisher.py` is a separate, explicitly authorized one-job runner for approved
+text posts/listings, not an always-on publishing mode in the normal agent. It
+requires a locally reviewed exact-account/composer adapter, reads back approved
+fields and audience, journals submit intent before its only click, requires exact
+new body/author/permalink evidence, and replays saved receipts without repeating
+browser actions. The normal agent refuses unresolved publishing checkpoints.
+Both runners hold the same device lock and the hosted claimant guard excludes
+browser-task leases as well as monitoring/publishing leases.
+
+See `docs/SUPERVISED-PUBLISHING.md` for setup and recovery, and
+`publishing-adapter.example.json` (deliberately incomplete/unreviewed). Live DOM,
+authorized account and one-post/one-listing acceptance remain necessary; media,
+unattended scheduling and account creation are not implemented by this pilot.
+`verify_publisher_browser.py --browser <installed-browser-executable>` runs real
+Playwright locators against intercepted synthetic HTML in a fresh isolated
+browser: it is an integration fixture, not an Incogniton/platform test.
+
+### Browser-task launch safety (2026-11-02; requires the session-gate migration)
+
+Browser tasks are authorized for the exact operator work session that queued
+them, not for the next session. Pause blocks new claims; closed/expired sessions
+and revoked membership cancel pending authorizations. An in-flight task may
+finish, but any outstanding lease still prevents overlap and needs explicit
+reconciliation after a crash. The migration is
+`supabase/migrations/202611020001_automation_session_gate.sql`; do not enable the
+updated UI against an ungated task queue.
+
+The worker rejects short/expired/far-future task leases. Cookie/proxy writes
+refuse an active or unknown-state profile; cookie replacement stops if clearing
+was not explicitly confirmed. Failure receipts contain a fixed safe message,
+never raw local API exceptions or private paths. Inspect the local profile
+before retrying a failed write; partial effects are possible and writes are not
+automatically replayed. Monitoring's durable journal below does **not** provide
+browser-task mutation recovery.
+
+Profile discovery returns at most 500 entries and at most 45,000 UTF-8 JSON
+bytes, with a total and a truthful partial flag. It is not pagination: repeated
+scans refresh the same leading list. Use the existing CSV inventory import for
+the remaining profiles. No scan opens a browser or reads cookie/proxy fields.
 
 The agent rejects malformed/expired leases, leases with less than six minutes
 remaining, and leases more than fifteen minutes ahead of the local UTC clock.

@@ -8,6 +8,8 @@ The monitoring bridge's staging database setup is applied, but the laptop worker
 
 - [Development and Windows setup](docs/DEVELOPMENT.md)
 - [Actual implementation status and blockers](docs/IMPLEMENTATION-STATUS.md)
+- [Opt-in Sheet writeback setup and recovery](docs/SHEET-WRITEBACK-SETUP.md)
+- [Supervised text publishing pilot](docs/SUPERVISED-PUBLISHING.md)
 - [OpenCode MCP and project commands](docs/OPENCODE-SETUP.md)
 - [Documentation index](docs/README.md)
 
@@ -23,7 +25,8 @@ Open <http://localhost:3000>. Visitors see the sign-in page, never database/migr
 
 - Default business timezone: **America/Los_Angeles**, with automatic PST/PDT. Device timezone is detected separately.
 - Daily **8–10 hour work sessions**. Explicitly configured local monitoring is session-gated; no 24/7 execution.
-- **No Nextdoor API**, dashboard publishing, account creation or random engagement. Initial read-only post checks require a paired local agent, validated selectors and an approved pilot.
+- **No Nextdoor API**, automatic account creation or random engagement. Read-only post checks and the separate one-job supervised text publisher require authorized local configuration and live acceptance. Approval/page views never submit content.
+- Source **0.1.4** includes automatic result-to-Sheet mappings, business-time schedules, explicit approved-revision bulk controls, bounded sequential publishing/delivery, approved images and private image import, plus durable browser-task recovery and separate supervised account/text-edit/delete/block workflows. New migrations remain local; configuration/live acceptance and remaining desktop parity are not complete. Existing read-only sync and the working fudge connector are unchanged. Production remains **0.1.1**. See [supervised workflow scope and recovery](docs/SUPERVISED-WORKFLOWS.md).
 - Existing `core/`, `gui/` and desktop launchers are preserved but **not connected** to this reporting app.
 - Reviewed CSV imports accept only post-reference fields and remain unverified until a sourced manual review is recorded.
 - Supabase Row Level Security separates organizations and explicitly assigned customer access. No service-role key is used by the application.
