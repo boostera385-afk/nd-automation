@@ -12,9 +12,11 @@ import { ComputerControls } from "@/components/computer-controls";
 import { hasActiveSession } from "@/lib/active-session";
 import { randomUUID } from "node:crypto";
 import { BulkIntakeForm } from "@/components/bulk-intake-form";
+import { canManageSetup } from "@/lib/setup-access";
 
 export default async function RunAutomation() {
-  const { organization } = await requireWorkspace(true);
+  const { organization, membership } = await requireWorkspace(true);
+  const manageSetup = canManageSetup(membership?.role);
   const [operations, data] = await Promise.all([getOperationsData(), getDashboardData()]);
   const activeSession = hasActiveSession(data.session, operations.loadedAt);
   const profiles = operations.bindings.map((binding) => {
@@ -25,11 +27,11 @@ export default async function RunAutomation() {
   const healthTotals = healthSummary(health);
   return <>
     <PageHeader eyebrow="DAILY CONTROL" title="Run automation" description="Choose your work. Technical connection and recovery details stay out of your daily flow." actions={<LiveRefresh />} />
-    <Panel title="Open & connect"><ComputerControls workers={operations.workers} activeSession={activeSession} available={operations.automationAvailable} /></Panel>
+    <Panel title="Open & connect"><ComputerControls workers={operations.workers} activeSession={activeSession} available={operations.automationAvailable} manageSetup={manageSetup} /></Panel>
     <Panel title="Choose your work"><div className="workflow-links">
       <Link href="/dashboard/content"><strong>Posts &amp; listings</strong><small>Prepare content, review attachments and approve the exact revision before publishing.</small></Link>
       <Link href="/dashboard/workflows"><strong>Account tools &amp; editing</strong><small>Authorized login/inspection, genuine-data signup handoff, exact-target editing and confirmed deletion/blocking.</small></Link>
-      <Link href="/dashboard/profiles"><strong>Profiles</strong><small>Detect your profile list and save customer assignments once.</small></Link>
+      <Link href="/dashboard/profiles"><strong>Profiles</strong><small>{manageSetup ? "Detect your profile list and save customer assignments once." : "View shared profiles and saved customer assignments."}</small></Link>
       <Link href="/dashboard/results"><strong>Post status &amp; comments</strong><small>See saved observations, check times and issues. An unchecked post is not live or deleted.</small></Link>
       <Link href="/dashboard/master-sheet"><strong>Master Sheet</strong><small>Keep your existing Sheet workflow and sync known post links.</small></Link>
     </div><p className="small muted">Publishing and account actions use separate reviewed local adapters and explicit authorization. These links do not start a browser or claim that real-platform acceptance is complete.</p></Panel>

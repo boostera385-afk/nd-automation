@@ -1,6 +1,10 @@
 # Simple dashboard + Incogniton workflow
 
-This is implemented source, **not deployed or accepted on a real account**.
+See [Admin-managed setup and employee daily work](ADMIN-EMPLOYEE-WORKFLOW.md)
+for the current responsibility split and delivery gates. The owner-device
+launcher/scan/import/session pilot passed (3,135 profiles, 2026-11-03 UTC).
+Employee-device and platform-action acceptance remain separate. New role-separated
+web changes are local until deployed.
 The desktop app in `ND Full Automated` and this repository's desktop code stay
 unchanged. There is no device-locked dashboard login: use your normal verified
 email/password on any computer where you have account access. Signing in does
@@ -14,11 +18,12 @@ not grant an unrelated computer permission to execute local work.
    existing trusted `Incogniton.exe`, then confirm installation. Python 3.13 with
    Tkinter must already be installed (the existing venv is reused when present).
    This source setup does not download Python/Incogniton or install a service.
-3. If no helper is connected yet, click **Connect local helper** in the dashboard.
+3. As an owner/admin, if no helper is connected yet, click **Connect local helper** in the dashboard.
    Its name defaults to **My computer**. Download the private connection once.
    It is a scoped, revocable credential—not a public configuration or password.
 4. Double-click **Connect Profile Helper.bat** and select that downloaded JSON.
-   The source helper saves it privately as `.monitoring/worker.json`, refusing
+    The source helper saves it under
+    `%LOCALAPPDATA%\NDAutomation\worker\private\worker.json`, refusing
    to overwrite an existing connection. After checking setup, remove the extra
    Downloads copy yourself. Never send it in chat or commit/share it.
 
@@ -64,12 +69,15 @@ One-time, one-file setup for a non-technical teammate:
    polls explicitly queued profile tasks during an eight-hour claim window.
    A bounded in-flight task may finish afterward. Ctrl+C stops the helper;
    preserve its journal and inspect any interrupted mutation before retrying.
-3. **Start work / Resume** in the dashboard's session bar, then **Detect profiles**.
+3. **Start work / Resume** in the dashboard's session bar. Employees open
+   **Run automation** using the helper/mappings prepared by their admin; they
+   do not repeat inventory import or assignment. Admin inventory setup uses
+   **Detect profiles**.
    The helper reports names/groups/UUIDs from the local Incogniton API, not from
    an account browser. Detection needs no DOM adapter or Playwright runtime.
 4. Open **Profiles**. Refresh (or wait for the minute refresh), review the actual
    completed scan and click **Save detected profiles**. Choose each authorized
-   customer once. The source scan is bounded to 500 entries plus a result-byte
+    customer once (owner/admin only). The source scan is bounded to 5,000 entries plus a result-byte
    budget: a partial scan says so, and CSV remains the fallback for omitted profiles.
 5. Use **Run automation** for direct links to post/listing drafts, account tools,
    profile work and post checks. Use **Results** for post status/comments.
@@ -101,7 +109,8 @@ unapproved publishing, artificial likes or invented identities were introduced.
 
 ## Local launcher security and removal
 
-Only two **exact** URI strings are accepted:
+Only these fixed actions are accepted (one browser/Windows-normalized trailing
+slash is also supported):
 
 ```text
 nd-automation://open-incogniton

@@ -33,6 +33,10 @@ def _profile_id(data):
     return None
 
 
+MAX_RESPONSE_BYTES = 96_000_000  # Every profile record comes back in one response.
+MAX_FORM_RESPONSE_BYTES = 2_000_000  # Write/import replies stay small; keep the tight cap.
+
+
 class Incogniton:
     def __init__(self):
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
@@ -42,8 +46,11 @@ class Incogniton:
         request = Request("http://127.0.0.1:35000" + path, data=data, method="POST" if data else "GET",
                           headers={"Content-Type": "application/json"} if data else {})
         with self.opener.open(request, timeout=timeout) as response:
-            content = response.read(2_000_001)
-            if len(content) > 2_000_000:
+            # /profile/all returns every profile's complete record: a real install
+            # with a few hundred profiles is already tens of megabytes. Only the
+            # identity fields are extracted; the rest is dropped unparsed.
+            content = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(content) > MAX_RESPONSE_BYTES:
                 raise ValueError("Local API response too large")
             return json.loads(content)
 
@@ -153,8 +160,8 @@ class Incogniton:
         request = Request("http://127.0.0.1:35000" + path, data=urlencode(fields).encode("utf-8"),
                           method="POST", headers={"Content-Type": "application/x-www-form-urlencoded"})
         with self.opener.open(request, timeout=timeout) as response:
-            content = response.read(2_000_001)
-            if len(content) > 2_000_000:
+            content = response.read(MAX_FORM_RESPONSE_BYTES + 1)
+            if len(content) > MAX_FORM_RESPONSE_BYTES:
                 raise ValueError("Local API response too large")
             text = content.decode("utf-8", "replace")
         try:

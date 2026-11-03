@@ -196,12 +196,12 @@ class ExecutionTests(unittest.TestCase):
 
     def test_large_multibyte_names_respect_the_result_byte_budget(self):
         listed = [{"profile_id": str(uuid4()), "name": "\u754c" * 200, "group_name": "\u754c" * 200}
-                  for _ in range(500)]
+                  for _ in range(tasks.MAX_SCAN_ENTRIES)]
         result = tasks.execute(task("inventory_scan", {}), FakeIncogniton(listed))
-        self.assertLess(len(result["profiles"]), 500)
+        self.assertLess(len(result["profiles"]), tasks.MAX_SCAN_ENTRIES)
         self.assertGreater(len(result["profiles"]), 0)
         self.assertLessEqual(len(json.dumps(result, ensure_ascii=False).encode("utf-8")), tasks.MAX_SCAN_RESULT_BYTES)
-        self.assertEqual(result["total"], 500)
+        self.assertEqual(result["total"], tasks.MAX_SCAN_ENTRIES)
         self.assertTrue(result["truncated"])
 
     def test_cookie_import_reads_a_local_file(self):

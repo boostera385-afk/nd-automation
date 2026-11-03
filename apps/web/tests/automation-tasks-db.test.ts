@@ -52,6 +52,8 @@ beforeAll(async () => {
   legacyTask = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Legacy pending scan','{}')", [org, worker]));
   await db.exec("commit");
   await db.exec(await readFile(new URL("../../../supabase/migrations/202611020001_automation_session_gate.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/202611020006_browser_task_receipts.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../../supabase/migrations/202611030001_inventory_scan_cap_v2.sql", import.meta.url), "utf8"));
 }, 120000);
 beforeEach(async () => {
   await db.exec("begin");
@@ -160,8 +162,10 @@ it("runs a profile creation task through claim and completion", async () => {
   expect(await complete(task, claimed.lease_token, "succeeded", { profile_id: profileId, name: "Fixture profile" })).toBe(true);
   expect(await scalar("select status from public.reporting_automation_tasks where id=$1", [task])).toBe("succeeded");
   expect(await scalar("select result->>'profile_id' from public.reporting_automation_tasks where id=$1", [task])).toBe(profileId);
-  // A replayed completion is acknowledged without double-writing.
-  expect(await complete(task, claimed.lease_token, "succeeded", { profile_id: profileId })).toBe(false);
+  // A replayed completion is acknowledged without double-writing; a changed
+  // result is a conflict, never a silent overwrite (browser_task_receipts_v1).
+  expect(await complete(task, claimed.lease_token, "succeeded", { profile_id: profileId, name: "Fixture profile" })).toBe(false);
+  await expect(complete(task, claimed.lease_token, "succeeded", { profile_id: profileId })).rejects.toThrow("replay conflict");
 });
 
 it("rejects an incomplete success and accepts a bounded failure", async () => {
@@ -244,7 +248,7 @@ it("validates a scan result shape and refuses smuggled row fields", async () => 
   await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [row], total: 1, truncated: "no" })).rejects.toThrow();
   await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ ...row, cookies: "SECRET" }], total: 1, truncated: false })).rejects.toThrow();
   await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: "not-a-uuid", name: "x", group_name: "g" }], total: 1, truncated: false })).rejects.toThrow();
-  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: row.profile_id, name: "x", group_name: "g" }], total: 501, truncated: false })).rejects.toThrow();
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: row.profile_id, name: "x", group_name: "g" }], total: 5001, truncated: false })).rejects.toThrow();
   await expect(complete(task, claimed.lease_token, "succeeded", { profiles: [{ profile_id: row.profile_id, name: "x", group_name: "g" }], total: 4, truncated: true, secret: "x" })).rejects.toThrow();
 });
 
@@ -264,27 +268,41 @@ it("stores a full capped scan, then feeds it straight into the inventory import"
   expect(await scalar("select count(*) from public.reporting_profile_inventory where organization_id=$1 and status='active'", [org])).toBe(300);
 });
 
-it("still refuses a scan result past its own 64,000-byte allowance", async () => {
+it("still refuses a scan result past its own 1,000,000-byte allowance", async () => {
   const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles',$3)",
     [org, worker, JSON.stringify({})]));
   const claimed = await claimTask() as { lease_token: string };
-  const huge = Array.from({ length: 500 }, () => ({
+  const huge = Array.from({ length: 5000 }, () => ({
     profile_id: randomUUID(), name: "n".repeat(200), group_name: "Team A",
   }));
-  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: huge, total: 500, truncated: true })).rejects.toThrow("Invalid task result");
+  await expect(complete(task, claimed.lease_token, "succeeded", { profiles: huge, total: 5000, truncated: true })).rejects.toThrow("Invalid task result");
+});
+
+it("stores a scan well past the old 500-row ceiling", async () => {
+  const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect 3,135 profiles',$3)",
+    [org, worker, JSON.stringify({})]));
+  const claimed = await claimTask() as { lease_token: string };
+  const rows = Array.from({ length: 3135 }, (_, i) => ({
+    profile_id: randomUUID(), name: `Detected Profile ${String(i + 1).padStart(4, "0")}`, group_name: "Team A",
+  }));
+  expect(await complete(task, claimed.lease_token, "succeeded", { profiles: rows, total: 3135, truncated: false })).toBe(true);
+  expect(await scalar("select jsonb_array_length(result->'profiles') from public.reporting_automation_tasks where id=$1", [task])).toBe(3135);
+  // The whole list must reach the same import path the CSV uses.
+  await rpc(operator, "select public.reporting_import_profiles($1, (select result->'profiles' from public.reporting_automation_tasks where id=$2), false)", [org, task]);
+  expect(await scalar("select count(*) from public.reporting_profile_inventory where organization_id=$1 and status='active'", [org])).toBe(3135);
 });
 
 it("accepts byte-budgeted scans with long multibyte names within the JSONB size cap", async () => {
   const task = String(await rpc(operator, "select public.reporting_enqueue_automation_task($1,$2,'inventory_scan','Detect profiles','{}')", [org, worker]));
   const claimed = await claimTask() as { lease_token: string };
-  const result = { profiles: [] as { profile_id: string; name: string; group_name: string }[], total: 500, truncated: true };
-  for (let i = 0; i < 500; i++) {
+  const result = { profiles: [] as { profile_id: string; name: string; group_name: string }[], total: 5000, truncated: true };
+  for (let i = 0; i < 5000; i++) {
     result.profiles.push({ profile_id: randomUUID(), name: "界".repeat(200), group_name: "界".repeat(200) });
-    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 45_000) { result.profiles.pop(); break; }
+    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 900_000) { result.profiles.pop(); break; }
   }
   expect(result.profiles.length).toBeGreaterThan(0);
   expect(await complete(task, claimed.lease_token, "succeeded", result)).toBe(true);
-  expect(Number(await scalar("select pg_column_size(result) from public.reporting_automation_tasks where id=$1", [task]))).toBeLessThan(64_000);
+  expect(Number(await scalar("select pg_column_size(result) from public.reporting_automation_tasks where id=$1", [task]))).toBeLessThan(1_000_000);
 });
 
 it("allows only one open task per laptop and lets staff cancel a pending one", async () => {

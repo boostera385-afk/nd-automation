@@ -13,10 +13,11 @@ from datetime import datetime, timezone
 
 KINDS = {"profile_create", "preset_snapshot", "cookie_import", "proxy_import",
          "cookie_write", "proxy_write", "inventory_scan"}
-MAX_SCAN_ENTRIES = 500
-# Leave room under the database's 64,000-byte JSONB result allowance, including
-# JSONB per-field overhead. Long/non-ASCII names may hit this before 500 rows.
-MAX_SCAN_RESULT_BYTES = 45_000
+MAX_SCAN_ENTRIES = 5000
+# Leave room under the database's 1,000,000-byte JSONB result allowance for
+# inventory_scan, including JSONB per-field overhead. Long/non-ASCII names may
+# hit this before 5,000 rows.
+MAX_SCAN_RESULT_BYTES = 900_000
 SYSTEMS = {"windows", "mac", "linux"}
 MAX_FILE_BYTES = 5_000_000
 MAX_ENTRIES = 50_000

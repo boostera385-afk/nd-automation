@@ -13,9 +13,11 @@ import { profileDayBoard, windowLabel } from "@/lib/daily-board";
 import { formatTime } from "@/lib/time";
 import { ComputerControls } from "@/components/computer-controls";
 import { hasActiveSession } from "@/lib/active-session";
+import { canManageSetup } from "@/lib/setup-access";
 
 export default async function Home() {
-  const { organization, isStaff } = await getContext();
+  const { organization, isStaff, membership } = await getContext();
+  const manageSetup = canManageSetup(membership?.role);
   if (!organization) return <>
     <PageHeader eyebrow="WELCOME" title="Finish your account setup" description="Your verified email works in Fudge and this dashboard. Keep your existing Sheet and Fudge setup unchanged." />
     <Panel title="Your business account"><p>If you belong to an existing team, ask its owner for access instead of creating a duplicate. Otherwise, the button below creates your empty private business account. No reviews are imported and no automation starts.</p><ActionForm action={createWorkspace} label="Set up my private business account"><input type="hidden" name="name" value="My business" /></ActionForm></Panel>
@@ -32,14 +34,14 @@ export default async function Home() {
   return <>
     <PageHeader eyebrow="OPEN → WORK → CHECK STATUS" title="Home" description="Open Incogniton, find your profiles and see your post status." actions={isStaff ? <Link className="button" href="/dashboard/run">Run automation</Link> : <Link className="button" href="/dashboard/results">View results</Link>} />
     {isStaff && <>
-      <Panel title="Your computer"><ComputerControls workers={operations?.workers ?? []} activeSession={hasActiveSession(data.session, now)} available={Boolean(operations?.automationAvailable)} /></Panel>
-      <details className="workflow-details"><summary>Connections &amp; setup details</summary>
+      <Panel title="Your computer"><ComputerControls workers={operations?.workers ?? []} activeSession={hasActiveSession(data.session, now)} available={Boolean(operations?.automationAvailable)} manageSetup={manageSetup} /></Panel>
+      {manageSetup && <details className="workflow-details"><summary>Connections &amp; setup details</summary>
       <div className="connection-grid">
         <Link className="connection-card" href="/dashboard/master-sheet"><span className="muted small">MASTER SHEET</span><strong>{configured ? "Connection configured" : "Connect once"}</strong><small>{configured ? "Open to read and check your tabs" : "Your existing Sheet stays unchanged"}</small></Link>
         <Link className="connection-card" href="/dashboard/settings#connections"><span className="muted small">LOCAL AUTOMATION AGENT</span><strong>{recent ? `${recent} seen recently` : enabledWorkers.length ? "Waiting for agent" : "Register once"}</strong><small>A heartbeat is not a browser-readiness check</small></Link>
         <Link className="connection-card" href="/dashboard/profiles"><span className="muted small">PROFILES</span><strong>{operations?.available ? `${operations.bindings.length} saved mappings` : "Not loaded"}</strong><small>Choose customers once, reuse for Sheet sync</small></Link>
       </div>
-      </details>
+      </details>}
       <div className="stats-grid">{[
         { label: "Checks waiting", value: operations?.available ? jobs.filter((job) => job.status === "pending").length : "—", hint: "Recent monitoring queue", icon: ClipboardList },
         { label: "Checks running", value: operations?.available ? jobs.filter((job) => job.status === "leased").length : "—", hint: "Includes expired leases needing review", icon: Clock3 },
@@ -47,7 +49,7 @@ export default async function Home() {
         { label: "Needs attention", value: issues.length, hint: "Saved check problems; not inferred removals", icon: TriangleAlert },
       ].map((item) => <StatCard key={item.label} {...item} />)}</div>
       {!operations?.available && <p className="notice">Local automation status is not available yet. <Link href="/dashboard/settings#connections">Complete one-time setup</Link>.</p>}
-      <Panel title="Your daily workflow"><div className="workflow-steps"><Link href="/dashboard/profiles"><span>1</span><strong>Profiles</strong><small>Detect profiles and save their customer once.</small></Link><Link href="/dashboard/run"><span>2</span><strong>Choose your work</strong><small>Post/listing drafts, account tools or post checks.</small></Link><Link href="/dashboard/results"><span>3</span><strong>Post status</strong><small>Saved links, visibility checks and comments.</small></Link></div><p className="small muted">Publishing and account actions still require their reviewed local setup and approval; opening a page starts nothing. Fudge stays separate. <Link href="/dashboard/master-sheet">Master Sheet</Link> · <Link href="/dashboard/settings/guide">Full setup guide</Link></p></Panel>
+      <Panel title="Your daily workflow"><div className="workflow-steps"><Link href="/dashboard/profiles"><span>1</span><strong>Profiles</strong><small>{manageSetup ? "Detect profiles and save their customer once." : "View the profiles your administrator prepared."}</small></Link><Link href="/dashboard/run"><span>2</span><strong>Choose your work</strong><small>Post/listing drafts, account tools or post checks.</small></Link><Link href="/dashboard/results"><span>3</span><strong>Post status</strong><small>Saved links, visibility checks and comments.</small></Link></div><p className="small muted">Publishing and account actions still require their reviewed local setup and approval; opening a page starts nothing. Fudge stays separate. <Link href="/dashboard/master-sheet">Master Sheet</Link> · <Link href="/dashboard/settings/guide">Full setup guide</Link></p></Panel>
       <Panel title="Last 24 hours by profile" hint={windowLabel(now, organization.time_zone)}>
         {board.length === 0 ? <p>No tracked post or saved comment is loaded yet. Sync post links and run a check batch to fill this board.</p> : <div className="table-wrap"><table><thead><tr><th>Profile</th><th>Customer</th><th>Posts (24h)</th><th>Comments (24h)</th><th>Last comment seen</th><th></th></tr></thead><tbody>{board.filter((row) => row.posts24h + row.comments24h > 0).slice(0, 24).map((row) => <tr key={row.profile}><td>{row.profile}</td><td>{row.customer}</td><td>{row.posts24h}</td><td>{row.comments24h}</td><td>{row.lastObservedAt ? formatTime(row.lastObservedAt, organization.time_zone) : "Not observed"}</td><td><Link className="text-link" href={`/dashboard/responses?profile=${encodeURIComponent(row.profile)}`}>Open</Link></td></tr>)}</tbody></table></div>}
         <p className="small"><Link className="text-link" href="/dashboard/responses">All loaded profiles and posts →</Link></p>

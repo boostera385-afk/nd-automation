@@ -52,7 +52,7 @@ beforeAll(async () => {
   for (const file of ["202610260001_reporting_foundation.sql", "202610270001_post_checks_and_notifications.sql", "202610270002_monitoring_worker_bridge.sql", "202610270003_worker_bridge_indexes.sql", "202610270004_content_drafts.sql", "202610270006_publish_jobs.sql"]) {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8"));
   }
-  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "20261031120000_cookie_proxy_write_v1.sql", "20261031150000_inventory_scan_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql"]) {
+  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "20261031120000_cookie_proxy_write_v1.sql", "20261031150000_inventory_scan_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql", "202611030001_inventory_scan_cap_v2.sql"]) {
     try { await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8")); }
     catch (error) { console.error("Fixture migration failed", file, (error as { position?: string }).position); throw error; }
     if (releaseSmokes[file]) await db.exec(await smokeSql(releaseSmokes[file]));

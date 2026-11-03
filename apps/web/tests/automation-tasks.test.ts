@@ -110,7 +110,7 @@ describe("honest outcome wording", () => {
     expect(describeResult(task({ kind: "inventory_scan", result: { profiles: [row], total: 1, truncated: false } })))
       .toBe("Detected 1 profile(s): UUID, name and group only.");
     expect(describeResult(task({ kind: "inventory_scan", result: { profiles: Array(500).fill(row), total: 3220, truncated: true } })))
-      .toBe("Detected 3220 profiles in Incogniton; the stored scan keeps the first 500 (limited by 500 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.");
+      .toBe("Detected 3220 profiles in Incogniton; the stored scan keeps the first 500 (limited by 5,000 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.");
     expect(describeResult(task({ kind: "inventory_scan", result: { total: 4 } }))).toMatch(/without a profile count/);
   });
 

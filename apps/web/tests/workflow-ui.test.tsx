@@ -20,8 +20,8 @@ import { Navigation } from "@/components/navigation";
 const organization = { id: "11111111-1111-4111-8111-111111111111", name: "Fixture workspace", time_zone: "America/Los_Angeles" };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.path = "/dashboard";
-  mocks.getContext.mockResolvedValue({ organization, isStaff: true });
-  mocks.requireWorkspace.mockResolvedValue({ organization, isStaff: true });
+  mocks.getContext.mockResolvedValue({ organization, isStaff: true, membership: { role: "owner" } });
+  mocks.requireWorkspace.mockResolvedValue({ organization, isStaff: true, membership: { role: "owner" } });
   mocks.getDashboardData.mockResolvedValue({ publications: [], customers: [], comments: [], session: null, truncated: false });
   mocks.getOperationsData.mockResolvedValue({ workers: [], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.parse("2026-10-27T12:00:00Z") });
   mocks.sheetSyncConfigured.mockReturnValue(false);
@@ -57,6 +57,16 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     const html = renderToStaticMarkup(await Home());
     expect(mocks.getOperationsData).not.toHaveBeenCalled();
     expect(html).not.toContain("LOCAL AUTOMATION AGENT"); expect(html).toContain("View results");
+  });
+  it("keeps operator home focused on daily work without a repeated setup wizard", async () => {
+    mocks.getContext.mockResolvedValue({ organization, isStaff: true, membership: { role: "operator" } });
+    const html = renderToStaticMarkup(await Home());
+    expect(html).toContain("Start profile helper");
+    expect(html).toContain("Your administrator handles one-time laptop setup");
+    expect(html).not.toContain("Register once");
+    expect(html).not.toContain("Detect profiles</button>");
+    expect(html).not.toContain("Connections &amp; setup details");
+    expect(html).toContain('href="/dashboard/run"');
   });
   it("offers only executable browser tasks and names what stays gated", async () => {
     mocks.getOperationsData.mockResolvedValueOnce({ workers: [{ id: "22222222-2222-4222-8222-222222222222", name: "Fixture laptop", enabled: true, last_seen_at: null }], bindings: [], jobs: [], tasks: [], profiles: [], tasksLimited: false, automationAvailable: true, available: true, limited: false, loadedAt: Date.now() });

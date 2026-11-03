@@ -1,0 +1,60 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ workspace: vi.fn(), operations: vi.fn(), data: vi.fn(), inventory: vi.fn() }));
+vi.mock("@/lib/data", () => ({ requireWorkspace: mocks.workspace, getDashboardData: mocks.data }));
+vi.mock("@/lib/operations-data", () => ({ getOperationsData: mocks.operations }));
+vi.mock("@/lib/profile-inventory-data", () => ({ loadProfileInventory: mocks.inventory }));
+vi.mock("@/lib/sheet-sync", () => ({ sheetSyncConfigured: () => false }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/app/actions/automation-tasks", () => ({ enqueueBrowserTask: vi.fn() }));
+vi.mock("@/app/actions/profiles", () => ({ setProfileArchived: vi.fn(), importScannedProfiles: vi.fn(), previewProfiles: vi.fn(), confirmProfileImport: vi.fn() }));
+vi.mock("@/app/actions/workers", () => ({ registerWorker: vi.fn(), bindWorkerProfile: vi.fn() }));
+import Settings from "@/app/dashboard/settings/page";
+import Computer from "@/app/dashboard/settings/computer/page";
+import Profiles from "@/app/dashboard/profiles/page";
+import { ProfileInventoryTable } from "@/components/profile-inventory-table";
+import { profileListPage } from "@/lib/profile-list";
+const organization = { id: "11111111-1111-4111-8111-111111111111", name: "Fixture", time_zone: "America/Los_Angeles" };
+const profile = { profile_id: "22222222-2222-4222-8222-222222222222", name: "Fixture profile", group_name: "Fixture group", status: "active", updated_at: "2026-11-04T00:00:00Z" };
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.workspace.mockResolvedValue({ organization, membership: { role: "operator" }, isStaff: true, db: {} });
+  mocks.operations.mockResolvedValue({ workers: [], bindings: [], tasks: [], available: true, automationAvailable: true, loadedAt: Date.now() });
+  mocks.data.mockResolvedValue({ customers: [], session: null });
+  mocks.inventory.mockResolvedValue({ data: [profile], error: null, limited: false });
+});
+it("gives employees laptop help and start links without helper registration", async () => {
+  const html = renderToStaticMarkup(await Computer());
+  expect(html).toContain("Your administrator sets up the laptop once");
+  expect(html).toContain("Setup Employee Computer.bat");
+  expect(html).toContain("Start profile helper");
+  expect(html).not.toContain("Connect local helper");
+  expect(html).not.toContain("Connect another helper");
+  expect(mocks.operations).not.toHaveBeenCalled();
+});
+it("separates employee settings from admin setup", async () => {
+  const operator = renderToStaticMarkup(await Settings());
+  expect(operator).toContain("Daily work");
+  expect(operator).not.toContain('href="/dashboard/settings/members"');
+  expect(operator).not.toContain("Admin-managed setup");
+  mocks.workspace.mockResolvedValue({ organization, membership: { role: "admin" }, isStaff: true });
+  const admin = renderToStaticMarkup(await Settings());
+  expect(admin).toContain("Admin-managed setup");
+  expect(admin).toContain('href="/dashboard/settings/members"');
+});
+it("shows operators saved profiles without import, mapping or archive controls", async () => {
+  const html = renderToStaticMarkup(await Profiles());
+  expect(html).toContain("Shared profile inventory");
+  expect(html).toContain("Fixture profile");
+  for (const control of ["Save mapping once", "Save detected profiles", "Archive inventory", "Map an existing profile", "Detect profiles</button>"]) expect(html).not.toContain(control);
+});
+it("renders only 50 inventory rows while searching across all loaded profiles", () => {
+  const rows = Array.from({ length: 3135 }, (_, i) => ({ ...profile, profile_id: `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`, name: `Fixture ${i}` }));
+  const html = renderToStaticMarkup(<ProfileInventoryTable profiles={rows} />);
+  expect((html.match(/<tr>/g) ?? []).length).toBe(51);
+  expect(html).toContain("3135 of 3135");
+  expect(profileListPage(rows, " fixture 3134 ", 0).rows).toEqual([rows[3134]]);
+  expect(profileListPage(rows, rows[3134].profile_id, 0).rows).toEqual([rows[3134]]);
+  expect(profileListPage(rows, "FIXTURE GROUP", 500).rows).toHaveLength(35);
+  expect(profileListPage(rows, "absent", 500)).toMatchObject({ rows: [], matches: 0, pages: 1, page: 0 });
+});

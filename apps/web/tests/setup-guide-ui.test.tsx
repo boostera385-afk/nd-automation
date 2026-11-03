@@ -31,6 +31,7 @@ describe("first-time setup guide", () => {
     expect(html).toContain("Detect your Incogniton profiles automatically");
     expect(html).toContain("Map the exact profile, not a guessed name");
     expect(html).toContain("Sync the Master Sheet");
+    expect(html).toContain("Read your dated plan");
     expect(html).toContain("Add the Sheet-sync variables to your hosting (Vercel)");
     expect(html).toContain("Confirm a monitoring batch once");
     expect(html).toContain("guide-tone-blue");

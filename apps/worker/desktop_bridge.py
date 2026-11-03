@@ -17,6 +17,28 @@ HELPER_URI = "nd-automation://start-profile-helper"
 CONFIG_NAME = "desktop-launch.json"
 
 
+def normalize_uri(value):
+    """Return only a fixed dashboard action.
+
+    Windows/browsers hand `nd-automation://start-profile-helper` to the handler as
+    `nd-automation://start-profile-helper/` (empty path normalized to "/"), so one
+    trailing slash is tolerated. Everything else - queries, fragments, extra
+    segments, encoded text, extra arguments - is refused before any local state
+    is read.
+    """
+    if not isinstance(value, str) or len(value) > 64:
+        raise ValueError("Only a fixed dashboard action is supported")
+    scheme, separator, action = value.partition("://")
+    if separator != "://" or scheme.strip().lower() != "nd-automation":
+        raise ValueError("Only a fixed dashboard action is supported")
+    if action.endswith("/"):
+        action = action[:-1]
+    candidate = "nd-automation://" + action
+    if candidate not in {OPEN_URI, HELPER_URI}:
+        raise ValueError("Only a fixed dashboard action is supported")
+    return candidate
+
+
 def local_file(value):
     if not isinstance(value, str) or any(ord(char) < 32 or char == '"' for char in value) or value.startswith(("\\\\", "//")):
         raise ValueError("A local file is required")
@@ -83,7 +105,7 @@ def load_config(path):
 
 
 def open_incogniton(uri, config, confirm, spawn=None, publisher_check=None):
-    if uri != OPEN_URI:
+    if normalize_uri(uri) != OPEN_URI:
         raise ValueError("Only the fixed Open Incogniton action is supported")
     executable = validate_config(config)
     check = publisher_check or verify_publisher
@@ -98,7 +120,7 @@ def open_incogniton(uri, config, confirm, spawn=None, publisher_check=None):
 
 
 def start_profile_helper(uri, confirm, spawn=None, root=None):
-    if uri != HELPER_URI:
+    if normalize_uri(uri) != HELPER_URI:
         raise ValueError("Only the fixed profile-helper action is supported")
     from worker_connection import validate_connection
     if root is None:
@@ -124,17 +146,21 @@ def start_profile_helper(uri, confirm, spawn=None, root=None):
 
 def main(argv=None):
     arguments = sys.argv[1:] if argv is None else argv
-    if os.name != "nt" or len(arguments) != 1 or arguments[0] not in {OPEN_URI, HELPER_URI}:
+    if os.name != "nt" or len(arguments) != 1:
         return 1  # Reject extra arguments/URLs before reading any local state.
+    try:
+        action = normalize_uri(arguments[0])
+    except ValueError:
+        return 1
     import tkinter as tk
     from tkinter import messagebox
     root = tk.Tk(); root.withdraw()
     try:
-        if arguments[0] == HELPER_URI:
-            start_profile_helper(arguments[0], lambda _script: messagebox.askyesno("Start ND profile helper?",
+        if action == HELPER_URI:
+            start_profile_helper(action, lambda _script: messagebox.askyesno("Start ND profile helper?",
                 "Poll explicitly queued profile tasks for an eight-hour window? A bounded in-flight task may finish afterward.\n\nThis includes profile scans and, only if separately authorized in the dashboard, blank profile creation and cookie/proxy imports. Work-session gates still apply.\n\nNo monitoring browser, publishing or account workflow is started. Close the helper console with Ctrl+C to stop.", parent=root))
         else:
-            open_incogniton(arguments[0], load_config(config_path()),
+            open_incogniton(action, load_config(config_path()),
                 lambda executable: messagebox.askyesno("ND dashboard", "Open your installed Incogniton app on this computer?\n\n"
                     "This does not start profiles, scan accounts or authorize publishing.\n\n" + str(executable), parent=root))
         return 0

@@ -1,5 +1,397 @@
 # Implementation status
 
+## Admin-managed setup / employee daily workflow (2026-11-04 device date)
+
+The operator requested central admin configuration so employees sign in with
+their added email and run daily work on a laptop prepared once with admin help.
+The current runbook is **`docs/ADMIN-EMPLOYEE-WORKFLOW.md`**; it records the exact
+responsibility split, one-time prerequisites/pairing, daily routine and next live
+acceptance gates. Private employee emails are intentionally not recorded here.
+
+Implemented locally (not deployed to Vercel):
+- Owner/admin setup gates on real server actions for customer creation, helper
+  registration/revocation/replacement, profile mapping, inventory import/archive.
+  Verified identity, live membership and stale-form workspace guards still run;
+  submitted role claims are never trusted.
+- Operator Home/Profiles/Settings/computer help no longer require repeated
+  detection/import/customer mapping or expose credential-registration controls.
+  Shared saved inventory/mappings remain visible, and daily session/task controls
+  remain available. Direct setup actions are denied even without using the UI.
+- Full inventory loading pages below the Data API's row cap (up to 5,000 rows),
+  checks pagination/count consistency, and labels larger windows as partial.
+  Search and 50-row table pages cover all loaded profiles, not just the first
+  API response. Multiple helpers show short IDs and require deliberate selection.
+
+**Approved hosted database enforcement:** `supabase/proposals/admin_managed_setup.sql`
+preserves six existing setup RPC implementations behind client-denied private
+functions, adds verified owner/admin wrappers, and restricts customer INSERT /
+UPDATE RLS while leaving SELECT and daily execution unchanged. After explicit
+approval it was applied as **`admin_managed_setup_v1`**, hosted record
+**`20261103204414`** (33 migration records). Live verification PASS: all six
+original function bodies preserved by fingerprint, private implementations
+anon/authenticated-denied, public wrappers anon-denied/authenticated-executable,
+all SECURITY DEFINER / empty search path; customer SELECT unchanged and
+INSERT/UPDATE now owner/admin-only. Security adviser classes/counts unchanged
+(private credentials no-policy INFO; worker anon-executable 9, guarded
+authenticated-executable 44, existing leaked-password-protection WARN).
+
+Validation: `npm.cmd run typecheck` PASS; `npm.cmd run lint` PASS; full
+`npm.cmd test` PASS, **1,115 tests / 84 files**. Targeted UI/guard/database checks
+also PASS (77 tests), including operator setup denial, verified-admin checks,
+shared reads, retained daily dispatch, full 3,135-row API pagination and 50-row
+searchable rendering. `npm.cmd run build` PASS (Next.js 16.4.3, webpack;
+compilation, TypeScript, page generation and build traces completed).
+
+Employee login acceptance is still pending: the operator reported a hydration
+attribute warning at local `/login`. An isolated Playwright visit to that same
+URL loaded with **zero console errors/warnings**. No credentials were entered.
+The issue is not yet reproduced; compare a fresh Chrome Incognito window and
+the expanded client/server attribute diff before changing rendering or broadly
+suppressing warnings. Browser extension/profile interference is a possibility,
+not a confirmed cause. No Auth/RLS changes were made for this warning.
+
+**User-present employee view PASS (screenshots, same developer computer):** the
+operator subsequently signed in with the existing employee account; screenshots
+show the simplified daily Home, **ND Test / Operator**, shared inventory
+**3,135 of 3,135** (page 1 of 63), search, and the existing customer mapping.
+No admin import/mapping controls appear in the shown operator view. This is
+browser evidence of login/shared views, not an employee-laptop execution test.
+The earlier dev hydration issue indicator remains visible and unresolved.
+The mapped helper is shown offline/stale. The first fresh MCP attempt failed on
+transient DNS; one retry succeeded and confirmed the employee is operator in
+the team workspace, **3,135 inventory rows**, **zero open employee sessions**,
+and helper heartbeat about **38 minutes stale**. Helper startup and a new
+employee-authorized task remain the next gates; no new automation was claimed.
+
+**Employee-role read-only execution PASS (same developer computer):** after the
+user started the helper and an operator work session, the employee explicitly
+queued `inventory_scan`. Hosted verification confirms correct creator/session
+ownership and operator role, claim at **2026-11-03 21:09:13 UTC**, completion at
+**21:09:20 UTC**, **3,135 detected / 3,135 stored**, `truncated=false`, no error,
+and a fresh helper heartbeat. Existing inventory/mappings were not reimported or
+changed. The user ended the employee session; hosted verification confirms
+`closed` at **2026-11-03 21:11:45 UTC**, **7.6 minutes** elapsed and **zero open
+automation tasks**. The same-device employee login/shared-view/session/scan pilot
+is complete. Physical employee-laptop setup and platform-action pilots remain
+separate acceptance gates.
+
+**Master Sheet read-only checkpoint (same operator session, now closed):** the
+user opened Master Sheet and Auto Posting showed no recognized task metadata.
+`apps/web`: `npm.cmd run check:sheet` PASS against the configured connector:
+Auto Posting returned **0 records**, Auto Listing **111 records**, both HTTP 200
+and not truncated; an invalid token was refused. Row contents, connector URL and
+secret token were not printed. This verifies the existing `getPostRecords` read
+path and token enforcement, not successful importing, publishing or platform
+visibility. The operator clarified that they have **not connected their intended
+Sheet yet**. The check used pre-existing local configuration; its source must not
+be assumed to be the intended customer/master Sheet. Pause sync/import until the
+admin verifies/configures the intended source. No sync/import or Sheet write was
+performed by this check; intended-Sheet acceptance is still pending.
+
+**Intended ND Master layout identified from user screenshot:** the user already
+has a cleaned operational workbook with date details and named regional/work
+tabs. The shown tab has a date banner in row 1 and business headers in row 2,
+including Services, Content, Date Posted, Final Rephrasing, Post Type, Pictures,
+Areas, State and Post Links. This is not the legacy row-1 Auto Posting / Auto
+Listing contract used by `reporting-sync.gs`. Do not require another spreadsheet,
+rename existing tabs, overwrite the Fudge script, or treat the earlier configured
+development connector's records as this source. A read-only layout review and
+explicit field/tab/date mapping are required before connecting/importing this
+workbook. The exact account/profile identity field and actual-posted versus
+planned/banner dates are not established by the screenshot; never infer them
+from phone numbers, areas, row order or a date banner. No Sheet edits or adapter
+implementation are claimed at this checkpoint; private workbook links stay out
+of repository docs.
+
+**Read-only layout inspection of the operator's linking workbook (2026-11-04):**
+anonymous, read-only access to the one shared tab returned a single date banner in
+**row 1** (`11/4/2026 Wednesday`) and headers in **row 2** across **17 used
+columns** (A–Q): `Services FUDGE`, `Content`, `Date Posted`, `Finding Keywords`,
+`Numbers`, `Final Rephrasing`, `Post Type`, `Pictures`, `Areas`, `State`,
+`Issues`, `Post Status`, `Account Name`, `Ranking`, (blank), `Remarks`, and a
+stray data value `Fudge Row= 941` occupying the Q header cell. **123 data rows**
+exist under that banner. Only A, B, D, E, F, G, H, I, J and M are populated;
+`Date Posted`, `Issues`, `Post Status`, `Ranking`, `Remarks` and Q are empty in
+this window. **No post-link column exists in that tab**, so the Nextdoor link the
+operator mentioned is either on another tab or added after posting. The anonymous
+view exposed one tab only; the full tab list is not visible without the workbook's
+own Apps Script. `Account Name` holds persona names (e.g. one person-style name),
+which may correspond to Incogniton profile names but is **not yet verified** against
+the 3,135 imported profiles.
+
+Consequence: the legacy `getPostRecords`/`getTaskRows` contract (headers in row 1,
+`Profile Name`/`Post link`/`Status`) **cannot read this workbook**. Nothing was
+imported, synced, written or mapped, and no planned date was treated as a
+publication timestamp.
+
+**New read-only capability (implemented, unit-tested, not deployed):** the
+connector gained `getMasterLayout`, which reports tab names, row/column counts, the
+detected header row, a planned calendar date from a row-1 banner, and column
+labels matching an allowlist. Unrecognised header text is counted, never returned;
+no data cell, credential value, URL or token is emitted. `apps/web` gained
+`npm.cmd run check:master-layout` (optional `SHEET_PROBE_URL` / `SHEET_PROBE_TOKEN`
+override so a probe never edits the saved workspace connection). Targeted tests
+`tests/apps-script.test.ts`, `tests/sheet-setup.test.ts` and
+`tests/sheet-transport.test.ts` PASS (**55 tests**, including exact-range reads,
+date-banner parsing, credential-value exclusion, 30-tab and 40-column caps, and
+token refusal). The generated connector artifact was regenerated. This is
+structure discovery only; workbook sync still needs explicit tab, identity and
+link-column confirmation.
+
+Validation on the 2026-11-04 device date: `npm.cmd run typecheck` PASS,
+`npm.cmd run lint` PASS (0 warnings), full `npm.cmd test` PASS **1,119 tests /
+84 files**, `npm.cmd run build` PASS. Live probe
+`npm.cmd run check:master-layout` against the saved development connector:
+reachable (HTTP 200) but the deployed Apps Script predates this action and
+refused it with `invalid_action`, so **no workbook structure was discovered
+remotely**. That is expected until the current script is redeployed against the
+intended workbook; the deployed connector was not modified and no Sheet cell was
+read as data or written.
+
+**Re-inspection after the operator added a full test day (same workbook, still
+read-only):** the workbook is now a **multi-section** layout, not one table:
+
+| Section | Banner (row) | Header row | Task rows | Nextdoor `/p/` links | Status marked |
+|---|---|---|---|---:|---:|
+| 1 | `11/4/2026` (1) | 2 | 3–125 (123) | **0** | 0 |
+| 2 | `11/3/2026` (126) | 127 | 128–250 (123) | **85** | 116 |
+| — | `11/4/2026` (251) | none | none | 0 | 0 |
+
+Verified facts: the **Nextdoor post links live in column K**, whose header still
+reads `Issues`; all 85 are unique `nextdoor.com/p/…` URLs, none duplicated (26 of
+them carried a query string, which is why the reader tolerates and strips one).
+All 85 also carry a status, but **31 further rows marked `Posted`/`posted` have no
+link**; `Date Posted` (column C) is empty in every row, so the only date is the
+section banner (a plan date, not a publication timestamp). Status text is
+inconsistent (`Posted` 91 / `posted` 25). The **top `11/4` section is the fresh
+plan** (0 links, 0 statuses, **53 of its 123 rows have no `Account Name`**); the
+`11/3` section holds the completed day. The trailing `11/4/2026` banner at row 251
+has no header row or data and looks accidental. Identity check against hosted
+inventory: of **38 distinct `Account Name` values, 37 match an active inventory
+profile exactly** (punctuation-tolerant check gives the same 37); **one
+10-character name matches nothing**, so that persona cannot be mapped or launched
+yet. Only counts were queried; no name, phone, link or content value was printed or
+stored. Because a section repeats the header row, the legacy row-1 contract and any
+naive "headers in row 1/2" reader would mis-read this file; a section-aware
+mapping is required. No Sheet edit, import, mapping, sync or write was performed,
+and the public link exposure noted above still applies.
+
+**Read-consistency note:** one narrow Google `gviz` range read initially returned a
+stale snapshot that placed the 85 links in the top section. A full-grid read plus
+two independent runs of the shipped connector agreed on the arrangement above, so
+those are the recorded numbers. The public `gviz` endpoint is not a consistency
+API; the Apps Script connector is the authoritative read path, and the workbook is
+being edited during testing, so every count is a snapshot.
+
+**Dated-plan reader implemented (read-only, local, not deployed):** the connector
+now has `getMasterSections`, which reads a tab as dated sections (column-A banner,
+repeated header row, rows beneath) and returns only mapped safe fields —
+Account/Profile Name, status, one-line title, service, area, state and an
+**exact Nextdoor link**. Decisions taken, all on the side of refusing rather than
+guessing:
+
+- **Link column is never inferred from data.** It must carry a recognised header
+  (`Post link`/`Nextdoor link`/…) or be declared with `SHEET_MASTER_LINK_HEADER`.
+  For this workbook the declared value is `Issues`. Without a declaration the
+  reader returns `link_column_missing` and no links, so a real issues column can
+  never be mistaken for links.
+- **Links are rebuilt, not trusted.** Only `https://…nextdoor.com|co.uk/p|for_sale_and_free/ID`
+  survives; query strings and fragments are stripped, and anything else (including
+  `javascript:`) is dropped and counted in `rejectedLinks`. 26 of the 85 real
+  links carried query strings, so tolerance plus normalisation was required.
+- **Plan date comes from the banner**, never from `Date Posted` (empty in every
+  row). The `11/3` section keeps its own date instead of being assumed to be
+  "yesterday".
+- **Only mapped columns are fetched**: phone (E), pictures (H), remarks (P),
+  content body and every credential column are never read. The one-line title is
+  taken from `Final Rephrasing` (priority) or `Content`.
+- **Bounds:** 4,000 scanned rows, 8 sections, 2,400 returned rows, with honest
+  `truncated` flags.
+
+Web side: `apps/web/src/lib/master-sections.ts` (strict zod schema that rejects an
+extra field such as `phone`, plus a counts-only summary that keeps a `Posted`
+claim separate from a verified observation), `fetchMasterSections` in
+`lib/sheet-sync.ts` behind the same workspace/token gate and an older-connector
+message, and `npm.cmd run check:master-sections -- "<tab>"` (counts only; no name,
+phone, content, link or token printed).
+
+Validation: `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS (0 warnings),
+full `npm.cmd test` PASS **1,138 tests / 85 files**, `npm.cmd run build` PASS. The
+new tests cover section detection with two banners, header-priority title
+selection, exact-range reads proving phone/pictures/remarks are never fetched,
+link normalisation and rejection, the no-guess link rule, missing declared header,
+token refusal, strict schema rejection of an extra field, and the summary's
+posted-with/without-link split. The live check available at that point refused
+`invalid_action` because the then-saved deployment ran the older script, so no real
+section was read through that deployment; the real read came later, once the
+owner's deployment was correct.
+
+**Real-workbook verification of the shipped connector code:** the repository's
+unmodified `reporting-sync.gs` was executed in a local VM against the live,
+publicly readable workbook (read-only Google `gviz` fetch, no credentials). Result:
+246 projected rows over two sections; the `11/3` section produced **85 exact
+Nextdoor links with 31 posted-without-link rows**, the top `11/4` plan produced
+**no links**, the detected columns were `profile M, link K (declared), status L,
+title F, service A, area I, state J`, and `warnings` was empty. Omitting the
+declaration returned `link_column_missing` and **zero link values**, proving the
+reader does not guess. Every returned link was a canonical Nextdoor URL; phone,
+content and remarks values did not appear in the output. This validates the reader
+logic against real data, not the deployed Apps Script (which was still older at
+that point) and not any import or publication.
+
+**Connector connected to the owner's real workbook (2026-11-04):** the owner
+created a separate Apps Script project and deployed it as a Web app. Three
+deployment attempts failed for deployment-side reasons, recorded so the failure
+modes are not repeated: a restricted deployment answered `403 Access denied`; a
+stale or archived deployment id answered `401 Page not found`; and a deployment
+still set to *Anyone with a Google account* answered an anonymous request with a
+Google sign-in page. The working deployment answers an anonymous `GET` with
+`{"ok":false,"error":"post_only"}`, which is the correct read-only response. The
+first token check returned `not_configured`, which is the script's own guard for a
+missing `SHEET_ID`/`SYNC_TOKEN` script property — not a token mismatch. Server
+configuration lives only in the git-ignored `apps/web/.env.local`
+(`SHEET_SYNC_URL`, rotated `SHEET_SYNC_TOKEN`, unchanged
+`SHEET_SYNC_ORGANIZATION_ID`, plus `SHEET_MASTER_LINK_HEADER=Issues`); the token was
+never printed, committed or pasted into chat, and the temporary local copy was
+deleted after use. The previous development endpoint was replaced, so the legacy
+desktop tab previews now fail honestly with "that tab does not exist" against this
+workbook instead of showing another workbook's rows.
+
+**Live read of the real workbook through the deployed connector (read-only,
+counts only):** the plan tab is named **`Sheet1`**, not `New Optimize Structure` —
+253 rows, 17 columns, header on row 2, one tab in the workbook. `getMasterLayout`
+returned the expected labels (services, content, date posted, keywords, phone,
+final rephrasing, post type, pictures, area, state, issues, post status, account
+name, ranking, remarks) and recognised one unlabelled header. `getMasterSections`
+with the declared `Issues` link header returned `ok: true`, `truncated: false`,
+zero warnings, `linkColumnSource: declared` and columns `A service, F title,
+I area, J state, K link, L status, M profile` — the same mapping the offline
+verification predicted. Snapshot of the two dated sections:
+
+| Plan date | Header row | Task rows | Tasks | Links | Posted claim + link | Posted claim, no link | No Account Name |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `2026-11-04` | 2 | 3–126 | 123 | 0 | 0 | 0 | **53** |
+| `2026-11-03` | 128 | 129–252 | 123 | **85** | **85** | **31** | 0 |
+
+No cell was written, no row was imported or mapped, and the check printed counts
+only — no name, phone, content, link or token.
+
+**Dated plan view delivered (`/dashboard/master-sheet/plan`):** a read-only server
+page that reads structure first (`fetchMasterLayout`), selects the only populated
+tab automatically, and refuses to guess when several tabs hold data — it shows an
+explicit tab chooser instead. It renders one panel per dated section with the
+counts above, a table of sheet row, account, status, post title, service,
+area/state and saved link, plus honest notices for a missing Account Name, refused
+link cells, a truncated read and a section with no banner (whose date stays
+unknown rather than being assumed to be today). A `Posted` label is shown as
+**"Posted (Sheet claim)"** and is never presented as a verified observation.
+Unrecognised status text is listed verbatim so nothing is silently reclassified.
+The tab name comes from the workbook's structure, never from a hardcoded guess, and
+`fetchMasterLayout`'s strict schema rejects any payload carrying cell text the
+connector was not asked to return.
+
+**Validation for the plan-view slice:** `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS (0 warnings), `npm.cmd test` PASS **1,154 tests / 86 files**, `npm.cmd run build` PASS with `/dashboard/master-sheet/plan` in the route manifest. New coverage: 12 plan-page tests (single-tab auto-selection, several-tab choice instead of a guess, claim wording, missing Account Name, refused link cells, truncated read, no-banner date, unconfigured connector message, wrong-tab repair, and proof that no phone/remarks/pictures/credential column is ever requested) and 4 transport tests (structure-only layout request, strict rejection of a payload carrying cell text, the missing-script-property message, and a token that never appears in an error).
+
+**Not claimed:** no link import into publications, no profile/customer mapping, no
+sync, no queueing, no publishing, and the legacy desktop tab previews remain
+unavailable against this one-tab workbook (they report the missing tab and link to
+the plan view). The 31 `Posted`-without-link rows, the 53 plan rows without an
+Account Name and the single unmatched persona remain data-quality items for the
+operator, not automation output. Nothing in this section is deployed to Vercel.
+
+**Employee membership correction (explicitly approved):** investigation found
+the designated employee was the sole owner of a separate, unused workspace,
+not an owner inside the team's workspace. An attempted ordinary role change
+stopped without changes because the acting team owner did not belong there.
+The operator closed the employee's work (20:41:14 UTC), then separately approved
+removing that unused workspace and joining the existing verified account to
+the team as operator. One transaction rechecked every public workspace-scoped
+table and the existing open-work guard, removed only the approved unused
+workspace (one closed session + notification-read state + sole membership), and
+called the existing add-member RPC. Auth identity/password/email confirmation
+were preserved. The employee now has one membership, **operator**, in the team's
+workspace. No private email is written into repository docs.
+
+Hosted authenticated-role smoke PASS (rolled back, no new data): employee can
+read all **3,135 inventory rows** and the **one mapping**, `is_setup_admin=false`,
+and all six direct setup RPCs return permission denial. This is SQL/RLS
+verification, not a claim of browser/password login acceptance.
+
+Next acceptance prerequisites: employee refreshes/signs in to receive the new
+workspace context. Local role-separated web changes have not been deployed to
+Vercel. Each laptop
+needs its own private pairing and access to the exact local Incogniton profiles.
+Existing mappings remain tied to their exact helper. Per-user helper ACLs and
+cryptographic proof that a browser is on a given laptop are **not implemented**;
+helpers remain workspace-scoped and explicit named selection is required.
+
+## Owner-device pilot and scan recovery regression (2026-11-04 device date)
+
+The owner completed the narrow launcher/pairing/session/scan/import/mapping/end
+pilot (2026-11-03 UTC): 3,135 profiles detected, 410 stored/imported under the
+original byte budget, one customer mapping saved, and the work session closed
+after about 28.7 minutes. This is **not** acceptance of publishing, monitoring,
+account onboarding, cookie/proxy writes, or full desktop parity. Employee-device
+acceptance remains outstanding.
+
+Operator-approved hosted migration `inventory_scan_cap_v2` was applied as record
+`20261103195418` (32 hosted records). The private completion implementation now
+allows up to 5,000 scan rows / 1,000,000 JSONB bytes. Previous verification found
+the private function client-denied, the public receipt wrapper unchanged, and
+SECURITY DEFINER / empty search path preserved. Local worker/web changes remain
+uncommitted and are not a new Vercel deployment.
+
+The first expanded live scan exposed a missed **local durable receipt** bound:
+`automation_journal.py` still limited completions to 66,000 bytes and journals
+to 100,000 bytes. The local checkpoint remains `claimed` with no saved result;
+subsequent helper startups correctly refuse to replay that unfinished action.
+Read-only hosted inspection confirmed its lease had expired before recovery.
+
+Local fix: only `inventory_scan` receipts get the worker's 900,000-byte result
+budget plus a small completion envelope and a 1,000,000-byte checkpoint ceiling.
+Other receipt/checkpoint bounds remain 66,000 / 100,000 bytes. Reads are bounded
+before decoding; credential scope, exact task reference, atomic persistence,
+inspection gates, and receipt-only recovery remain enforced.
+
+Validation for this recovery fix:
+- New synthetic 3,135-row lost-ack recovery and 5,000-row durable-save tests
+  reproduced the old failure (2 errors before the fix).
+- `apps/worker`: `.venv\\Scripts\\python.exe -m unittest
+  test_automation_journal test_profile_helper test_worker_state` PASS, **26 tests**.
+  Includes receipt-only replay, oversized-receipt preservation, kind-specific
+  limits, and unresolved-claim refusal.
+- Full worker `.venv\\Scripts\\python.exe -m unittest discover` PASS,
+  **294 tests** (27.961 seconds).
+- Prior web validation for the cap work: typecheck/lint PASS and **1,090 tests /
+  80 files PASS**. No web code changed in this recovery fix; a fresh production
+  build and expanded live scan/import acceptance remain deferred.
+
+**Explicitly approved recovery:** the operator selected "Recover this scan".
+Only the matching expired read-only scan was reconciled using the existing staff
+RPC after checking its exact task, worker, original verified owner and expiry.
+Hosted status is now `cancelled`, lease cleared, no invented result. The original
+local claim was backed up in the device's private recovery directory, then the
+existing `--confirm-browser-reconciled` command settled that exact checkpoint.
+Local gate verification PASS (`operator_reconciled`, zero network calls/browser
+operations). Hosted verification shows 410 inventory rows, one mapping, and no
+pending/leased automation task on this helper. No profiles or mappings deleted;
+no new scan was dispatched.
+
+**Expanded live scan PASS:** owner restarted the helper (hosted heartbeat fresh)
+and authorized a new scan during the active work session. Hosted read-only
+verification at 2026-11-03 20:17 UTC confirms `succeeded`, **3,135 detected /
+3,135 stored**, `truncated=false`, no error. This verifies the expanded durable
+result path against the owner's real installation. **Full inventory import also
+PASS:** after the owner checked the import confirmation and saved, hosted
+read-only verification confirms **3,135 active inventory rows**, all 3,135 scan
+rows matched by exact UUID/name/group, and the existing single customer mapping
+preserved. The owner ended the second session; hosted verification confirms
+`closed` at **2026-11-03 20:22:21 UTC** after **24.1 minutes**. The expanded
+owner-device scan/import/session pilot is complete. Employee-device acceptance,
+a fresh production build, and deployment of these local web/worker changes
+remain pending. Do not manufacture results for the cancelled scan or clear
+unrelated tasks, credentials, or journals.
+
 ## Workspace members and one-click employee setup (2026-11-03)
 
 Closes the missing workspace-membership flow (the browser-side gap in the

@@ -9,6 +9,7 @@ import { importRowsSchema, publicationInput, timeZoneSchema, uuid, visibilitySch
 import { previewCsv } from "@/lib/imports";
 import type { FormState } from "./auth";
 import type { ImportedRow } from "@/lib/validation";
+import { assertSetupAdmin } from "@/lib/setup-access";
 
 const refresh = () => revalidatePath("/dashboard", "layout");
 
@@ -25,7 +26,8 @@ export async function createWorkspace(_previous: FormState, form: FormData): Pro
 }
 
 export async function createCustomer(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true, form);
+  const { db, organization, membership } = await requireWorkspace(true, form);
+  assertSetupAdmin(membership);
   const input = z.object({ name: z.string().trim().min(2).max(120), service: z.string().trim().max(160), time_zone: timeZoneSchema }).safeParse({ name: form.get("name"), service: form.get("service"), time_zone: form.get("time_zone") });
   if (!input.success) return { error: input.error.issues[0].message };
   const { error } = await db.from("reporting_customers").insert({ organization_id: organization.id, ...input.data });

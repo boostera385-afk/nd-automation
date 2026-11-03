@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
-from desktop_bridge import OPEN_URI, HELPER_URI, file_hash, load_config, local_file, main as native_main, open_incogniton, start_profile_helper, validate_config, verify_publisher
+from desktop_bridge import OPEN_URI, HELPER_URI, file_hash, load_config, local_file, main as native_main, normalize_uri, open_incogniton, start_profile_helper, validate_config, verify_publisher
 from install_desktop_bridge import REGISTRY_ROOT, connect_helper, install, remove
 
 
@@ -39,11 +39,20 @@ class DesktopBridgeTests(unittest.TestCase):
     def launch(self, uri=OPEN_URI, confirm=None):
         return open_incogniton(uri, self.config, confirm or Mock(return_value=True), self.spawn, self.publisher)
 
-    def test_only_exact_uri_no_arguments_paths_tokens_callbacks_or_encoded_variants(self):
-        for uri in (OPEN_URI + "/", OPEN_URI + "?code=secret", OPEN_URI + "#x", HELPER_URI,
-                    "nd-automation://open-incogniton%22 --execute", "file:///Incogniton.exe", OPEN_URI.upper()):
+    def test_only_fixed_uri_no_arguments_paths_tokens_callbacks_or_encoded_variants(self):
+        for uri in (OPEN_URI + "//", OPEN_URI + "?code=secret", OPEN_URI + "#x", HELPER_URI,
+                    "nd-automation://open-incogniton%22 --execute", "file:///Incogniton.exe", OPEN_URI.upper(),
+                    "nd-automation://open-incogniton/extra", "nd-automation://../open-incogniton"):
             with self.subTest(uri=uri), self.assertRaises(ValueError): self.launch(uri)
         self.spawn.assert_not_called(); self.publisher.assert_not_called()
+
+    def test_windows_trailing_slash_handoff_is_accepted_for_both_actions(self):
+        # Windows/browsers normalize nd-automation://action into nd-automation://action/
+        self.assertEqual(normalize_uri(OPEN_URI + "/"), OPEN_URI)
+        self.assertEqual(normalize_uri(HELPER_URI + "/"), HELPER_URI)
+        self.assertEqual(normalize_uri(OPEN_URI), OPEN_URI)
+        self.assertEqual(self.launch(OPEN_URI + "/"), "launch_requested")
+        self.spawn.assert_called_once()
 
     def test_launch_requires_native_confirmation_and_publisher_validation(self):
         self.assertEqual(self.launch(confirm=Mock(return_value=False)), "cancelled")

@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/data";
-import { previewProfileCsv, profileRowSchema, type ProfileRow } from "@/lib/profiles";
+import { previewProfileCsv, profileRowSchema, PROFILE_SCAN_LIMIT, type ProfileRow } from "@/lib/profiles";
 import type { FormState } from "./auth";
+import { assertSetupAdmin } from "@/lib/setup-access";
 
 export type ProfileImportState = FormState & { rows?: ProfileRow[]; errors?: string[] };
 const refresh = () => revalidatePath("/dashboard/profiles");
 
 export async function previewProfiles(_previous: ProfileImportState, form: FormData): Promise<ProfileImportState> {
-  await requireWorkspace(true, form);
+  const { membership } = await requireWorkspace(true, form);
+  assertSetupAdmin(membership);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV inventory export to preview." };
   if (file.size > 1024 * 1024) return { error: "Import file must be smaller than 1 MB." };
@@ -20,7 +22,8 @@ export async function previewProfiles(_previous: ProfileImportState, form: FormD
 }
 
 export async function confirmProfileImport(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true, form);
+  const { db, organization, membership } = await requireWorkspace(true, form);
+  assertSetupAdmin(membership);
   if (form.get("confirmed") !== "on") return { error: "Confirm this inventory was exported from your authorized Incogniton installation." };
   const records = z.string().max(2_100_000).safeParse(form.get("records"));
   let rows: unknown;
@@ -38,7 +41,8 @@ export async function confirmProfileImport(_previous: FormState, form: FormData)
 }
 
 export async function importScannedProfiles(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true, form);
+  const { db, organization, membership } = await requireWorkspace(true, form);
+  assertSetupAdmin(membership);
   if (form.get("confirmed") !== "on") return { error: "Confirm importing the latest detected profiles into this workspace's inventory." };
   const { data, error } = await db.from("reporting_automation_tasks")
     .select("id,result,completed_at")
@@ -54,20 +58,21 @@ export async function importScannedProfiles(_previous: FormState, form: FormData
     : null;
   if (!scan || !scanned) return { error: "No completed device scan is stored yet. Queue a profile detection task from Run automation first." };
   if (scanned.length === 0) return { error: "The latest scan found no profiles in Incogniton. Nothing to import; confirm the profiles exist locally." };
-  const parsed = z.array(profileRowSchema).min(1).max(500).safeParse(scanned);
+  const parsed = z.array(profileRowSchema).min(1).max(PROFILE_SCAN_LIMIT).safeParse(scanned);
   if (!parsed.success) return { error: "The stored scan does not match the inventory row contract. Queue a fresh detection task." };
   const truncated = (scan.result as Record<string, unknown>).truncated === true;
-  if (truncated && form.get("truncated_confirmed") !== "on") return { error: "This scan was capped at 500 profiles. Also confirm importing the capped list." };
+  if (truncated && form.get("truncated_confirmed") !== "on") return { error: `This scan was capped at ${PROFILE_SCAN_LIMIT} profiles. Also confirm importing the capped list.` };
   const imported = await db.rpc("reporting_import_profiles", { org: organization.id, rows: parsed.data, archive_missing: false });
   if (imported.error) return { error: "Import failed validation or organization checks. No partial import was committed." };
   const counts = imported.data as { received: number; inserted: number; updated: number };
   refresh();
   revalidatePath("/dashboard/automation");
-  return { success: `Inventory updated from the device scan: ${counts.received} received, ${counts.inserted} new, ${counts.updated} updated.${truncated ? " The scan was capped at 500; more profiles exist in Incogniton." : ""} Nothing was launched or verified.` };
+  return { success: `Inventory updated from the device scan: ${counts.received} received, ${counts.inserted} new, ${counts.updated} updated.${truncated ? ` The scan was capped at ${PROFILE_SCAN_LIMIT}; more profiles exist in Incogniton.` : ""} Nothing was launched or verified.` };
 }
 
 export async function setProfileArchived(_previous: FormState, form: FormData): Promise<FormState> {
-  const { db, organization } = await requireWorkspace(true, form);
+  const { db, organization, membership } = await requireWorkspace(true, form);
+  assertSetupAdmin(membership);
   const profile = z.uuid().safeParse(form.get("profile"));
   const archived = form.get("archived") === "true";
   if (!profile.success || form.get("confirmed") !== "on") return { error: "Confirm this inventory status change." };

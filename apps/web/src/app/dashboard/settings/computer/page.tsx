@@ -3,9 +3,16 @@ import { requireWorkspace } from "@/lib/data";
 import { getOperationsData } from "@/lib/operations-data";
 import { PageHeader, Panel } from "@/components/ui";
 import { WorkerRegistration } from "@/components/worker-registration";
+import { canManageSetup } from "@/lib/setup-access";
+import { EmployeeComputerGuide } from "@/components/employee-computer-guide";
 
 export default async function ComputerSetup() {
-  await requireWorkspace(true);
+  const { membership } = await requireWorkspace(true);
+  if (!canManageSetup(membership.role)) return <>
+    <PageHeader title="Your prepared laptop" description="One-time setup is managed by your administrator. Sign-in does not install or pair a local helper." />
+    <EmployeeComputerGuide />
+    <p className="action-row"><a className="button" href="nd-automation://open-incogniton">Open Incogniton</a><a className="button secondary" href="nd-automation://start-profile-helper">Start profile helper</a><Link href="/dashboard/run">Run automation</Link></p>
+  </>;
   const operations = await getOperationsData();
   const helpers = operations.workers.filter((worker) => worker.enabled);
   return <>

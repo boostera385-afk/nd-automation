@@ -6,6 +6,9 @@ export const profileRowSchema = z.object({
   name: z.string().trim().min(1).max(200),
   group_name: z.string().trim().min(1).max(200),
 }).strict();
+// One place for the scan ceiling: it must stay equal to the database allowance
+// (inventory_scan_cap_v2) and to the inventory import limit of 5,000 rows.
+export const PROFILE_SCAN_LIMIT = 5000;
 export type ProfileRow = z.infer<typeof profileRowSchema>;
 export type InventoryProfile = ProfileRow & { status: "active" | "archived"; updated_at: string };
 

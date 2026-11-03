@@ -1,9 +1,53 @@
 """Offline tests for the local Incogniton adapter. No network, no browser."""
 
+import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from local_incogniton import Incogniton, ProfileUnavailable
+
+
+class FakeResponse:
+    def __init__(self, data):
+        self.data = data
+
+    def read(self, size):
+        return self.data[:size]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *arguments):
+        return False
+
+
+class ResponseLimitTests(unittest.TestCase):
+    def api(self, payload):
+        api = Incogniton()
+        api.opener = Mock()
+        api.opener.open.return_value = FakeResponse(payload)
+        return api
+
+    def test_multi_megabyte_profile_list_is_accepted(self):
+        # A real install returns every profile's full record; /profile/all for a
+        # few hundred profiles is already far past the old 2 MB ceiling.
+        payload = b'{"status":"ok","profileData":[]}' + b" " * 3_000_000
+        self.assertEqual(self.api(payload).request("/profile/all"), {"status": "ok", "profileData": []})
+
+    def test_oversized_reply_is_still_refused(self):
+        with patch("local_incogniton.MAX_RESPONSE_BYTES", 10):
+            with self.assertRaises(ValueError):
+                self.api(b"x" * 100).request("/profile/all")
+
+    def test_profile_all_extracts_identity_only(self):
+        payload = json.dumps({"status": "ok", "profileData": [{
+            "general_profile_information": {"browser_id": "6166a28d-d73a-4387-96ae-bb08438f09b6",
+                                            "profile_name": "Melissa Adams", "profile_group": "Dylan"},
+            "Proxy": {"proxy_password": "never-returned"}}]}).encode("utf-8")
+        profiles = self.api(payload).list_profiles()
+        self.assertEqual(profiles, [{"profile_id": "6166a28d-d73a-4387-96ae-bb08438f09b6",
+                                    "name": "Melissa Adams", "group_name": "Dylan"}])
+        self.assertNotIn("never-returned", json.dumps(profiles))
 
 
 class FakeApi(Incogniton):

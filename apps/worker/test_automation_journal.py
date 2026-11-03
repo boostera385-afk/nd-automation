@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from automation_journal import AutomationJournal, TASK_FAILURE, recover_automation
+from automation_tasks import MAX_SCAN_ENTRIES, MAX_SCAN_RESULT_BYTES
 from agent import poll_automation
 from test_automation_tasks import task
 
@@ -57,6 +58,70 @@ class AutomationJournalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unconfirmed"):
             recover_automation(self.bridge, self.journal)
         self.assertEqual(self.journal.read()["state"], "result_ready")
+
+    def test_full_scan_survives_lost_ack_and_replays_only_its_saved_receipt(self):
+        self.task = task("inventory_scan", {})
+        self.bridge.rpc.return_value = self.task
+        rows = [{"profile_id": f"44444444-4444-4444-8444-{i:012d}",
+                 "name": f"Fixture profile {i}", "group_name": "Fixture group"}
+                for i in range(3135)]
+        result = {"profiles": rows, "total": len(rows), "truncated": False}
+        self.bridge.complete_task.side_effect = [RuntimeError("lost"), False]
+        with patch("agent.execute_task", return_value=result) as execute:
+            with self.assertRaisesRegex(RuntimeError, "lost"):
+                poll_automation(self.bridge, Mock(), self.journal)
+            self.assertGreater(self.path.stat().st_size, 100000)
+            self.assertEqual(self.journal.read()["completion"]["result"], result)
+            self.assertEqual(recover_automation(self.bridge, self.journal), "acknowledged")
+            execute.assert_called_once()
+        self.assertEqual(self.bridge.complete_task.call_args_list[0], self.bridge.complete_task.call_args_list[1])
+        self.assertIsNone(self.journal.read()["task"])
+        self.assertIsNone(self.journal.read()["completion"])
+
+    def test_full_5000_row_scan_fits_durable_checkpoint(self):
+        scan = task("inventory_scan", {})
+        result = {"profiles": [{"profile_id": f"44444444-4444-4444-8444-{i:012d}",
+                                "name": "Fixture", "group_name": "Fixture"}
+                               for i in range(MAX_SCAN_ENTRIES)],
+                  "total": MAX_SCAN_ENTRIES, "truncated": False}
+        self.journal.begin(scan)
+        self.journal.record("succeeded", result)
+        self.assertEqual(self.journal.read()["completion"]["result"], result)
+
+    def test_larger_receipt_budget_is_scan_only(self):
+        self.journal.begin(self.task)
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "receipt exceeded"):
+            self.journal.record("succeeded", {"note": "x" * 66000})
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_checkpoint_read_and_write_limits_remain_kind_specific(self):
+        self.journal.begin(self.task)
+        saved = self.journal.read()
+        oversized = {**saved, "padding": "x" * 100000}
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "checkpoint exceeded"):
+            self.journal.write(oversized)
+        self.assertEqual(self.path.read_bytes(), before)
+        oversized.pop("padding")
+        self.path.write_bytes(json.dumps(oversized).encode() + b" " * 100000)
+        with self.assertRaisesRegex(ValueError, "checkpoint exceeded"):
+            self.journal.read()
+        self.path.write_bytes(b" " * 1_000_001)
+        with self.assertRaisesRegex(ValueError, "checkpoint exceeded"):
+            self.journal.read()
+
+    def test_oversized_scan_result_preserves_claim_and_never_submits(self):
+        self.task = task("inventory_scan", {})
+        self.bridge.rpc.return_value = self.task
+        with patch("agent.execute_task", return_value={"note": "x" * MAX_SCAN_RESULT_BYTES}) as execute:
+            with self.assertRaisesRegex(ValueError, "receipt exceeded"):
+                poll_automation(self.bridge, Mock(), self.journal)
+            self.assertEqual(self.journal.read()["state"], "claimed")
+            self.bridge.complete_task.assert_not_called()
+            with self.assertRaisesRegex(ValueError, "unresolved"):
+                poll_automation(self.bridge, Mock(), self.journal)
+            execute.assert_called_once()
 
     def test_uncertain_mutation_is_acknowledged_but_blocks_all_new_work_until_inspected(self):
         with patch("agent.execute_task", side_effect=ValueError("PRIVATE_SECRET")):

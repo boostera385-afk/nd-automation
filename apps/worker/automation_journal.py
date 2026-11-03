@@ -7,14 +7,21 @@ from pathlib import Path
 import re
 import tempfile
 
-from automation_tasks import validate_task
+from automation_tasks import MAX_SCAN_RESULT_BYTES, validate_task
 
 WORKFLOW_KINDS = frozenset({"supervised_workflow"})
 TASK_FAILURE = "Task failed on this device. Inspect the local file and Incogniton state before retrying; raw errors are withheld."
 UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
-def completion(value):
+# Only scans get the larger durable budget. Leave room for the completion
+# envelope and claim metadata without widening other browser-task receipts.
+MAX_CHECKPOINT_BYTES = 1_000_000
+DEFAULT_CHECKPOINT_BYTES = 100_000
+DEFAULT_RECEIPT_BYTES = 66_000
+
+
+def completion(value, kind=None):
     if not isinstance(value, dict) or set(value) != {"status", "result", "error"}:
         raise ValueError("Invalid saved browser-task completion")
     if value["status"] == "failed":
@@ -25,7 +32,12 @@ def completion(value):
             raise ValueError("A successful browser task needs an explicit result object")
     else:
         raise ValueError("Invalid browser-task status")
-    if len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode()) > 66000:
+    maximum = DEFAULT_RECEIPT_BYTES
+    if kind == "inventory_scan":
+        maximum = MAX_SCAN_RESULT_BYTES + 2_000
+        if len(json.dumps(value["result"], ensure_ascii=False, allow_nan=False).encode()) > MAX_SCAN_RESULT_BYTES:
+            raise ValueError("Browser-task receipt exceeded its bound")
+    if len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode()) > maximum:
         raise ValueError("Browser-task receipt exceeded its bound")
     return value
 
@@ -42,7 +54,7 @@ class AutomationJournal:
             raise ValueError("Unsafe browser-task checkpoint location")
         if not self.path.exists():
             return None
-        if self.path.stat().st_size > 100000:
+        if self.path.stat().st_size > MAX_CHECKPOINT_BYTES:
             raise ValueError("Browser-task checkpoint exceeded its bound")
         def unique(pairs):
             value = {}
@@ -51,7 +63,11 @@ class AutomationJournal:
                     raise ValueError("Duplicate checkpoint fields")
                 value[key] = item
             return value
-        value = json.loads(self.path.read_bytes(), object_pairs_hook=unique)
+        with self.path.open("rb") as stream:
+            data = stream.read(MAX_CHECKPOINT_BYTES + 1)
+        if len(data) > MAX_CHECKPOINT_BYTES:
+            raise ValueError("Browser-task checkpoint exceeded its bound")
+        value = json.loads(data, object_pairs_hook=unique)
         if (not isinstance(value, dict) or set(value) != {"version", "scope", "state", "task", "reference", "completion", "inspection_required"}
                 or type(value["version"]) is not int or value["version"] != 1 or not isinstance(value["scope"], str)
                 or not re.fullmatch(r"[a-f0-9]{64}", value["scope"]) or type(value["inspection_required"]) is not bool
@@ -61,6 +77,8 @@ class AutomationJournal:
         if (not isinstance(reference, dict) or set(reference) != {"task_id", "kind"} or not isinstance(reference["task_id"], str)
                 or not UUID.fullmatch(reference["task_id"]) or not isinstance(reference["kind"], str)):
             raise ValueError("Invalid browser-task checkpoint reference")
+        if reference["kind"] != "inventory_scan" and len(data) > DEFAULT_CHECKPOINT_BYTES:
+            raise ValueError("Browser-task checkpoint exceeded its bound")
         if value["scope"] != self.scope:
             if value["state"] in {"acknowledged", "operator_reconciled"} and not value["inspection_required"]:
                 return None
@@ -72,7 +90,7 @@ class AutomationJournal:
         elif value["task"] is not None:
             raise ValueError("Terminal browser-task checkpoint retains unexpected payload")
         if value["state"] == "result_ready":
-            completion(value["completion"])
+            completion(value["completion"], reference["kind"])
         elif value["completion"] is not None:
             raise ValueError("Unexpected browser-task completion")
         if value["state"] == "operator_reconciled" and value["inspection_required"]:
@@ -84,7 +102,8 @@ class AutomationJournal:
         if self.path.is_symlink() or self.path.parent.is_symlink():
             raise ValueError("Unsafe browser-task checkpoint location")
         data = json.dumps(value, ensure_ascii=False, allow_nan=False).encode()
-        if len(data) > 100000:
+        maximum = MAX_CHECKPOINT_BYTES if value.get("reference", {}).get("kind") == "inventory_scan" else DEFAULT_CHECKPOINT_BYTES
+        if len(data) > maximum:
             raise ValueError("Browser-task checkpoint exceeded its bound")
         descriptor, name = tempfile.mkstemp(prefix=".browser-task-", dir=self.path.parent)
         try:
@@ -107,7 +126,7 @@ class AutomationJournal:
         saved = self.read()
         if not saved or saved["state"] != "claimed" or type(inspection_required) is not bool:
             raise ValueError("One durable result is required for the exact outstanding task")
-        value = completion({"status": status, "result": result, "error": error})
+        value = completion({"status": status, "result": result, "error": error}, saved["reference"]["kind"])
         self.write({**saved, "state": "result_ready", "completion": value, "inspection_required": inspection_required})
 
     def acknowledge(self):

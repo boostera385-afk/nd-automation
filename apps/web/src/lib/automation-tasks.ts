@@ -35,7 +35,7 @@ export const kindDescriptions: Record<AutomationKind, string> = {
   supervised_workflow: "Use the separate supervised workflow controls and local runner. A recorded receipt can require human handoff or reconciliation; it does not prove a completed account/content action.",
   profile_create: "Asks this device's automation agent to create one blank Incogniton profile. No proxy, cookie, password or account label is sent or stored here.",
   preset_snapshot: "Reads how many profiles and groups exist and how many are open. Counts only; no names, cookies or proxies are returned.",
-  inventory_scan: "Reads the Incogniton profile list on this device and returns UUID, name and group only, limited by 500 entries and result size with an honest truncation flag. Cookies, proxies and account details are dropped, never parsed.",
+  inventory_scan: "Reads the Incogniton profile list on this device and returns UUID, name and group only, limited by 5,000 entries and result size with an honest truncation flag. Cookies, proxies and account details are dropped, never parsed.",
   cookie_import: "Validates a Netscape cookies.txt file already on the worker machine. Counts entries and domains; never stores or uploads cookie values.",
   proxy_import: "Validates a host:port or host:port:user:pass list already on the worker machine. Reports counts; credentials are never returned.",
   cookie_write: "Writes a Netscape cookies.txt file from this device into one Incogniton profile, through Incogniton's local API on this same device. One profile at a time, with your confirmation per task.",
@@ -123,7 +123,7 @@ export function describeResult(task: AutomationTask, workerName?: string, profil
     if (found === null || total === null) return "The agent reported success without a profile count.";
     const truncated = result.truncated === true;
     return truncated
-      ? `Detected ${total} profiles in Incogniton; the stored scan keeps the first ${found} (limited by 500 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.`
+      ? `Detected ${total} profiles in Incogniton; the stored scan keeps the first ${found} (limited by 5,000 entries and result size). Use CSV import for profiles outside this partial scan; re-running refreshes the same list.`
       : `Detected ${total} profile(s): UUID, name and group only.`;
   }
   if (task.kind === "cookie_write" || task.kind === "proxy_write") {

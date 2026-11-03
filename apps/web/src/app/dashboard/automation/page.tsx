@@ -6,13 +6,15 @@ import { ActionForm } from "@/components/action-form";
 import { WorkerRegistration } from "@/components/worker-registration";
 import { EmptyState, OutcomeBadge, PageHeader, Panel } from "@/components/ui";
 import { bindWorkerProfile, cancelPendingCheck, reassignWorkerProfile, reconcileExpiredCheck, revokeWorker, setProfileMonitoring } from "@/app/actions/workers";
+import { canManageSetup } from "@/lib/setup-access";
 
 type Worker = { id: string; name: string; enabled: boolean; last_seen_at: string | null };
 type Binding = { id: string; worker_id: string; customer_id: string; profile_id: string; account_label: string; monitoring_session_id: string | null };
 type Job = { id: string; worker_id: string; publication_id: string; status: string; outcome: string | null; created_at: string; lease_expires_at: string | null };
 
 export default async function Automation() {
-  const { db, organization } = await requireWorkspace(true);
+  const { db, organization, membership } = await requireWorkspace(true);
+  const manageSetup = canManageSetup(membership.role);
   const { customers, publications, session, truncated } = await getDashboardData();
   const [workerQuery, bindingQuery, jobQuery, inventoryQuery] = await Promise.all([
     db.from("reporting_workers").select("id,name,enabled,last_seen_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(101),
@@ -34,6 +36,8 @@ export default async function Automation() {
     <div className="notice subtle"><strong>{session?.status === "active" ? "Work session active" : "Work session is not active"}</strong><p>Enable each assigned profile for the current session. A connected agent plans checks for older/unknown-date posts that have not been checked in 24 hours. Pause/End work prevents new claims; an in-flight read may finish. Dispatch expires after ten hours. The agent and Incogniton on this device must remain available.</p></div>
     {!available ? <Panel title="Worker setup pending"><p>The monitoring-worker database migration has not been applied. Ask your administrator to review and apply <code>202610270002_monitoring_worker_bridge.sql</code> to staging. No browser controls are enabled here until that setup is complete.</p></Panel> : <>
       {limited && <p className="notice">Lists are limited to 100 records per section and may be partial. No overall automation-coverage count is claimed.</p>}
+      {!manageSetup && <p className="notice">Your administrator manages helper registration, profile mappings and credential changes. Daily session monitoring controls remain available below.</p>}
+      {manageSetup && <>
       <Panel title="1. Register this device's automation agent" hint="Private, revocable credential; no service-role key"><WorkerRegistration /></Panel>
       <Panel title="2. Assign an authorized profile" hint="Exact UUID and account label — no guessed profile names">
         {customers.length && workers.some((worker) => worker.enabled) ? <ActionForm action={bindWorkerProfile} label="Assign profile">
@@ -46,6 +50,7 @@ export default async function Automation() {
           <label className="check-label"><input type="checkbox" name="authorized" required />This customer authorizes this exact profile and its read-only post checks.</label>
         </ActionForm> : <EmptyState title="Customer and agent needed">Register this device&apos;s automation agent and add an authorized customer before assigning profiles.</EmptyState>}
       </Panel>
+      </>}
       <Panel title="3. Enable monitoring for this session" hint="New sessions require a new authorization">
         {bindings.length ? bindings.map((binding) => {
           const active = Boolean(session?.status === "active" && binding.monitoring_session_id === session.id && workers.find((worker) => worker.id === binding.worker_id)?.enabled);
@@ -54,7 +59,7 @@ export default async function Automation() {
               <input type="hidden" name="binding" value={binding.id} /><input type="hidden" name="enabled" value={active ? "false" : "true"} />
               {!active && <label className="check-label"><input type="checkbox" name="authorized" required />Authorize checks and partial comment collection during my current work session.</label>}
             </ActionForm>
-            {workers.find((worker) => worker.id === binding.worker_id)?.enabled === false && workers.some((worker) => worker.enabled) && <ActionForm action={reassignWorkerProfile} label="Move to replacement worker" secondary>
+            {manageSetup && workers.find((worker) => worker.id === binding.worker_id)?.enabled === false && workers.some((worker) => worker.enabled) && <ActionForm action={reassignWorkerProfile} label="Move to replacement worker" secondary>
               <input type="hidden" name="binding" value={binding.id} />
               <label>Replacement agent<select name="replacement" required>{workers.filter((worker) => worker.enabled).map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
               <label className="check-label"><input type="checkbox" name="confirmed" required />The old agent is stopped, the profile is closed, and outstanding leases have been reconciled.</label>
@@ -62,7 +67,7 @@ export default async function Automation() {
         }) : <EmptyState title="No assigned profiles">Assignments are explicit and organization-scoped. Never import cookies or proxy passwords into these forms.</EmptyState>}
       </Panel>
       <Panel title="Automation agents" hint="Last seen is a heartbeat, not proof a browser is ready">
-        {workers.map((worker) => <article className="notice subtle" key={worker.id}><strong>{worker.name} · {worker.enabled ? "Credential enabled" : "Revoked"}</strong><p>Last seen: {worker.last_seen_at ? formatTime(worker.last_seen_at, organization.time_zone) : "Never connected"}</p>{worker.enabled && <ActionForm action={revokeWorker} label="Revoke agent" secondary><input type="hidden" name="worker" value={worker.id} /><label className="check-label"><input type="checkbox" name="confirmed" required />Revoke its credential and cancel pending jobs. This does not force-close a browser.</label></ActionForm>}</article>)}
+        {workers.map((worker) => <article className="notice subtle" key={worker.id}><strong>{worker.name} · {worker.enabled ? "Credential enabled" : "Revoked"}</strong><p>Last seen: {worker.last_seen_at ? formatTime(worker.last_seen_at, organization.time_zone) : "Never connected"}</p>{manageSetup && worker.enabled && <ActionForm action={revokeWorker} label="Revoke agent" secondary><input type="hidden" name="worker" value={worker.id} /><label className="check-label"><input type="checkbox" name="confirmed" required />Revoke its credential and cancel pending jobs. This does not force-close a browser.</label></ActionForm>}</article>)}
       </Panel>
       <Panel title="Latest 100 monitoring jobs" hint="Refresh to see new progress; expired leases are not retried automatically">
         {jobs.length ? <div className="table-wrap"><table><thead><tr><th>Post</th><th>Created</th><th>State</th><th>Result</th><th>Action</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}>

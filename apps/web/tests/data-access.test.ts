@@ -12,11 +12,11 @@ vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Erro
 // workspace-selection and stale-form checks with a transport boundary fixture.
 import { getContext, getDashboardData, getPublication, getWorkspaceAccess, requireWorkspace } from "@/lib/data";
 import { setBatchMonitoring } from "@/app/actions/workflow";
-import { registerWorker } from "@/app/actions/workers";
+import { registerWorker, bindWorkerProfile, revokeWorker, reassignWorkerProfile } from "@/app/actions/workers";
 import { stageServiceCatalog } from "@/app/actions/service-catalog";
 import { enqueueSheetWriteback } from "@/app/actions/sheet-writeback";
-import { sessionAction, confirmImport } from "@/app/actions/reporting";
-import { confirmProfileImport, importScannedProfiles } from "@/app/actions/profiles";
+import { sessionAction, confirmImport, createCustomer } from "@/app/actions/reporting";
+import { confirmProfileImport, importScannedProfiles, previewProfiles, setProfileArchived } from "@/app/actions/profiles";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/operations-data", () => ({ getOperationsData: vi.fn(() => { throw new Error("Unexpected operational read"); }) }));
 vi.mock("@/lib/sheet-sync", () => ({ fetchSheetRows: vi.fn(), SheetSyncError: Error }));
@@ -136,6 +136,12 @@ describe("real central dashboard data-access guard", () => {
   it.each([setBatchMonitoring, registerWorker, stageServiceCatalog, enqueueSheetWriteback, sessionAction, confirmImport, confirmProfileImport, importScannedProfiles])("blocks real mutation entrypoint %s before dispatch after an old-tab submission", async (action) => {
     const form = new FormData(); form.set("workspaceContext", workspaceContext(userId, orgB));
     await expect(action({}, form)).rejects.toThrow("redirect:/workspaces?notice=context-changed");
+    expect(mocks.from.mock.calls.map(([table]) => table)).toEqual(["reporting_memberships", "reporting_organizations"]);
+  });
+  it.each([registerWorker, bindWorkerProfile, revokeWorker, reassignWorkerProfile, createCustomer, confirmProfileImport, importScannedProfiles, previewProfiles, setProfileArchived])("denies an operator's direct setup action %s before any business mutation", async (action) => {
+    memberResult.data = [membership(orgA, "operator")];
+    const form = new FormData(); form.set("workspaceContext", workspaceContext(userId, orgA)); form.set("role", "owner");
+    await expect(action({}, form)).rejects.toThrow("Only a workspace owner or admin");
     expect(mocks.from.mock.calls.map(([table]) => table)).toEqual(["reporting_memberships", "reporting_organizations"]);
   });
 });
