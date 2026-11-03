@@ -54,12 +54,37 @@ Validation (2026-11-03, from `apps/web`): `npm.cmd run typecheck` PASS,
 the 9 members tests), `build` PASS. Worker suite from `apps/worker`:
 `python -m unittest discover` **285 tests OK**.
 
-Uncommitted-to-hosted honesty: the proposal is **not applied to the hosted
-database yet** and the deployed production build (v0.1.4) does not include the
-members UI. Until the proposal is applied and the web is redeployed, the
-members page correctly reports that member management is unavailable. Each of
-those steps needs explicit operator approval, as does any manual email
-confirmation for the employee's account (email delivery remains unverified).
+**Approved same day for live testing (operator instruction: "live the
+testings").** The proposal was applied through MCP as hosted migration
+**`workspace_members_v1`** (baseline re-verified first: 30 migrations, no
+member functions present, all dependencies present). Hosted history is now
+**31 migrations**. Post-application verification PASS: anon denied execute on
+all four public RPCs; authenticated granted on all four;
+`private_reporting.member_has_open_work` denied to clients; all five
+functions SECURITY DEFINER with `search_path=''`. Security advisers after the
+DDL show the members functions only inside the intentional
+authenticated-executable SECURITY DEFINER class (now 44 findings — each
+guards itself with live role checks), the anon-executable worker
+claim/complete class unchanged (9), and the pre-existing
+`worker_credentials` no-policy INFO; no new findings caused by this change.
+One unrelated pre-existing Auth advisory appeared: **leaked password
+protection is disabled** (WARN) — enabling it is an operator decision, no
+action taken.
+
+**Members-live production deployment (same approval):** the first
+`vercel deploy` attempt failed on the known CLI network error ("fetch
+failed"); the retry from the unmodified tree succeeded. Production
+deployment **`dpl_9fRRCkNbJ44nQhDaDbb6F74paDEj`**
+(`nd-automation-dashboard-81b5hogvb-jelly-bean2.vercel.app`) returned Ready
+and is aliased to **https://nd-automation-dashboard.vercel.app**; the
+anonymous `/login` footer reports **nd v0.1.4 / production** with that
+deployment ID.
+`npm.cmd run check:deployment` against the alias PASS (login 200; expected
+signed-out 307 redirects for dashboard/run/cohorts/verify-email). These are
+anonymous checks only — signed-in member add/remove/role actions remain to be
+exercised by the operator with the employee account. Desktop live-account
+gates are unchanged: hosted rows still show no workers/publications/tasks,
+and real automation start still requires the operator physically.
 
 ## Operator-approved hosting and 0.1.4 deployment (2026-11-03)
 
