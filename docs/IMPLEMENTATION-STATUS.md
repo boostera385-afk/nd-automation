@@ -1,5 +1,46 @@
 # Implementation status
 
+## Operator-approved hosting and 0.1.4 deployment (2026-11-03)
+
+The same operator later explicitly approved (in-chat): applying both proposals
+to the hosted test database, deploying the reviewed 0.1.4 candidate to Vercel,
+and a guided real-automation startup. Both proposals were applied individually
+through MCP as hosted migrations **`protected_evidence_v1`** and
+**`protected_bulk_intake_v1`** (baseline re-verified first: 28 migration
+records, no evidence/intake objects, zero buckets). Additive only; no existing
+rows touched (all new tables remain at 0 rows).
+
+Post-application verification PASS: `reporting_evidence` and
+`reporting_intake_batches` exist with RLS enabled and exactly one staff-read
+policy each; authenticated-only execute on `reporting_reserve_evidence`,
+`reporting_evidence_action`, `reporting_enqueue_intake_batch` (anon denied);
+private `reporting-evidence` bucket (3 MiB, PNG/JPEG only) with exactly the
+three evidence-scoped INSERT/SELECT/DELETE storage policies; both intake task
+columns added; the `automation_one_open_task` unique index is the narrowed
+non-batch variant exactly as proposed; the `reporting_intake_dispatch` guard
+trigger exists with no direct grants. Hosted history is now **30 migrations**.
+Security/performance advisers after the DDL show only the previously
+documented classes (private no-policy INFO on `worker_credentials`,
+intentional anon-executable worker claim/complete SECURITY DEFINER warnings,
+unused-index INFOs) with **no new findings**; not a clean security sign-off,
+and backup/PITR remains unverified.
+
+**0.1.4 web deployment (same approval):** the first `vercel deploy` attempt
+failed on a CLI network error ("fetch failed") with no deployment created; the
+immediate retry from the unmodified tree succeeded. Production deployment
+**`dpl_F5EJDuBLsEqAeVAQLwvVg17oDVB8`**
+(`nd-automation-dashboard-bqx607klo-jelly-bean2.vercel.app`, build 54s)
+returned **Ready**, is aliased to
+**https://nd-automation-dashboard.vercel.app**, and the anonymous `/login`
+footer now reports **nd v0.1.4 / production** with that deployment ID.
+`npm.cmd run check:deployment` against the alias PASS (login 200; expected
+signed-out 307 redirects for dashboard/run/cohorts). Signed-in,
+evidence/intake and live-worker acceptance remains unverified; these are
+anonymous checks only. Desktop code and all live-account gates are unchanged:
+hosted rows still show **0 workers, bindings, publications, tasks, jobs,
+evidence rows and batches**; the one pre-existing active session and three
+workspaces remain untouched.
+
 ## Protected evidence, bulk intake, worker release lifecycle (2026-11-03)
 
 Operator-directed completion of the remaining local engineering gaps, per the

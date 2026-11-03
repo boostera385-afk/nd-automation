@@ -1,12 +1,12 @@
 # Protected bulk cookie/proxy intake (F06–F09)
 
-Implemented source only, **gated on explicit operator policy**: whether
-cookie/session transfer is necessary instead of normal login, and which
-permitted account-transfer/proxy uses the application may support. The hosted
-SQL is a local candidate proposal (`supabase/proposals/protected_bulk_intake.sql`),
-**not applied**, and the intake task RPC/batch table do not exist on the hosted
-database yet. No cookie/proxy values, no plaintext and no service credentials
-enter the database, the dashboard, tasks or journals.
+Implemented source, applied to the hosted test database on 2026-11-03 as
+migration **`protected_bulk_intake_v1`** after explicit operator approval
+(host verification PASS; see `IMPLEMENTATION-STATUS.md`). Still **gated on
+explicit operator policy**: whether cookie/session transfer is necessary
+instead of normal login, and which permitted account-transfer/proxy uses the
+application may support. No cookie/proxy values, no plaintext and no service
+credentials enter the database, the dashboard, tasks or journals.
 
 ## Local staging (`apps/worker/bulk_intake.py` + `private_vault.py`)
 

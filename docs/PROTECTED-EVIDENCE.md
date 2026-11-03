@@ -1,11 +1,11 @@
 # Protected evidence storage (F32)
 
-Status: local engineering candidate only. The SQL is a **local proposal**
-(`supabase/proposals/protected_evidence.sql`), **not applied**; it creates a
-private storage bucket and new table, which requires separate explicit
-approval. No evidence has been uploaded, held, deleted or live-accepted. The
-retention policy itself remains an open operator decision; **no automatic
-deletion, retention scheduling or scheduled job exists**.
+Status: applied to the hosted test database on 2026-11-03 as migration
+**`protected_evidence_v1`** after explicit operator approval (see
+`IMPLEMENTATION-STATUS.md`), with host verification PASS. No evidence has been
+uploaded, held, deleted or live-accepted yet. The retention policy itself
+remains an open operator decision; **no automatic deletion, retention
+scheduling or scheduled job exists**.
 
 ## Design
 

@@ -7,15 +7,11 @@ live-customer-data basis; backup/PITR remains unverified. Web deployment, commit
 pushes and live operations remain separate. Baseline/approval text below records
 the starting plan and is superseded only for those five database applications.
 
-**Latest local tranches (same day; no remote change):** engineering source for
-phase 3 (F32 evidence), phase 4 (F36 worker state/release lifecycle/acceptance
-validator) and phase 5 (F06/F07 staged bulk intake; F09 stays unimplemented by
-design) now exists and is unit-tested — see `PROTECTED-EVIDENCE.md`,
-`WORKER-RELEASE-LIFECYCLE.md` and `PROTECTED-BULK-INTAKE.md`. The SQL files
-under `supabase/proposals/` are **local candidates, not applied**; hosted
-application, bucket creation, real signing, the retention decision, the
-permitted-use decision, deployment and every live acceptance item below remain
-explicit gates. Policy questions and the ledger below are unchanged in force.
+**Hosted application (2026-11-03, explicitly approved):** both proposals are now
+applied as hosted migrations `protected_evidence_v1` and
+`protected_bulk_intake_v1` (30 hosted records; verification PASS). Web
+deployment of the 0.1.4 candidate followed. Retention, permitted-use,
+real signing and every live acceptance item below remain explicit gates.
 
 This is a phased engineering plan, not production approval or a parity sign-off.
 The current user request supersedes historical approvals quoted in older status

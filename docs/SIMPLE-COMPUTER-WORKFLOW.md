@@ -131,8 +131,10 @@ state migration, a shared cross-version state/lock root, Authenticode-verified
 offline release install/rollback and the F01–F36 operator acceptance validator
 (`WORKER-RELEASE-LIFECYCLE.md`). All of those are source and tests only:
 
-- the proposal SQL under `supabase/proposals/` is **not hosted**; evidence/batch
-  queueing is nonfunctional on the hosted database until separately approved;
+- the former proposals were applied to the hosted database on 2026-11-03
+  after explicit approval (`protected_evidence_v1`, `protected_bulk_intake_v1`);
+  evidence/batch queueing now exists on the hosted database, but no evidence
+  or batch has been created and none of it is live-accepted;
 - real signing needs a genuine certificate and out-of-band publisher
   thumbprint; no release exists yet;
 - nothing here adds evidence/image/file storage to this workflow; the daily
