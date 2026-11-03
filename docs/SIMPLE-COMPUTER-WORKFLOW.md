@@ -26,6 +26,36 @@ If a helper is already connected on this computer, reuse it instead of repeatedl
 registering more credentials. If its credential was revoked, use the existing
 revocation/replacement workflow; do not erase unresolved checkpoints to reconnect.
 
+## Employee / second-computer setup
+
+One-time, one-file setup for a non-technical teammate:
+
+1. **Teammate first:** they sign up with their own email on the dashboard and
+   confirm the email address (email delivery is not verified yet — if the
+   confirmation message never arrives, the workspace administrator confirms
+   the address manually; that account step needs explicit owner approval).
+2. **Owner, in the dashboard:** open **Settings → Workspace members**
+   (`/dashboard/settings/members`) and add that exact verified email with the
+   **operator** role. No invite email is sent and no account is created for
+   them. Adding is permanent: one account can only ever belong to one
+   workspace. Members with open work cannot be removed or demoted until the
+   work is finished.
+3. **Owner:** on **Settings → Connect Incogniton once**, under "Connect another
+   helper", connect a helper for the employee's computer and download its
+   private connection JSON. Give the teammate that file privately — never your
+   own credential, and never commit or share it.
+4. **Teammate, once, on their Windows computer:** in the worker folder,
+   double-click **Setup Employee Computer.bat**. It runs both steps in one
+   pass: the launcher setup (select the installed `Incogniton.exe`) and the
+   private-connection picker (select the JSON from the owner). Nothing
+   downloads, nothing auto-starts; Python 3.13 with Tkinter and Incogniton
+   must already be installed. Cancelled dialogs simply mean the file can be
+   run again; saved connections are never overwritten.
+5. The teammate signs in to the dashboard with their own confirmed email and
+   sees the business data and automations immediately, then follows the daily
+   flow below. Helpers are connected per business and claim only explicitly
+   queued tasks; nothing runs unattended or around the clock.
+
 ## Daily flow
 
 1. Sign in → **Open Incogniton**. Approve the native prompt. This opens the app

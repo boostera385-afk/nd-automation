@@ -10,7 +10,7 @@ import { signOut } from "@/app/actions/auth";
 export default async function Workspaces({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const { notice } = await searchParams;
   const { db, user, memberships } = await getWorkspaceAccess();
-  if (!memberships.length) return <AuthScreen title="No business access" description="Ask your team owner for access, or explicitly create your own private account."><Link className="button" href="/dashboard">Account setup</Link><form action={signOut}><button className="button secondary">Sign out</button></form></AuthScreen>;
+  if (!memberships.length) return <AuthScreen title="No business access" description="Ask your team owner for access, or explicitly create your own private account. If you are a teammate: sign up, confirm your email, then ask the owner to add that exact email under Settings / Members — creating your own workspace is permanent, because one account can only ever belong to one workspace."><Link className="button" href="/dashboard">Account setup</Link><form action={signOut}><button className="button secondary">Sign out</button></form></AuthScreen>;
   const result = await db.from("reporting_organizations").select("id,name").in("id", memberships.map((row) => row.organization_id)).order("name").order("id").limit(MAX_WORKSPACES + 1);
   const parsed = z.array(z.strictObject({ id: z.uuid(), name: z.string().min(1).max(100) })).max(MAX_WORKSPACES).safeParse(result.data);
   if (result.error || !parsed.success || parsed.data.length !== memberships.length

@@ -16,6 +16,7 @@ export default async function Settings() {
       <div className="workflow-links">
         <Link href="/dashboard/settings/computer"><strong>Connect Incogniton once</strong><small>Open-app launcher and profile/check helper setup. Sign in from any computer.</small></Link>
         <Link href="/dashboard/profiles"><strong>Map profiles to customers</strong><small>Saved exact-UUID mappings are reused by Sheet sync and monitoring.</small></Link>
+        <Link href="/dashboard/settings/members"><strong>Workspace members</strong><small>Add a teammate by their confirmed signup email; owners manage roles and removals.</small></Link>
         <Link href="/dashboard/settings/sheet-setup"><strong>Connect Master Sheet — step-by-step</strong><small>{connected ? "Connection configured. Test it or open the copy-and-paste setup guide." : "Copy connector code, create settings and test the connection here."}</small></Link>
         <Link href="/dashboard/customers"><strong>Customers</strong><small>Customer setup and business timezones.</small></Link>
         <Link href="/dashboard/fudge"><strong>Fudge intake receipts</strong><small>Read-only backend counts and revision receipts; local queue status remains in Fudge.</small></Link>

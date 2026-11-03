@@ -1,5 +1,66 @@
 # Implementation status
 
+## Workspace members and one-click employee setup (2026-11-03)
+
+Closes the missing workspace-membership flow (the browser-side gap in the
+onboarding plan). Employees are added **by email of an already-registered,
+confirmed account** — the memberships FK to `auth.users` forbids pre-signup
+invites, so no invite-email flow exists. Order: teammate signs up and confirms
+their email → owner adds that exact email under the new
+**Settings → Workspace members** page → the member sees the business data and
+automations immediately (verified through RLS). One-workspace-per-person stays
+enforced; `/workspaces` no-access copy now explains the order and that creating
+your own workspace is permanent.
+
+Delivered, all tested against PGlite exactly like the hosted database:
+
+- **`supabase/proposals/workspace_members.sql`** (local candidate, not applied
+  to the hosted DB yet): `reporting_list_workspace_members`,
+  `reporting_add_workspace_member`, `reporting_set_member_role`,
+  `reporting_remove_workspace_member`, plus shared guard
+  `private_reporting.member_has_open_work`
+  (open session OR queued automation task by `created_by` OR pending/leased
+  check or publish job joined via the member's session; helpers are org-level
+  with no user attribution, so they never block). All SECURITY DEFINER,
+  `search_path=''`, revoke from public/anon/authenticated, grant to
+  authenticated only. Owner-only role changes (no self-change, last-owner
+  defense), admin removes only operator/customer, no self-removal, ≤50
+  members, advisory-locked. plpgsql keyword collisions found and avoided:
+  parameter named `address` (not `email`), variable named `existing_role`
+  (not `current_role`) — both were real test failures.
+- **`apps/web/tests/members.test.ts`**: 9/9 PASS (adds/listing/RLS access,
+  privilege + direct-write denial, rank rules, 50-cap, verified-target rule,
+  one-workspace rule, role-change rules, open-work guards for automation
+  task/check job/publish job/open session, `reporting_customer_access`
+  cascade, cross-workspace isolation).
+- **Web layer:** `app/actions/members.ts` (3 form actions, all
+  `requireWorkspace(true, form)`, error-message mapper), new
+  `components/members-panel.tsx` (3 forms, each one `<WorkspaceField />`), new
+  `/dashboard/settings/members` page (staff-only roster via RPC with
+  `z.strictObject` verification; customers get a view-only panel; RPC
+  failure shows the honest "apply the `workspace_members` proposal
+  (hosted: `workspace_members_v1`)" notice instead of an empty list), static
+  link in Settings, boundary-test module lists updated (guarded count
+  43→46).
+- **`apps/worker/Setup Employee Computer.bat`**: one file, two chained runs of
+  `install_desktop_bridge.py` (launcher setup → `--connect-helper` private
+  JSON pick; no Python changes). Mentioned on the computer setup page and in
+  `docs/SIMPLE-COMPUTER-WORKFLOW.md` (new "Employee / second-computer setup"
+  section). Employee gets **their own** downloaded helper credential — never
+  the owner's.
+
+Validation (2026-11-03, from `apps/web`): `npm.cmd run typecheck` PASS,
+`lint` PASS (max-warnings 0), `test` PASS **1,089 tests / 80 files** (includes
+the 9 members tests), `build` PASS. Worker suite from `apps/worker`:
+`python -m unittest discover` **285 tests OK**.
+
+Uncommitted-to-hosted honesty: the proposal is **not applied to the hosted
+database yet** and the deployed production build (v0.1.4) does not include the
+members UI. Until the proposal is applied and the web is redeployed, the
+members page correctly reports that member management is unavailable. Each of
+those steps needs explicit operator approval, as does any manual email
+confirmation for the employee's account (email delivery remains unverified).
+
 ## Operator-approved hosting and 0.1.4 deployment (2026-11-03)
 
 The same operator later explicitly approved (in-chat): applying both proposals
