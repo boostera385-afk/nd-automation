@@ -100,6 +100,18 @@ is an admin support issue, not a reason to register another helper.
   are not evidence of physical laptop ownership or browser readiness.
 - The simple profile helper does not run monitoring, publishing or supervised
   account actions. Those need separate reviewed runners/adapters and acceptance.
+- **One Incogniton login, two laptops.** The owner and the operator share a single
+  Incogniton account, so each laptop sees the same profile list. That is what
+  makes the profiles usable from either machine, and it is also the one real
+  hazard: launching the *same* profile on both laptops at once presents two
+  devices on one session to Nextdoor and can trigger a verification challenge.
+  Rule: one profile runs on one machine at a time — finish and close before the
+  other opens it. Incogniton does not enforce this for you.
+- Sharing the browser login does **not** share dashboard identity. A profile binds
+  to exactly one helper (`reporting_worker_profiles.profile_id` is unique), and
+  moving it to another machine requires revoking the previous worker first, so the
+  dashboard refuses rather than silently running one profile in two places. Each
+  laptop also needs its own work session and its own revocable helper credential.
 
 ## Support and next live test
 

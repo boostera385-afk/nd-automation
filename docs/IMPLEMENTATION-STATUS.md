@@ -292,12 +292,54 @@ connector was not asked to return.
 
 **Validation for the plan-view slice:** `npm.cmd run typecheck` PASS, `npm.cmd run lint` PASS (0 warnings), `npm.cmd test` PASS **1,154 tests / 86 files**, `npm.cmd run build` PASS with `/dashboard/master-sheet/plan` in the route manifest. New coverage: 12 plan-page tests (single-tab auto-selection, several-tab choice instead of a guess, claim wording, missing Account Name, refused link cells, truncated read, no-banner date, unconfigured connector message, wrong-tab repair, and proof that no phone/remarks/pictures/credential column is ever requested) and 4 transport tests (structure-only layout request, strict rejection of a payload carrying cell text, the missing-script-property message, and a token that never appears in an error).
 
+**Production deployment of the dated plan (owner-approved, 2026-11-04):** the tree
+containing the connector, the plan page and the worker/admin work was committed as
+`3cb6075` and pushed to `origin/main`; a pre-commit scan confirmed no credential
+path, no `AKfycb…` deployment id, no JWT, no `sb_secret_`/`sbp_` key and no
+48-character token in the staged diff (the six previously flagged lines are
+documentation placeholders and test literals). Vercel CLI authentication was
+completed by the owner through a device-code link; the resulting token was never
+read, printed or pasted. Four production variables were added by piping values
+straight from the git-ignored `apps/web/.env.local` into `vercel env add` —
+`SHEET_SYNC_URL`, `SHEET_SYNC_TOKEN`, `SHEET_SYNC_ORGANIZATION_ID` and
+`SHEET_MASTER_LINK_HEADER=Issues`. `vercel env ls` confirms all four exist for
+**Production only** with hidden values; none was added to Preview or Development,
+so a later `vercel env pull` cannot write the token into a developer's working
+copy. The four pre-existing variables (`APP_URL`,
+`SUPABASE_EXPECTED_PROJECT_REF`, `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) were left untouched.
+
+Production deployment **`dpl_CbuYK8nkfbvBjcdUE3LdwD4oVoV6`** is READY and aliased
+to `https://nd-automation-dashboard.vercel.app`; the served page reports that exact
+deployment id, so the alias is not pointing at an older build.
+`npm.cmd run check:deployment -- https://nd-automation-dashboard.vercel.app`
+returned `anonymousRouteChecksPassed: true` (`/login` 200; `/workspaces`,
+`/verify-email`, `/dashboard`, `/dashboard/run/cohorts` all 307).
+`/dashboard/master-sheet` and `/dashboard/master-sheet/plan` both answer 307 to an
+anonymous request, which confirms the routes exist in the deployed build and are
+auth-gated rather than public. A defensive `trim()` was then added to the
+organisation-id read in `settings()`, because a hosting dashboard can store a
+trailing newline with a pasted value and a strict UUID parse would have turned
+that into a misleading "not configured" for the employee; the redeploy above
+carries that change (`typecheck` PASS, `lint` PASS, 38 targeted tests PASS).
+
+**Deliberately not verified:** `vercel env pull` returns the literal
+`[SENSITIVE]` placeholder for every secret-typed variable, so the stored values
+could not be compared byte-for-byte against the local ones — that check was
+attempted and is honestly reported as inconclusive, not passed. No authenticated
+read of the production plan page has been performed by the agent: it needs a
+signed-in session, and real-account operations require the owner present. The
+owner's own check of the production page is therefore the outstanding proof that
+production can read the workbook. Nothing was written to the Sheet, no publication
+was imported or queued, and no browser was launched.
+
 **Not claimed:** no link import into publications, no profile/customer mapping, no
 sync, no queueing, no publishing, and the legacy desktop tab previews remain
 unavailable against this one-tab workbook (they report the missing tab and link to
 the plan view). The 31 `Posted`-without-link rows, the 53 plan rows without an
 Account Name and the single unmatched persona remain data-quality items for the
-operator, not automation output. Nothing in this section is deployed to Vercel.
+operator, not automation output. Production serves the plan as a **read-only
+view**; posting tomorrow is still the desktop flow.
 
 **Employee membership correction (explicitly approved):** investigation found
 the designated employee was the sole owner of a separate, unused workspace,

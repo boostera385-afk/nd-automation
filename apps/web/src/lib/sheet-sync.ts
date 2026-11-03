@@ -17,9 +17,12 @@ const MAX_LAYOUT_BODY_CHARS = 500_000;
 const TIMEOUT_MS = 25_000;
 
 function settings() {
-  const endpoint = parseSyncEndpoint(process.env.SHEET_SYNC_URL);
+  // Values pasted into a hosting dashboard often carry a trailing newline or a
+  // stray space. Trim every one of them, so a correct secret that was entered
+  // with a line break is not mistaken for a missing connection.
+  const endpoint = parseSyncEndpoint(process.env.SHEET_SYNC_URL?.trim());
   const token = process.env.SHEET_SYNC_TOKEN?.trim() ?? "";
-  const organization = z.uuid().safeParse(process.env.SHEET_SYNC_ORGANIZATION_ID);
+  const organization = z.uuid().safeParse((process.env.SHEET_SYNC_ORGANIZATION_ID ?? "").trim());
   const linkHeader = (process.env.SHEET_MASTER_LINK_HEADER ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
   return endpoint && token.length >= 24 && organization.success ? { endpoint, token, organizationId: organization.data, linkHeader } : null;
 }
