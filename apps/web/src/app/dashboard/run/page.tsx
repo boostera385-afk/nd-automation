@@ -8,12 +8,15 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { gatedTasks } from "@/lib/automation-tasks";
 import { healthLabels, healthSummary, profileHealth } from "@/lib/profile-health";
 import { formatTime } from "@/lib/time";
+import { ComputerControls } from "@/components/computer-controls";
+import { hasActiveSession } from "@/lib/active-session";
+import { randomUUID } from "node:crypto";
+import { BulkIntakeForm } from "@/components/bulk-intake-form";
 
 export default async function RunAutomation() {
   const { organization } = await requireWorkspace(true);
   const [operations, data] = await Promise.all([getOperationsData(), getDashboardData()]);
-  const sessionAge = data.session ? operations.loadedAt - Date.parse(data.session.started_at) : Number.NaN;
-  const activeSession = data.session?.status === "active" && sessionAge >= 0 && sessionAge < 10 * 3600_000;
+  const activeSession = hasActiveSession(data.session, operations.loadedAt);
   const profiles = operations.bindings.map((binding) => {
     const worker = operations.workers.find((item) => item.id === binding.worker_id);
     return { id: binding.id, label: binding.account_label, customer: data.customers.find((customer) => customer.id === binding.customer_id)?.name ?? "Assigned customer", worker: worker?.name ?? "Assigned device", enabled: Boolean(worker?.enabled), monitoring: Boolean(activeSession && binding.monitoring_session_id === data.session?.id && worker?.enabled), posts: data.publications.filter((post) => post.customer_id === binding.customer_id && post.account_label === binding.account_label).length };
@@ -21,13 +24,23 @@ export default async function RunAutomation() {
   const health = operations.bindings.map((binding) => profileHealth({ binding, worker: operations.workers.find((item) => item.id === binding.worker_id), jobs: operations.jobs, sessionId: activeSession ? data.session?.id ?? null : null, now: operations.loadedAt }));
   const healthTotals = healthSummary(health);
   return <>
-    <PageHeader eyebrow="DAILY CONTROL" title="Run automation" description="Use your saved profiles and master-Sheet records. Select a batch once; review progress in Results." actions={<LiveRefresh />} />
+    <PageHeader eyebrow="DAILY CONTROL" title="Run automation" description="Choose your work. Technical connection and recovery details stay out of your daily flow." actions={<LiveRefresh />} />
+    <Panel title="Open & connect"><ComputerControls workers={operations.workers} activeSession={activeSession} available={operations.automationAvailable} /></Panel>
+    <Panel title="Choose your work"><div className="workflow-links">
+      <Link href="/dashboard/content"><strong>Posts &amp; listings</strong><small>Prepare content, review attachments and approve the exact revision before publishing.</small></Link>
+      <Link href="/dashboard/workflows"><strong>Account tools &amp; editing</strong><small>Authorized login/inspection, genuine-data signup handoff, exact-target editing and confirmed deletion/blocking.</small></Link>
+      <Link href="/dashboard/profiles"><strong>Profiles</strong><small>Detect your profile list and save customer assignments once.</small></Link>
+      <Link href="/dashboard/results"><strong>Post status &amp; comments</strong><small>See saved observations, check times and issues. An unchecked post is not live or deleted.</small></Link>
+      <Link href="/dashboard/master-sheet"><strong>Master Sheet</strong><small>Keep your existing Sheet workflow and sync known post links.</small></Link>
+    </div><p className="small muted">Publishing and account actions use separate reviewed local adapters and explicit authorization. These links do not start a browser or claim that real-platform acceptance is complete.</p></Panel>
     <Panel title="One-click prior-day cohort"><p>Choose an exact customer/publication date and follow every tracked record, including skipped and blocked cases. Setup and session authorization are checked separately.</p><Link className="button secondary" href="/dashboard/run/cohorts">Refresh post statuses by date</Link></Panel>
     <Panel title="Post checks & comments" hint="Available with the local monitoring agent">
       <p>After syncing reported links from Master Sheet, enable checks for selected profiles. Your local agent checks older or unknown-date posts due for review. One batch confirmation replaces repeated profile-by-profile setup.</p>
       {!operations.available || profiles.length === 0 ? <p>Start this device&apos;s automation agent and <Link href="/dashboard/profiles">assign profiles</Link> first. <Link href="/dashboard/settings#connections">Open one-time setup</Link>.</p> : <MonitoringBatch profiles={profiles} activeSession={Boolean(activeSession)} />}
       {(operations.limited || data.truncated) && <p className="notice">Loaded records are partial. Profile/post counts describe only this view.</p>}
     </Panel>
+    <details className="workflow-details"><summary>Advanced imports, connection health &amp; recovery</summary>
+    <Panel title="Protected bulk intake"><BulkIntakeForm workers={operations.workers} request={randomUUID()} /></Panel>
     <Panel title="Profile & session health" hint="Read-only status from the last agent heartbeat">
       {operations.bindings.length === 0 ? <p>No profiles are assigned yet. <Link href="/dashboard/profiles">Assign profiles</Link> to see their status here.</p> : <>
         <p className="small">{healthTotals.live} live · {healthTotals.stale} stale · {healthTotals.offline} offline · {healthTotals.disabled} disabled · {healthTotals.monitored} bound to the current session.{" "}{healthTotals.expiredLeases > 0 ? `${healthTotals.expiredLeases} lease(s) expired and need review.` : "No expired leases."}</p>
@@ -43,6 +56,7 @@ export default async function RunAutomation() {
       <BrowserTasks workers={operations.workers} tasks={operations.tasks} profiles={operations.profiles} timeZone={organization.time_zone} available={operations.automationAvailable} activeSession={Boolean(activeSession)} />
       {operations.tasksLimited && <p className="notice">Showing the 20 most recent tasks only.</p>}
     </Panel>
-    <Panel title="Still gated" hint="Deliberately not executable from the dashboard"><div className="task-list">{gatedTasks.map((task) => <div className="task-row" key={task.label}><div><strong>{task.label}</strong><small className="muted">{task.reason}</small></div><span className="badge">Gated</span></div>)}</div><p className="muted small">These rows are not coming soon: each needs its own approval and a live test before any Start button exists. Cookie and proxy imports above are the real thing now — one profile per task, confirmed by you each time, and not yet verified against a live Incogniton install, so a first run may report a failure honestly.</p></Panel>
+    <Panel title="Execution boundaries" hint="Source functionality is not live acceptance"><div className="task-list">{gatedTasks.map((task) => <div className="task-row" key={task.label}><div><strong>{task.label}</strong><small className="muted">{task.reason}</small></div><span className="badge">Gated</span></div>)}</div><p className="muted small">Use the separate task-specific controls above. Cookie/proxy writes remain one profile per task, explicitly confirmed and not live-accepted. Artificial engagement and deceptive warmup remain disabled.</p></Panel>
+    </details>
   </>;
 }

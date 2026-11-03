@@ -11,6 +11,10 @@ import { ScanImport, type LatestScanSummary } from "@/components/scan-import";
 import { ProfileAssignment } from "@/components/profile-assignment";
 import { setProfileArchived } from "@/app/actions/profiles";
 import { PageHeader, Panel } from "@/components/ui";
+import { ComputerControls } from "@/components/computer-controls";
+import { hasActiveSession } from "@/lib/active-session";
+import { profileRowSchema } from "@/lib/profiles";
+import { LiveRefresh } from "@/components/live-refresh";
 
 export default async function Profiles() {
   const { db, organization } = await requireWorkspace(true);
@@ -34,8 +38,13 @@ export default async function Profiles() {
         completedText: scanTask.completed_at ? formatTime(scanTask.completed_at, organization.time_zone) : "an unknown time",
       }
     : null;
+  const detected = scannedList?.flatMap((row) => { const parsed = profileRowSchema.safeParse(row); return parsed.success ? [parsed.data] : []; }) ?? [];
   return <>
-    <PageHeader title="Profiles" description="Select existing profiles and map each to its customer once. Master Sheet sync and monitoring reuse these saved mappings." actions={<Link className="button secondary" href="/dashboard/run">Run checks</Link>} />
+    <PageHeader title="Profiles" description="Detect existing profiles and save their customer once. No repeated profile-ID typing." actions={<LiveRefresh />} />
+    <Panel title="Find your Incogniton profiles"><ComputerControls workers={operations.workers} activeSession={hasActiveSession(data.session, operations.loadedAt)} available={operations.automationAvailable} />
+      <ScanImport latest={latestScan} />
+      {detected.length > 0 && <><p className="small">Latest completed scan — not a live readiness check. Save it with the button above before assigning customers.{detected.length !== scannedList?.length && " Some returned rows are invalid; import validation must pass before saving."}</p><div className="table-wrap"><table><thead><tr><th>Detected profile</th><th>Group</th><th>Profile ID</th></tr></thead><tbody>{detected.map((profile, index) => <tr key={`${profile.profile_id}-${index}`}><td>{profile.name}</td><td>{profile.group_name}</td><td><code>{profile.profile_id}</code></td></tr>)}</tbody></table></div></>}
+    </Panel>
     <Panel title="Saved customer mappings" hint={`${operations.bindings.length} loaded assignments`}>
       {operations.bindings.length ? <div className="table-wrap"><table><thead><tr><th>Sheet profile name</th><th>Customer</th><th>Group</th><th>Device</th><th>Identity</th></tr></thead><tbody>{operations.bindings.map((binding) => {
         const profile = profiles.find((item) => item.profile_id === binding.profile_id);
@@ -48,8 +57,8 @@ export default async function Profiles() {
       {!result.error && choices.length && enabledWorkers.length && data.customers.length ? <ProfileAssignment profiles={choices} workers={enabledWorkers} customers={data.customers} /> : <p>{choices.length === 0 ? "No unassigned active inventory profiles are loaded. " : ""}{!data.customers.length ? "Add your customer in Settings / More. " : ""}{!enabledWorkers.length ? "Register this device's automation agent in connection setup. " : ""}<Link href="/dashboard/settings#connections">Open setup</Link>. Inventory import is available below.</p>}
     </Panel>
     <details className="workflow-details"><summary>Inventory setup & advanced tools</summary>
-      <p className="muted small">Profiles are detected from Incogniton on this device: the automation agent reads the UUID/name/group list (no cookies, proxies or account details), and the result imports here in one click. A CSV export remains available as a fallback. Neither path launches, creates or verifies profiles. Archive affects inventory suggestions only, not saved assignments.</p>
-      {!result.error ? <><ScanImport latest={latestScan} /><ProfileImport /><div className="table-wrap"><table><thead><tr><th>Inventory profile</th><th>Group</th><th>Status</th><th>Advanced</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.profile_id}><td>{profile.name}<small>{profile.profile_id}</small></td><td>{profile.group_name}</td><td>{profile.status}</td><td><ActionForm action={setProfileArchived} label={profile.status === "active" ? "Archive inventory" : "Reactivate inventory"} secondary><input type="hidden" name="profile" value={profile.profile_id} /><input type="hidden" name="archived" value={profile.status === "active" ? "true" : "false"} /><label className="check"><input type="checkbox" name="confirmed" required />Change this inventory claim only.</label></ActionForm></td></tr>)}</tbody></table></div></> : <p>Inventory setup is unavailable. Ask your administrator to complete the database setup.</p>}
+      <p className="muted small">Profiles are detected from Incogniton on the connected helper: it reads UUID/name/group only, capped at 500 entries and a result-size budget. A CSV export remains the fallback for omitted profiles. Neither path launches, creates or verifies profiles. Archive affects inventory suggestions only, not saved assignments.</p>
+      {!result.error ? <><ProfileImport /><div className="table-wrap"><table><thead><tr><th>Inventory profile</th><th>Group</th><th>Status</th><th>Advanced</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.profile_id}><td>{profile.name}<small>{profile.profile_id}</small></td><td>{profile.group_name}</td><td>{profile.status}</td><td><ActionForm action={setProfileArchived} label={profile.status === "active" ? "Archive inventory" : "Reactivate inventory"} secondary><input type="hidden" name="profile" value={profile.profile_id} /><input type="hidden" name="archived" value={profile.status === "active" ? "true" : "false"} /><label className="check"><input type="checkbox" name="confirmed" required />Change this inventory claim only.</label></ActionForm></td></tr>)}</tbody></table></div></> : <p>Inventory setup is unavailable. Ask your administrator to complete the database setup.</p>}
       <p><Link href="/dashboard/automation">Worker replacement, manual UUID assignment & diagnostics</Link></p>
     </details>
   </>;

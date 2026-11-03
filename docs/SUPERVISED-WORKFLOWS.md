@@ -16,8 +16,12 @@ The source migrations are not automatically applied by committing/pushing.
 - Edit: exact owned tracked post/listing, expected existing normalized-body hash,
   separately approved immutable text revision, matching original account/customer
   assignment, final content/audience readback and exact result-card verification.
-  This adapter refuses existing/new attachments; attachment-preserving edits
-  require further code and fixture/live review rather than silently dropping them.
+  The local retain-all adapter can preserve explicitly reviewed existing asset IDs
+  and order. Adding, removing or reordering attachments is not implemented. The
+  default text-only plan refuses any attachment nodes, including hidden nodes.
+  Both variants check the original card, composer before/after filling and saved
+  result; missing or changed result evidence requires reconciliation, never retry.
+  These are synthetic fixture checks, not live platform compatibility or byte proof.
 - Delete/block: exact target, separate dashboard and local destructive confirmation,
   same-target dialog and result evidence, one final confirmation click. A missing
   result is `needs_reconciliation`; mere page absence is never deletion evidence.
@@ -31,9 +35,10 @@ The source migrations are not automatically applied by committing/pushing.
    text draft/revision of the same target kind. Review and confirm the manifest.
    The dashboard sends only that strict non-secret manifest; no credentials,
    identity documents, OTP, private paths or browser selectors are accepted there.
-3. Privately create `.monitoring/workflow.private.json` with precisely four keys:
+3. Privately create `.monitoring/workflow.private.json` with four required keys:
    `manifest` (the exact reviewed dashboard JSON), `reviewed: true`, `selectors`
-   and `values`. Keep it on the authorized device and out of repos/archives.
+   and `values`. An edit may additionally have the local-only `attachments` review
+   described below. Keep it on the authorized device and out of repos/archives.
 4. Each selector is a locally reviewed bounded locator, never remote JavaScript.
    All operations require `account`, `login`, `challenge`, `disabled`.
    Login additionally requires `form`, `email`, `password`, `submit`;
@@ -44,7 +49,11 @@ The source migrations are not automatically applied by committing/pushing.
    `post_body`, `post_media`, each scoped to the exact selected post.
    Edits also require `edit_open`, `edit_root`, `body`, `title`, `price`, `category`,
    `audience`, `submit`, `result_title`, `result_price`, `result_category`,
-   `result_audience`. This adapter expects native category/audience selects and
+   `result_audience`, `edit_media`. `post_media` and `edit_media` must select
+   individual attachment nodes, not gallery containers or unrelated avatars.
+   Older edit plans without `edit_media` now fail preflight and need local review;
+   the runner must inspect composer attachments even for text-only edits.
+   This adapter expects native category/audience selects and
    exact saved result labels; other UI variants are not claimed supported.
    Delete/block additionally require `action_open`, `dialog`, `dialog_target`,
    `confirm`, `result`, `result_target`. Target selectors must expose an exact
@@ -64,6 +73,43 @@ The source migrations are not automatically applied by committing/pushing.
 The existing body fingerprint is SHA-256 of UTF-8 text after splitting whitespace
 and joining with one ASCII space (`supervised_workflows.body_hash`). Review that
 exact source and ownership before approval; never guess a hash from a title.
+
+## Local retain-all attachment review
+
+For an exact text edit only, an optional fifth local plan key is:
+
+```json
+"attachments": {
+  "mode": "preserve",
+  "id_attribute": "data-media-id",
+  "ids": ["reviewed-asset-1", "reviewed-asset-2"]
+}
+```
+
+This fragment is illustrative, **not a real platform adapter**. Use only actual
+stable platform asset identifiers individually reviewed on the owned post and in
+its composer, in their exact order (1–10, distinct bounded opaque IDs). The local
+attribute must be a reviewed `data-*` attribute, never `src`, signed URLs, private
+paths or credentials. Do not inject IDs into the page to satisfy this contract.
+If the platform exposes no reliable common asset identity across card/composer/
+saved result, this variant is unsupported and must stop for a human.
+
+Selectors must cover all actual attachments, including hidden nodes, while
+excluding container placeholders and unrelated media. Missing/lazy-loaded media
+may stop a legitimate operation; never narrow selectors to manufacture success.
+IDs attest DOM identity/order only: no download, image-byte verification or proof
+of content permission is performed. Actual platform selector/asset semantics and
+visual preservation require explicit live acceptance. Do not enable this adapter
+based on synthetic fixtures alone.
+
+Only the hash of selectors plus the local attachment review enters the result.
+The review is not queued, journaled or uploaded. Existing hosted manifests remain
+unchanged; approved draft content still describes the text change, not replacement
+media. No upload, remove or reorder control is invoked. Any post-save mismatch is
+`needs_reconciliation`, preserves the checkpoint and blocks blind replay. A
+failed save is not rolled back or retried automatically, since its effects may be
+unknown. Adding/removing/reordering assets needs a future separately approved
+protocol, including explicit destructive confirmation for removal.
 
 ## Handoff and recovery
 

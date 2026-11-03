@@ -252,7 +252,7 @@ def execute(task, incogniton):
         target = profile_target(payload)
         if not incogniton.stopped(target["profile_id"]):
             raise TaskError("The target profile is active or its state is unknown; stop it before importing")
-        cookies = parse_cookie_entries(_read_text(target["path"]))
+        cookies = parse_cookie_entries(write_text(target, kind))
         if not cookies:
             raise TaskError("The file has no cookies.txt rows to import")
         if target["replace"]:
@@ -263,7 +263,14 @@ def execute(task, incogniton):
     target = profile_target(payload)
     if not incogniton.stopped(target["profile_id"]):
         raise TaskError("The target profile is active or its state is unknown; stop it before importing")
-    text = _read_text(target["path"])
+    text = write_text(target, kind)
     proxy = first_proxy(text)
     applied = incogniton.set_proxy(target["profile_id"], proxy)
     return {"entries": parse_proxies(text)["entries"], "applied": applied}
+
+
+def write_text(target, kind):
+    if target["path"].endswith(".private.bin"):
+        from bulk_intake import read_staged
+        return read_staged(target["path"], kind, target["profile_id"], target["replace"])
+    return _read_text(target["path"])

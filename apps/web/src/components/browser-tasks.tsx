@@ -5,6 +5,7 @@ import { cancelBrowserTask, enqueueBrowserTask } from "@/app/actions/automation-
 import { automationKinds, describeResult, kindDescriptions, kindLabels, operatingSystems, statusLabels, statusTones, type AutomationKind, type AutomationTask, type InventoryProfile } from "@/lib/automation-tasks";
 import { formatTime } from "@/lib/time";
 import { WorkspaceField } from "./workspace-context";
+import { LocalHelperField } from "./local-helper-field";
 
 type Worker = { id: string; name: string; enabled: boolean; last_seen_at: string | null };
 
@@ -21,14 +22,14 @@ export function BrowserTasks({ workers, tasks, profiles, timeZone, available, ac
   if (!available) return <p className="notice">The browser task queue or its session-safety migration is not available on this deployment yet. No task can be queued.</p>;
   if (usable.length === 0) return <p>No automation agent is enabled yet. <a href="/dashboard/settings#connections">Register or re-enable the agent on this device</a> before queuing a browser task.</p>;
   const confirmText = writes
-    ? `I authorize this import into the chosen Incogniton profile on this device's automation agent. It writes cookies or a proxy into that one profile; it does not post, publish, browse Nextdoor or change any other profile.`
-    : `I authorize this task on this device's automation agent. It creates or reads only; it does not post, publish, create an account or change cookies.`;
+    ? `I authorize this import into the chosen Incogniton profile on the selected connected helper. It writes cookies or a proxy into that one profile; it does not post, publish, browse Nextdoor or change any other profile.`
+    : `I authorize this task on the selected connected helper. It creates or reads only; it does not post, publish, create an account or change cookies.`;
   return <>
     {!activeSession && <p className="notice">Start or resume an active work session before queuing a browser task. Sessions expire after ten hours; paused or ended sessions cannot dispatch new tasks.</p>}
     {writes && profiles.length === 0 && <p className="notice">No Incogniton profiles are recorded yet. Choose Detect Incogniton profiles first, then load the scan under Profiles before importing into one.</p>}
     <form action={action} className="form-grid">
       <WorkspaceField />
-      <label>Device<select name="worker" defaultValue={usable[0].id} required>{usable.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
+      <LocalHelperField helpers={usable} />
       <label>Task<select name="kind" value={kind} onChange={(event) => setKind(event.target.value as AutomationKind)}>{automationKinds.map((item) => <option key={item} value={item}>{kindLabels[item]}</option>)}</select></label>
       <p className="small muted">{kindDescriptions[kind]}</p>
       {kind === "profile_create" && <>

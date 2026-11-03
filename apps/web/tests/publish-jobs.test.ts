@@ -11,6 +11,16 @@ const draftId = "44444444-4444-4444-8444-444444444444";
 const token = "e".repeat(64);
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const content = { kind: "post", title: "Authorized launch post", body: "Fixture post body", audience: "neighborhood", price_cents: null, category: null };
+const releaseSmokes: Record<string, string> = {
+  "202611020003_publish_scheduling.sql": "publish_scheduling_hosted_smoke.sql",
+  "202611020004_automatic_sheet_mapping.sql": "automatic_sheet_mapping_hosted_smoke.sql",
+  "202611020005_approved_media.sql": "approved_media_hosted_smoke.sql",
+  "202611020006_browser_task_receipts.sql": "browser_task_receipts_hosted_smoke.sql",
+  "202611020007_supervised_workflows.sql": "supervised_workflows_hosted_smoke.sql",
+};
+const smokeSql = (name: string) => readFile(new URL(`../../../supabase/tests/${name}`, import.meta.url), "utf8");
+// Tests below already own a transaction/savepoint; retain only the assertions.
+const smokeBody = async (name: string) => (await smokeSql(name)).replace(/^begin read only;\r?\n/m, "").replace(/^rollback;\r?$/m, "");
 let org: string, customer: string, worker: string, binding: string, session: string;
 async function scalar(sql: string, params: unknown[] = []) {
   return Object.values((await db.query<Record<string, unknown>>(sql, params)).rows[0])[0];
@@ -42,10 +52,12 @@ beforeAll(async () => {
   for (const file of ["202610260001_reporting_foundation.sql", "202610270001_post_checks_and_notifications.sql", "202610270002_monitoring_worker_bridge.sql", "202610270003_worker_bridge_indexes.sql", "202610270004_content_drafts.sql", "202610270006_publish_jobs.sql"]) {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8"));
   }
-  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql"]) {
+  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "20261031120000_cookie_proxy_write_v1.sql", "20261031150000_inventory_scan_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql"]) {
     try { await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8")); }
     catch (error) { console.error("Fixture migration failed", file, (error as { position?: string }).position); throw error; }
+    if (releaseSmokes[file]) await db.exec(await smokeSql(releaseSmokes[file]));
   }
+  await db.exec(await readFile(new URL("../../../supabase/proposals/protected_bulk_intake.sql", import.meta.url), "utf8"));
   await db.exec("begin");
   org = String(await owner(() => scalar("select public.reporting_create_workspace('Publish workspace')")));
   const otherOrg = await as("authenticated", other, () => scalar("select public.reporting_create_workspace('Other workspace')"));
@@ -59,6 +71,70 @@ beforeAll(async () => {
 beforeEach(async () => { await db.exec("begin"); });
 afterEach(async () => { await db.exec("reset role; rollback"); });
 afterAll(async () => { await db.close(); });
+
+describe("ordered release catalog smokes", () => {
+  it("remains compatible after later migrations without touching application rows", async () => {
+    for (const name of Object.values(releaseSmokes)) await db.exec(await smokeBody(name));
+    expect(await scalar("select count(*) from public.reporting_publish_jobs")).toBe(0);
+    expect(await scalar("select count(*) from public.reporting_automation_tasks")).toBe(0);
+  });
+  it.each([
+    ["publish_scheduling_hosted_smoke.sql", "grant insert on public.reporting_publish_batches to authenticated"],
+    ["automatic_sheet_mapping_hosted_smoke.sql", "grant select on public.reporting_sheet_delivery_events to anon"],
+    ["approved_media_hosted_smoke.sql", "grant execute on function private_reporting.valid_approved_media(jsonb) to anon"],
+    ["browser_task_receipts_hosted_smoke.sql", "grant execute on function private_reporting.reporting_complete_automation_task(text,uuid,uuid,text,jsonb,text) to authenticated"],
+    ["supervised_workflows_hosted_smoke.sql", "grant execute on function public.reporting_enqueue_supervised_workflow(uuid,uuid,jsonb,boolean) to anon"],
+  ])("%s detects an accidental privilege expansion", async (name, grant) => {
+    await db.exec("savepoint smoke_privileges");
+    try {
+      await db.exec(grant);
+      await expect(db.exec(await smokeBody(name))).rejects.toThrow(/mismatch|exposed/);
+    } finally {
+      await db.exec("rollback to savepoint smoke_privileges; release savepoint smoke_privileges");
+    }
+  });
+});
+
+describe("protected bulk intake candidate", () => {
+  const request = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const row = (changes = {}) => ({ profile_id: profile, kind: "cookie_write", replace: false, path: `C:/Private/${profile}.private.bin`, ...changes });
+  const queue = (rows = [row()], permitted = true) => owner(() => scalar("select reporting_enqueue_intake_batch($1,$2,$3,$4::jsonb,$5)", [org, worker, request, JSON.stringify(rows), permitted]));
+  it("records exact bindings and replays identical receipts, not mutations", async () => {
+    expect(await queue()).toBe(request); expect(await queue()).toBe(request);
+    expect(await scalar("select count(*) from reporting_automation_tasks where intake_batch_id=$1", [request])).toBe(1);
+    expect(await scalar("select intake_customer_id from reporting_automation_tasks where intake_batch_id=$1", [request])).toBe(customer);
+    await expect(queue([row({ replace: true })])).rejects.toThrow("identity conflict");
+  });
+  it("rejects raw fields, duplicate/unknown targets, clear-proxy and missing permission atomically", async () => {
+    for (const rows of [[row({ cookie_value: "must-not-enter-db" })], [row(), row()], [row({ profile_id: "99999999-9999-4999-8999-999999999999" })], [row({ kind: "proxy_write", replace: true })], [row({ path: "C:/raw-cookies.txt" })]]) {
+      await expect(queue(rows)).rejects.toThrow();
+      expect(await scalar("select count(*) from reporting_intake_batches")).toBe(0);
+      expect(await scalar("select count(*) from reporting_automation_tasks")).toBe(0);
+    }
+    await expect(queue([row()], false)).rejects.toThrow("permitted-use");
+  });
+  it("requires the exact active human session and denies anonymous enqueue", async () => {
+    await owner(() => scalar("select reporting_session_action($1,'pause','America/Los_Angeles')", [org]));
+    await expect(queue()).rejects.toThrow("active work session");
+    await expect(agent(() => scalar("select reporting_enqueue_intake_batch($1,$2,$3,$4::jsonb,true)", [org, worker, request, JSON.stringify([row()])]))).rejects.toThrow("permission denied");
+  });
+  it("stops later rows after any failed/cancelled row even after a helper restart", async () => {
+    const second = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    await owner(() => scalar("select reporting_bind_worker_profile($1,$2,$3,$4,'Second profile')", [org, worker, customer, second]));
+    await queue([row(), row({ profile_id: second })]);
+    const task = await agent(() => scalar("select reporting_claim_automation_task($1)", [token])) as { task_id: string; lease_token: string };
+    expect(task).toBeTruthy();
+    await agent(() => scalar("select reporting_complete_automation_task($1,$2,$3,'failed',null,'Redacted failure')", [token, task.task_id, task.lease_token]));
+    await expect(agent(() => scalar("select reporting_claim_automation_task($1)", [token]))).rejects.toThrow("stopped on failure");
+    expect(await scalar("select count(*) from reporting_automation_tasks where status='pending'")).toBe(1);
+  });
+  it("refuses dispatch when a profile changes customer after approval", async () => {
+    await queue();
+    const replacement = await scalar("insert into reporting_customers(organization_id,name) values ($1,'Other authorized customer') returning id", [org]);
+    await db.query("update reporting_worker_profiles set customer_id=$1 where id=$2", [replacement, binding]);
+    await expect(agent(() => scalar("select reporting_claim_automation_task($1)", [token]))).rejects.toThrow("assignment changed");
+  });
+});
 
 describe("enqueue guards", () => {
   it("rejects anonymous enqueue and grants staff reads only", async () => {

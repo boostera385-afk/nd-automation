@@ -2,6 +2,29 @@
 
 ## Direction and current status
 
+Local simplification (2026-11-03): daily Home/Profiles/Run controls, fixed-action
+Windows app/profile-helper launch source, one-time private connection picker and
+stdlib-only profile-task mode are implemented with mocked native/unit fixtures.
+Device selection is hidden only for one helper, not replaced with guessed
+execution ownership. See `SIMPLE-COMPUTER-WORKFLOW.md`; local install, deployment,
+real Windows/profile acceptance and signed installer/update parity remain open.
+
+Hosted database follow-up (2026-11-03): the operator approved applying source
+003–007 to the existing test project; all five individual hosted smokes PASS.
+There are now 28 migration records and 33 public RLS-enabled tables. Backup/PITR
+was not verified; the operator directed proceeding on a testing/no-live-data
+basis. Web deployment and live acceptance remain separate. See
+`DB-DEPLOYMENT-20261103-0.1.4.md`; older pending-migration statements below describe
+historical checkpoints, not current hosted status.
+
+Local follow-up (2026-11-03): F19 now has a retain-all existing-attachment
+text-edit adapter with exact local asset-ID/order checks and synthetic fixtures.
+Adding/removing/reordering attachments and real platform acceptance remain open.
+Edit plans require a reviewed composer-media selector, including text-only plans.
+`REMAINING-WORK-PLAN.md` tracks each F01–F36 acceptance item and later policy
+gates; `DB-DEPLOYMENT-0.1.4-PLAN.md` covers the five pending hosted migrations with
+individual smoke scripts. Nothing in this follow-up deploys or enables them.
+
 Source **0.1.4** adds durable browser-task recovery and explicit one-task genuine
 registration first-step/human handoff, local login, account inspection, bounded
 browsing and approved text-edit/exact-target delete/block workflows. These are

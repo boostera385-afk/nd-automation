@@ -24,6 +24,9 @@ vi.mock("@/components/reporting-forms", () => ({
   CommentForm: () => null,
   SingleCheckForm: () => null,
 }));
+// The evidence panel is an async server component with its own storage query;
+// its RPC/table behavior is covered separately in evidence.test.ts.
+vi.mock("@/components/evidence-panel", () => ({ EvidencePanel: () => null }));
 
 import Comments from "@/app/dashboard/comments/page";
 import Results from "@/app/dashboard/results/page";

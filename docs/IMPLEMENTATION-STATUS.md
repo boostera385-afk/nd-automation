@@ -1,5 +1,211 @@
 # Implementation status
 
+## Protected evidence, bulk intake, worker release lifecycle (2026-11-03)
+
+Operator-directed completion of the remaining local engineering gaps, per the
+phases in `REMAINING-WORK-PLAN.md`. Everything here is **implemented source with
+tests only**: no proposal was hosted, no bucket created, no release signed or
+installed, no live account/platform/Sheet operation, commit or push. Desktop
+code (`core/`, `gui/`, launchers) is unchanged.
+
+- **F32 evidence** (`PROTECTED-EVIDENCE.md`): web upload/inspect actions plus a
+  strict candidate schema/RPC set in `supabase/proposals/protected_evidence.sql`
+  — reserve → upload → `ready`; operator-supplied observation time changes no
+  publication status; `review_after` is a human note, never a deletion deadline;
+  holds block delete; irreversible two-phase delete with a metadata tombstone;
+  PNG/JPEG ≤3 MiB with SHA-256, ≤10,000 non-deleted rows per workspace. Real
+  PGlite tests cover reserve/replay, customer/foreign/anonymous denial, hold
+  and two-phase delete. **Not hosted**: a private bucket + table/RPCs need
+  separate approval; retention remains a policy gate.
+- **F06–F09 bulk intake** (`PROTECTED-BULK-INTAKE.md`): `bulk_intake.py` is a
+  local read-only preview plus explicit `--stage` with per-row Windows
+  current-user DPAPI ciphertext (`private_vault.py`, no plaintext fallback, no
+  persisted key), 24-hour expiry, strict Netscape/proxy validation and byte
+  budgets. The web form enqueues only redacted ciphertext-path descriptors via
+  the candidate `reporting_enqueue_intake_batch` RPC with necessity/permitted-use
+  confirmations and receipt replay. The candidate proposal narrows the
+  `automation_one_open_task` unique index to non-batch rows so one batch may
+  queue several pending rows; one-lease-at-a-time stays enforced by every
+  claim path's worker-row FOR UPDATE lock plus leased checks, a dispatch guard
+  stops a batch after any failed/cancelled row, and assignment changes stop
+  dispatch. Batch rows still apply through the existing one-profile task queue.
+  F09 automatic polling/watching stays unimplemented by design; the proposal is
+  **not hosted**; permitted-use/retention policy decisions remain open.
+- **F36 worker lifecycle** (`WORKER-RELEASE-LIFECYCLE.md`): `worker_state.py`
+  gives a stable per-user state root (`ND_WORKER_HOME`, else
+  `%LOCALAPPDATA%/NDAutomation/worker`) shared across future release
+  directories, with cross-release/old-checkout exclusion locks, an explicit
+  fingerprinted one-time `migrate` command for legacy `.worker-state` journals
+  (never auto-copied or discarded) and a drained-checkpoints requirement.
+  `release_lifecycle.py` installs/rolls back only Authenticode-**signed**
+  data-only manifests (`# ND-RELEASE-V1`, never executed), pinned to an exact
+  reviewed publisher thumbprint, with byte/SHA-256 verification of exactly
+  five worker files, pinned runtime/pins (no auto-install), staging + atomic
+  pointer switch (partial installs never execute), strictly increasing
+  sequences and explicit rollback to the previous release.
+  `scripts/create_worker_release.py` builds **unsigned candidates** only.
+  Real signing, a genuine certificate and a user-present install/rollback test
+  remain open gate items.
+- **Acceptance validator** (`apps/worker/acceptance.py`): validates
+  operator-supplied F01–F36 records (user-present acceptance or approved
+  retirement, or honestly `pending`); it cannot manufacture evidence or
+  authorize desktop retirement. The full ledger stays in
+  `REMAINING-WORK-PLAN.md`.
+- Test fix: the post ledger test now mocks the async evidence-panel child (RPCs
+  covered separately by the evidence SQL tests); the previously failing batch
+  scenario passes against the narrowed index proposal.
+
+Validation (final tree, 2026-11-03): web **typecheck PASS**, **lint PASS (zero
+warnings)**, **1,080 tests / 79 files PASS** (first full run caught one
+render assertion against the new evidence panel; fixed as above and re-run in
+full), **production build PASS**. Worker **285 unittest cases PASS**
+(`apps/worker/.venv`, exit 0). **Four packaging-safety tests PASS**.
+`git diff --check` PASS (line-ending notices only). Targeted package
+secret-pattern scan: **76 changed/new files, zero findings**; not a complete
+repository security audit. Hosted state intentionally untouched: production
+web remains **0.1.1**, source **0.1.4**; the 28-record hosted migration
+history must be re-checked before any future proposal is applied.
+
+## Local simplification — daily controls and Windows launcher (2026-11-03)
+
+The operator requested a desktop-like flow, normal same-email sign-in from any
+computer and less device/setup complexity. Implemented locally; **not deployed,
+installed into Windows or live-accepted**. No desktop code/launchers were changed.
+
+- Home/Profiles/Run now expose **Open Incogniton**, **Start profile helper**,
+  **Detect profiles** and **View post status**. Home connection cards and Run
+  diagnostics/imports/recovery are collapsed, not deleted. Run has direct links
+  to post/listing drafts, account/editing tools, Profiles, Sheet and Results.
+- A single connected helper no longer needs a device selector; the exact scoped
+  worker ID remains in the form. Multiple helpers still require an explicit
+  selection. This removes repeated UI choices, **not** Auth/RLS, scoped credentials,
+  active work sessions, exact ownership or destructive confirmations.
+- Profiles shows actual completed scan names/groups/UUIDs immediately, with its
+  existing explicit save/import control moved out of Advanced. Refresh is read-only.
+  Detection remains capped at 500/result-byte budget; CSV fallback is unchanged.
+- `/dashboard/settings/computer` provides one-time setup. Registration defaults
+  to My computer; private JSON can be downloaded rather than hand-copied.
+  **Setup Dashboard Launcher.bat** installs the current-user protocol after local
+  confirmation; **Connect Profile Helper.bat** selects a private connection and
+  saves it exclusively without overwriting existing credentials.
+- `desktop_bridge.py` accepts two fixed, argument-free URIs and always asks for
+  native approval. Open-app launch checks local paths, pinned SHA-256 and valid
+  WorkingGreen B.V. Authenticode signature. No URL credentials, arbitrary remote
+  code, local listener, exposed Incogniton/debug ports, service or autorun.
+  Changed apps/publishers require review; another protocol handler is not replaced.
+- `agent.py --tasks-only` is an explicitly authorized stdlib-only profile-task
+  helper: no Playwright or DOM adapter needed for scans, no monitoring/publishing/
+  supervised claimant. It shares the lock/recovery checks, stops on task failure
+  and limits new claims to an eight-hour window; an in-flight bounded task may
+  finish afterward. Post-status monitoring still needs its reviewed DOM adapter.
+- The browser cannot prove a URI request succeeded or that a stored helper runs
+  on the current computer. Both distinctions are visible. Signing in alone does
+  not install/connect a local helper. No fake readiness or post status is shown.
+
+See `SIMPLE-COMPUTER-WORKFLOW.md` for setup, daily use, removal, security boundaries
+and remaining gaps. Evidence storage/retention, bulk intake, signed installation/
+update parity, attachment changes and real-account/F01–F36 sign-off remain open.
+No new database schema, remote application/deployment, registry change, genuine
+app/profile launch, Google write, commit or push occurred in this tranche.
+
+Validation: **262 worker tests PASS**; required web **typecheck PASS**, **lint PASS
+(zero warnings)**, **1,065 tests / 77 files PASS**, **production build PASS**
+(includes `/dashboard/settings/computer`). Four package-safety tests and
+`git diff --check` PASS (line-ending notices only). Targeted package secret-pattern
+scan: 43 changed/new files, no findings; not a complete repository security audit.
+Native tests mock process launches, signature tooling and registry operations; they
+do not establish real Windows integration or platform acceptance.
+
+## Authorized hosted test-database migrations 003–007 (2026-11-03)
+
+The operator explicitly authorized Supabase migration application and, after the
+backup question, directed proceeding because this is testing with no live customer
+data. **Backup/PITR availability remains unverified**; no production backup/restore
+readiness is claimed. Existing workspace/membership/session records were preserved.
+This authorization covered the five migrations, not web deployment or live actions.
+
+| Source suffix | Applied hosted version / name | Individual hosted smoke |
+|---|---|---|
+| `003_publish_scheduling` | `20261103150402 publish_scheduling` | PASS |
+| `004_automatic_sheet_mapping` | `20261103150527 automatic_sheet_mapping` | PASS |
+| `005_approved_media` | `20261103150630 approved_media` | PASS |
+| `006_browser_task_receipts` | `20261103150709 browser_task_receipts` | PASS |
+| `007_supervised_workflows` | `20261103150830 supervised_workflows` | PASS |
+
+Applied individually in order; each catalog/pure-validator smoke, history check,
+normalized source/body comparison and error/adviser review preceded the next stage.
+No blind push or history repair. **28 hosted migrations; 33 public tables, all RLS
+enabled**. Additional existing verified-staff role reads/version checks, foreign
+workspace access-helper denial and anonymous denial PASS (read-only, no Auth
+sign-in or fixtures). Populated-row/customer isolation and real execution remain
+unverified. See `DB-DEPLOYMENT-20261103-0.1.4.md` for the full record and limits.
+
+Final counts: 3 workspaces, 3 memberships, 2 sessions preserved; zero workers,
+credentials, customers, publications, browser tasks, publish jobs, publish batches,
+Sheet mappings/targets/events/outbox entries and storage buckets. One current human
+session found at preflight was left untouched. No posting/account/profile/Google
+operation, bucket creation, restore, commit, push or deployment was performed.
+
+Post-application queries returned no database ERROR/FATAL/PANIC or HTTP 5xx in
+their requested windows (ingestion lag remains possible). Advisers still report
+leaked-password protection disabled, reviewed public SECURITY DEFINER RPC warnings,
+private credential no-policy INFO and unused-index INFOs; not a clean security
+sign-off. Source remains **0.1.4**; final anonymous `/login` fetch still reports
+hosted web **0.1.1**, deployment `dpl_HPLFL7yaXBykftgUvQhpBLGuxqVt`. Web deployment
+remains separate. `git diff --check` PASS (line-ending notices only).
+The earlier exact-source local validation remains the evidence below; checks were
+not rerun for documentation-only recording of this remote application.
+
+## Local follow-up — retain-only edits and rollout preparation (2026-11-03)
+
+This entry supersedes the earlier statement that all attachment-preserving edit
+variants are unimplemented, **only for the narrow retain-all source variant**.
+It is not a completed parity release. Current authority is local engineering and
+read-only hosted inspection; historical production/commit approvals below are not
+reused. Source remains **0.1.4**, not deployed by this tranche.
+
+- F19: local optional `attachments` review pins 1–10 existing stable platform
+  asset IDs and their order. The exact owned card, composer before/after filling,
+  final pre-submit card and saved result must agree. Default text-only edits also
+  reject any matching media node, including hidden nodes. No upload, remove or
+  reorder controls are used; changed/missing result evidence requires durable
+  reconciliation, never automatic save retry or a fabricated rollback.
+- All edit plans now require a reviewed `edit_media` selector. Older local plans
+  fail preflight until updated; they do not silently inherit attachment support.
+  An actual platform must expose reliable common asset identity and complete
+  selectors. DOM ID equality is not image-byte verification, permission proof or
+  real Nextdoor compatibility. Attachment addition/removal/reorder remains open.
+- The local attachment review stays out of queued manifests, checkpoints and
+  results; only its adapter fingerprint is recorded. Existing approved text-only
+  hosted draft/manifests remain unchanged. Dashboard copy documents these limits.
+- Added five individual catalog/pure-validation smoke scripts under
+  `supabase/tests/` for 003–007. The local publishing SQL harness executes each
+  after its corresponding migration, before later migrations. These are read-only
+  hosted candidates, not hosted behavioral/live acceptance. Added local negative
+  privilege-expansion checks; final validation results are recorded below.
+- `REMAINING-WORK-PLAN.md` records phases, later policy questions and a conservative
+  individual F01–F36 acceptance ledger. `DB-DEPLOYMENT-0.1.4-PLAN.md` records
+  ordered application/smokes, backup/access gates, stop/recovery conditions and
+  production approval requirements. Protected evidence/retention, secure bulk
+  intake and worker install/update parity remain unimplemented.
+
+Read-only hosted verification in this session: **23 migrations**, 003–007 absent;
+production `/login` footer **0.1.1**, deployment
+`dpl_HPLFL7yaXBykftgUvQhpBLGuxqVt`; **29 public tables, all RLS-enabled**, **zero
+storage buckets** and **zero pending/leased browser tasks or publishing jobs**.
+Supabase MCP access is now available; missing credentials is not the current
+blocker. Production changes still await explicit approval and the runbook gates.
+No hosted migration, deployment, bucket creation, account access, real platform
+request, Sheet write, commit or push was performed. Desktop code is unchanged.
+
+Validation: **240 worker unittest cases PASS**, **29 isolated Chrome synthetic
+workflow fixtures PASS** with all traffic intercepted and zero real platform
+requests. Final web **typecheck PASS**, **lint PASS (zero warnings)**,
+**1,059 tests / 76 files PASS**, **production build PASS**. Four package-safety
+tests PASS. `git diff --check` PASS (line-ending notices only); the
+targeted package secret-pattern scan found no findings across 17 changed/new
+files. This scan is not a full repository security audit.
+
 ## Source 0.1.4 — durable browser tasks and supervised workflows
 
 The operator requested continuing implementation and authorized commits/pushes
@@ -43,7 +249,7 @@ lint PASS (zero warnings), 1,053 tests / 76 files PASS, production build PASS**
 package-safety tests PASS and `git diff --check` PASS (line-ending notices only).
 These are development checks, not live acceptance.
 
-### Migration status (2026-11-03)
+### Historical migration status (before the authorized application above)
 
 | Source migration | Hosted |
 |---|---|

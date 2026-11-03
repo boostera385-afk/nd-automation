@@ -9,7 +9,7 @@ import time
 
 from local_incogniton import Incogniton, ProfileUnavailable, debug_endpoint
 from monitoring import classify_snapshot, navigation_failure, result, validate_adapter, validate_manifest
-from worker_lock import monitoring_lock
+from worker_state import execution_lock as monitoring_lock, state_directory
 
 
 SNAPSHOT_JS = """({adapter, target, title}) => {
@@ -266,7 +266,7 @@ def main():
     require_runtime()
     from playwright.sync_api import sync_playwright
     # Exclusive creation prevents accidental overwriting; partial results survive interruption.
-    lock = Path(__file__).resolve().parent / ".worker-state" / "monitor.lock"
+    lock = state_directory() / "monitor.lock"
     with monitoring_lock(lock), Path(args.output).open("x", encoding="utf-8") as output:
         def emit(item):
             item["adapter_sha256"] = hashlib.sha256(json.dumps(adapter, sort_keys=True).encode()).hexdigest()

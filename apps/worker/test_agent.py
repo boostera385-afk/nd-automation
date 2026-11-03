@@ -20,6 +20,8 @@ class AgentTests(unittest.TestCase):
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.journal = MonitoringJournal(Path(self.directory.name) / "journal.json", CONFIG)
+        state = patch("agent.state_directory", return_value=Path(self.directory.name) / "state")
+        state.start(); self.addCleanup(state.stop)
 
     def test_valid_connection(self):
         self.assertEqual(validate_connection(CONFIG), CONFIG)

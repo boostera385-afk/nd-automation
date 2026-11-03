@@ -24,7 +24,8 @@ from publishing_protocol import account_url, uuid, validate_job as validate_publ
 from publisher import normalized, one, fill_checked, check_text
 from sheet_writeback import load_private
 from worker_connection import validate_connection
-from worker_lock import monitoring_lock
+from worker_state import execution_lock as monitoring_lock, state_directory
+from workflow_attachments import check_attachments, validate_attachment_review
 
 OPERATIONS = {"account_register", "account_login", "account_inspect", "profile_browse", "post_edit", "post_delete", "account_block"}
 MANIFEST = {"version", "operation", "binding_id", "profile_id", "customer_id", "account_label", "account_url",
@@ -32,7 +33,7 @@ MANIFEST = {"version", "operation", "binding_id", "profile_id", "customer_id", "
 BASE_SELECTORS = {"account", "login", "challenge", "disabled"}
 POST_SELECTORS = {"post_root", "post_link", "post_author", "post_body", "post_media"}
 EDIT_SELECTORS = {"edit_open", "edit_root", "body", "title", "price", "category", "audience", "submit",
-                  "result_title", "result_price", "result_category", "result_audience"}
+                  "result_title", "result_price", "result_category", "result_audience", "edit_media"}
 
 
 def body_hash(text):
@@ -75,10 +76,15 @@ def validate_manifest(value):
 
 
 def validate_plan(plan):
-    if not isinstance(plan, dict) or set(plan) != {"manifest", "reviewed", "selectors", "values"} or plan["reviewed"] is not True:
+    required = {"manifest", "reviewed", "selectors", "values"}
+    if not isinstance(plan, dict) or not required <= set(plan) or set(plan) - required - {"attachments"} or plan["reviewed"] is not True:
         raise ValueError("A private locally reviewed workflow plan is required")
     manifest = validate_manifest(plan["manifest"])
     operation = manifest["operation"]
+    if "attachments" in plan:
+        if operation != "post_edit":
+            raise ValueError("Attachment review is only supported for an exact edit")
+        validate_attachment_review(plan["attachments"])
     expected = set(BASE_SELECTORS)
     if operation in {"account_register", "account_login"}:
         expected |= {"form", "email", "password", "submit"}
@@ -157,7 +163,8 @@ def execute_workflow(task, plan, api, chromium, journal):
     # Only the public manifest/approved content enter the journal, never values.
     journal.begin(task)
     selectors, operation = plan["selectors"], manifest["operation"]
-    fingerprint = hashlib.sha256(json.dumps(selectors, sort_keys=True).encode()).hexdigest()
+    attachments = plan.get("attachments")
+    fingerprint = hashlib.sha256(json.dumps({"selectors": selectors, "attachments": attachments}, sort_keys=True).encode()).hexdigest()
     deadline = time.monotonic() + 240
     attempted, launched, cleanup, page = False, False, True, None
     outcome = "validation_error"
@@ -229,10 +236,10 @@ def execute_workflow(task, plan, api, chromium, journal):
             else:
                 root = exact_post(page, selectors, manifest) if operation in {"post_edit", "post_delete"} else page
                 if operation == "post_edit":
-                    if visible(root, selectors["post_media"]):
-                        raise ValueError("Existing attachments require a separately reviewed edit adapter")
+                    check_attachments(root, selectors["post_media"], attachments)
                     one(root, selectors["edit_open"]).click(timeout=10000)
                     form = one(page, selectors["edit_root"])
+                    check_attachments(form, selectors["edit_media"], attachments)
                     fill_checked(form, selectors["body"], content["body"])
                     if content["kind"] == "listing":
                         fill_checked(form, selectors["title"], content["title"])
@@ -249,7 +256,9 @@ def execute_workflow(task, plan, api, chromium, journal):
                         if normalized(one(form, selectors["category"]).locator("option:checked").inner_text()) != normalized(content["category"]):
                             raise ValueError("Edit category changed")
                     exact_account(page, selectors, manifest)
-                    exact_post(page, selectors, manifest)
+                    root = exact_post(page, selectors, manifest)
+                    check_attachments(root, selectors["post_media"], attachments)
+                    check_attachments(form, selectors["edit_media"], attachments)
                     if not guard():
                         outcome = "handoff_required"
                     else:
@@ -260,6 +269,7 @@ def execute_workflow(task, plan, api, chromium, journal):
                                 break
                             try:
                                 result = exact_post(page, selectors, manifest, content["body"])
+                                check_attachments(result, selectors["post_media"], attachments)
                                 if normalized(one(result, selectors["result_audience"]).inner_text()) != content["audience"]:
                                     raise ValueError("Result audience mismatch")
                                 if content["kind"] == "listing":
@@ -334,7 +344,7 @@ def main(argv=None):
     if not args.confirm_authorized or (plan["manifest"]["operation"] in {"post_delete", "account_block"} and not args.confirm_destructive):
         parser.error("Execution requires explicit local authorization and destructive-target confirmation when applicable")
     from playwright.sync_api import sync_playwright
-    state = Path(__file__).resolve().parent / ".worker-state"
+    state = state_directory()
     bridge = WorkerBridge(connection); journal = AutomationJournal(state / "automation-journal.json", connection)
     with monitoring_lock(state / "monitor.lock"):
         recover_automation(bridge, journal)

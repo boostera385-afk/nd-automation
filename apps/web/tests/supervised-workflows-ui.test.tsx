@@ -23,4 +23,7 @@ it("labels identity handoff, no secrets and no invented coverage explicitly", as
   expect(html).toContain("No email, password, OTP, birth date, residence"); expect(html).toContain("Receipt recorded is not the same as action verified");
   expect(html).toContain("Those require separately sourced observations"); expect(html).toContain("/dashboard/run/cohorts");
   expect(html).not.toContain('type="password"');
+  expect(html).toContain("separately reviewed local retain-all adapter");
+  expect(html).toContain("Adding, removing or reordering attachments is not supported");
+  expect(html).toContain("Live platform compatibility is not yet verified");
 });

@@ -49,7 +49,8 @@ describe("rendered sheet-first UI (fixture data; not hosted auth acceptance)", (
     expect(html).toContain("MASTER SHEET"); expect(html).toContain("LOCAL AUTOMATION AGENT"); expect(html).toContain("saved mappings");
     expect(html).not.toContain("Setup checklist"); expect(html).not.toContain("Keep the session honest");
     expect(html).not.toContain('href="/dashboard/posts/new"');
-    expect(html).toContain("still gated");
+    expect(html).toContain("Open Incogniton");
+    expect(html).toContain("Publishing and account actions still require");
   });
   it("renders customer home without loading any operations data", async () => {
     mocks.getContext.mockResolvedValue({ organization, isStaff: false });

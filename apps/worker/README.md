@@ -1,5 +1,15 @@
 # Local worker foundation
 
+## Simple dashboard controls (local follow-up)
+
+See `docs/SIMPLE-COMPUTER-WORKFLOW.md` from the repository root. The optional
+Windows launcher supplies fixed **Open Incogniton** and **Start profile helper**
+links after one-time local setup. `agent.py --tasks-only` runs only explicitly
+queued profile tasks with the same scoped credential, session gates, lock and
+durable recovery; no DOM adapter or Playwright is needed for profile detection.
+It does not monitor posts or claim publishing/supervised workflows. Neither
+installation nor browser/real-account acceptance is established by source tests.
+
 Source **0.1.3** adds separately confirmed bounded sequential publishing/delivery
 and due-job polling (maximum 20 operations/eight hours, not a default daemon).
 `publisher.py --media-registry` opts into the new media-capable claimant; image
@@ -85,11 +95,17 @@ minutes for the final bounded navigation, cleanup and completion attempts; this
 does not provide a hard kill of an in-flight browser/API operation.
 
 Before profile launch, the agent atomically writes and flushes a private
-`.worker-state/monitoring-journal.json`. It saves the bounded observation before
-backend submission, accepts only a boolean completion receipt (false is a valid
-idempotent replay), and clears saved comment text after acknowledgment. A
-restart replays only the saved result, never a browser action. Both normal
-execution and the result-only command use the same exclusive local lock.
+journal under the shared per-user state root (`ND_WORKER_HOME`, else
+`%LOCALAPPDATA%/NDAutomation/worker/state`; a legacy checkout
+`.worker-state/monitoring-journal.json` must be migrated explicitly with
+`worker_state.py --migrate-from <checkout> --confirm-stopped-all-old-workers`
+— nothing is copied or discarded silently). It saves the bounded observation
+before backend submission, accepts only a boolean completion receipt (false is
+a valid idempotent replay), and clears saved comment text after
+acknowledgment. A restart replays only the saved result, never a browser
+action. Both normal execution and the result-only command use the same
+exclusive local lock, shared across all future release directories and with
+old checkouts. See `docs/WORKER-RELEASE-LIFECYCLE.md`.
 
 To replay an existing result without importing Playwright, loading selectors or
 touching Incogniton, after explicit authorization:

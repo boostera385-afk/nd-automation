@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, build_opener, ProxyHandler
@@ -15,7 +16,7 @@ from monitoring_journal import MonitoringJournal
 from automation_tasks import execute as execute_task, validate_task
 from worker_protocol import (COMPLETION_RESERVE_SECONDS, completion_payload, remaining_lease,
                              validate_completion, validate_job)
-from worker_lock import monitoring_lock
+from worker_state import execution_lock as monitoring_lock, state_directory
 from worker_connection import validate_connection
 from automation_journal import AutomationJournal, TASK_FAILURE, recover_automation
 
@@ -184,10 +185,45 @@ def poll_once(bridge, adapter, api, chromium, journal, allow_expansion=False, in
     return "completed"
 
 
+class TaskOnlyBridge(WorkerBridge):
+    """The simple helper cannot lease monitoring, publishing or supervised work."""
+    def rpc(self, method, params=None):
+        if method not in {"reporting_worker_heartbeat", "reporting_claim_automation_task", "reporting_complete_automation_task"}:
+            raise BridgeError("This helper runs only explicitly queued profile tasks")
+        return super().rpc(method, params)
+
+
+def run_tasks_only(connection, once=False, state=None):
+    """Stdlib-only profile-task loop. No DOM adapter or Playwright startup."""
+    state = state or state_directory()
+    bridge = TaskOnlyBridge(connection)
+    automation = AutomationJournal(state / "automation-journal.json", connection)
+    with monitoring_lock(state / "monitor.lock"):
+        from publishing_journal import PublishingJournal
+        monitoring = MonitoringJournal(state / "monitoring-journal.json", connection).read()
+        publishing = PublishingJournal(state / "publishing-journal.json", connection).read()
+        if monitoring and (monitoring["state"] not in {"acknowledged", "operator_reconciled"} or monitoring["cleanup_required"]):
+            raise BridgeError("Resolve the monitoring checkpoint before starting the profile helper")
+        if publishing and (publishing["state"] not in {"acknowledged", "operator_reconciled"} or publishing["cleanup_required"]):
+            raise BridgeError("Resolve the publishing checkpoint before starting the profile helper")
+        recover_automation(bridge, automation)
+        deadline = time.monotonic() + 8 * 3600
+        status = "idle"
+        while time.monotonic() < deadline:
+            bridge.rpc("reporting_worker_heartbeat")
+            status = poll_automation(bridge, Incogniton(), automation) or "idle"
+            print(json.dumps({"state": status, "mode": "profile_tasks_only"}), flush=True)
+            if once or status == "automation_failed":
+                break
+            time.sleep(15)
+    return 1 if status == "automation_failed" else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--connection", required=True, help="Private worker JSON saved from the dashboard")
     parser.add_argument("--adapter", help="Locally validated read-only page adapter")
+    parser.add_argument("--tasks-only", action="store_true", help="Run only explicitly queued profile tasks; no browser DOM adapter, monitoring or publishing")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm-authorized", action="store_true")
     parser.add_argument("--once", action="store_true", help="Poll at most one job, then exit")
@@ -205,12 +241,23 @@ def main():
     from preflight import preflight, require_runtime
     connection = validate_connection(load_json(args.connection))
     recovery_modes = sum(bool(mode) for mode in (args.recover_results, args.confirm_profile_cleanup, args.confirm_lease_reconciled,
-                                                args.recover_browser_results, args.confirm_browser_inspection, args.confirm_browser_reconciled))
+                                                 args.recover_browser_results, args.confirm_browser_inspection, args.confirm_browser_reconciled))
+    if args.tasks_only:
+        if recovery_modes or args.adapter or args.allow_comment_expansion or args.acknowledge_observation_loss or args.acknowledge_action_ambiguity:
+            parser.error("Profile-task-only mode cannot combine monitoring adapters or recovery modes")
+        if sys.version_info < (3, 12):
+            parser.error("The local helper requires Python 3.12 or later")
+        if not args.execute:
+            print(json.dumps({"mode": "offline_profile_tasks_preflight", "configuration_valid": True, "network_calls": 0, "live_ready": False}))
+            return 0
+        if not args.confirm_authorized:
+            parser.error("Execution requires explicit --confirm-authorized")
+        return run_tasks_only(connection, args.once)
     if recovery_modes > 1 or (args.acknowledge_observation_loss and not args.confirm_lease_reconciled):
         parser.error("Choose exactly one recovery mode; observation-loss confirmation belongs only to lease reconciliation")
     if args.acknowledge_action_ambiguity and not args.confirm_browser_reconciled:
         parser.error("Action ambiguity confirmation belongs only to exact browser-task reconciliation")
-    state = Path(__file__).resolve().parent / ".worker-state"
+    state = state_directory()
     journal = MonitoringJournal(state / "monitoring-journal.json", connection)
     automation = AutomationJournal(state / "automation-journal.json", connection)
     lock = state / "monitor.lock"

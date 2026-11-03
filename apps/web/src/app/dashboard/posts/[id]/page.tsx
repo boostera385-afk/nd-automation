@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/time";
 import { getChecksForPost } from "@/lib/checks-data";
 import { ObservationForm, CommentForm, SingleCheckForm } from "@/components/reporting-forms";
 import { Badge, EmptyState, PageHeader, Panel } from "@/components/ui";
+import { EvidencePanel } from "@/components/evidence-panel";
 
 export default async function PostDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +24,7 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
       <Panel title="Observation history" hint="Latest 100 observations">
         {observations.length ? <ol className="timeline">{observations.map((item) => <li key={item.id}><div><Badge status={item.visibility} /><time>{formatTime(item.observed_at, organization.time_zone)}</time></div><p>{item.notes || "No additional viewing-context notes."}</p><small>{item.source === "auto_check" ? "Automatic check" : "Manual review"} · Comments: {item.comments_total ?? "unknown"} · Collection {item.comments_complete ? "reported complete" : "partial / not established"}</small></li>)}</ol> : <EmptyState title="Not reviewed yet">An imported or recorded URL does not establish visibility. Record an authorized manual observation or review a connected monitoring result.</EmptyState>}
       </Panel>
+      <EvidencePanel publication={id} />
       <Panel title="Recorded comments" hint="Latest 200 recorded comments">
         {comments.length ? <div className="comment-list">{comments.map((comment) => <article key={comment.id}><strong>{comment.author_label}</strong><p>{comment.body}</p><small>{comment.source === "auto_check" ? "Automatically collected" : "Manually recorded"} · First observed {formatTime(comment.first_observed_at, organization.time_zone)}{!comment.platform_created_at && " · Platform creation time unknown"}</small></article>)}</div> : <EmptyState title="No comments recorded">This means no comment records are stored—not that the post has zero comments.</EmptyState>}
       </Panel>

@@ -8,6 +8,11 @@ from pathlib import Path
 @contextmanager
 def monitoring_lock(path):
     path = Path(path)
+    for part in (path, *path.parents):
+        if part.is_symlink() or getattr(part, "is_junction", lambda: False)():
+            raise ValueError("Linked worker lock paths are not supported")
+    if path.exists() and not path.is_file():
+        raise ValueError("Worker lock must be an ordinary local file")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as stream:
         stream.seek(0, 2)

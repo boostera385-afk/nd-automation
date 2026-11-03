@@ -13,12 +13,12 @@ export function ScanImport({ latest }: { latest: LatestScanSummary }) {
   return <div>
     {latest
       ? <p className="muted small">Last completed scan detected {latest.total} profile(s) in Incogniton({latest.stored} stored{latest.truncated ? ", capped at 500" : ""}) on {latest.completedText}. The scan reads UUID, name and group only.</p>
-      : <p className="muted small">No completed detection scan yet. Queue <strong>Detect Incogniton profiles</strong> from <a href="/dashboard/run">Run automation</a> first; the automation agent on this device fills the list.</p>}
+      : <p className="muted small">No completed scan yet. Click Detect profiles above, then refresh this page after your connected helper reports the result.</p>}
     <form action={action} className="form-grid">
       <WorkspaceField />
       <label className="check-label"><input type="checkbox" name="confirmed" required />Import the latest detected UUID/name/group list into this workspace&apos;s inventory. It never launches, creates or verifies profiles.</label>
       {latest?.truncated === true && <label className="check-label"><input type="checkbox" name="truncated_confirmed" required />The scan was capped at 500 entries. Confirm importing the capped list.</label>}
-      <button className="button secondary" type="submit" disabled={pending || !latest} aria-busy={pending}>{pending ? <><LoaderCircle className="spin" size={15} aria-hidden /> Importing…</> : "Use latest device scan"}</button>
+      <button className="button secondary" type="submit" disabled={pending || !latest} aria-busy={pending}>{pending ? <><LoaderCircle className="spin" size={15} aria-hidden /> Saving…</> : "Save detected profiles"}</button>
     </form>
     {state.error && <p role="alert" className="notice error">{state.error}</p>}
     {state.success && <p role="status" className="notice success">{state.success}</p>}

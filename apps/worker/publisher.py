@@ -16,7 +16,7 @@ from monitoring_journal import MonitoringJournal
 from publishing_journal import PublishingJournal
 from publishing_protocol import account_url, require_live_lease, validate_adapter, validate_job, validate_result
 from worker_connection import validate_connection
-from worker_lock import monitoring_lock
+from worker_state import execution_lock as monitoring_lock, state_directory
 from worker_protocol import validate_completion
 from publisher_run import run_due_jobs
 from publishing_media import prepare_media, validate_registry
@@ -316,8 +316,6 @@ def main(argv=None):
     if not 1 <= args.max_jobs <= 20 or not 0 <= args.watch_minutes <= 480:
         parser.error("Choose 1–20 jobs and 0–480 watch minutes")
     connection = validate_connection(load_json(args.connection))
-    state = Path(__file__).resolve().parent / ".worker-state"
-    journal = PublishingJournal(state / "publishing-journal.json", connection)
     recovery = args.recover_results or args.confirm_reconciled
     if (args.recover_results and args.confirm_reconciled) or (recovery and args.execute):
         parser.error("Choose result recovery or operator reconciliation, without execution")
@@ -325,6 +323,8 @@ def main(argv=None):
         parser.error("Recovery is receipt-only and cannot run/watch a batch")
     if (args.execute or recovery) and not args.confirm_authorized:
         parser.error("Execution/recovery requires explicit --confirm-authorized")
+    state = state_directory() if args.execute or recovery else None
+    journal = PublishingJournal(state / "publishing-journal.json", connection) if state else None
     if recovery:
         with monitoring_lock(state / "monitor.lock"):
             if args.confirm_reconciled:

@@ -22,7 +22,7 @@ from urllib.request import Request, build_opener, ProxyHandler
 from uuid import UUID, uuid4
 
 from local_incogniton import NoRedirect
-from worker_lock import monitoring_lock
+from worker_state import execution_lock as monitoring_lock, state_directory
 
 SAFE_COLUMNS = {"Profile Name", "Post link", "Status", "Post Text", "Title"}
 CONFLICTS = {"operation_conflict", "row_identity_conflict", "revision_conflict", "column_not_allowed",
@@ -416,7 +416,7 @@ def main():
             parser.error("Multiple intents or watching also require --confirm-batch")
         if config["enabled"] is not True:
             raise WritebackError("Delivery is disabled; no sign-in was attempted")
-        state = Path(__file__).resolve().parent / ".worker-state"
+        state = state_directory()
         with monitoring_lock(state / "writeback.lock"):
             if args.sign_in:
                 # Refuse getpass's echoing fallback in terminals that cannot hide
