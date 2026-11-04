@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { z } from "zod";
 import { requireWorkspace, getDashboardData } from "@/lib/data";
 import { isMissingSchemaError } from "@/lib/checks";
 import { formatTime } from "@/lib/time";
@@ -12,14 +13,17 @@ type Worker = { id: string; name: string; enabled: boolean; last_seen_at: string
 type Binding = { id: string; worker_id: string; customer_id: string; profile_id: string; account_label: string; monitoring_session_id: string | null };
 type Job = { id: string; worker_id: string; publication_id: string; status: string; outcome: string | null; created_at: string; lease_expires_at: string | null };
 
-export default async function Automation() {
+export default async function Automation({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const jobsPageRaw = z.coerce.number().int().min(0).max(999).safeParse(params.jobs_page);
+  const jobsPage = jobsPageRaw.success ? jobsPageRaw.data : 0;
   const { db, organization, membership } = await requireWorkspace(true);
   const manageSetup = canManageSetup(membership.role);
   const { customers, publications, session, truncated } = await getDashboardData();
   const [workerQuery, bindingQuery, jobQuery, inventoryQuery] = await Promise.all([
     db.from("reporting_workers").select("id,name,enabled,last_seen_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(101),
     db.from("reporting_worker_profiles").select("id,worker_id,customer_id,profile_id,account_label,monitoring_session_id").eq("organization_id", organization.id).limit(101),
-    db.from("reporting_check_jobs").select("id,worker_id,publication_id,status,outcome,created_at,lease_expires_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(101),
+    db.from("reporting_check_jobs").select("id,worker_id,publication_id,status,outcome,created_at,lease_expires_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).range(jobsPage * 100, jobsPage * 100 + 100),
     db.from("reporting_profile_inventory").select("profile_id,name,group_name,status").eq("organization_id", organization.id).eq("status", "active").order("name").limit(501),
   ]);
   const errors = [workerQuery.error, bindingQuery.error, jobQuery.error].filter(Boolean);
@@ -28,8 +32,9 @@ export default async function Automation() {
   const available = errors.length === 0;
   const workers = (workerQuery.data || []).slice(0, 100) as Worker[];
   const bindings = (bindingQuery.data || []).slice(0, 100) as Binding[];
+  const jobsHasMore = (jobQuery.data?.length ?? 0) > 100;
   const jobs = (jobQuery.data || []).slice(0, 100) as Job[];
-  const limited = truncated || [workerQuery.data, bindingQuery.data, jobQuery.data].some((rows) => (rows?.length || 0) > 100);
+  const limited = truncated || [workerQuery.data, bindingQuery.data].some((rows) => (rows?.length || 0) > 100);
   return <>
     <PageHeader eyebrow="LOCAL AUTOMATION" title="Automation control" description="Authorize exact local profiles and read-only monitoring. Publishing and supervised account/content operations have their own explicit controls." actions={<Link className="button secondary" href="/dashboard/checks">Check results</Link>} />
     <p><Link href="/dashboard/workflows">Supervised account, edit/delete and moderation workflows</Link> · <Link href="/dashboard/content">Content approvals and publishing</Link></p>
@@ -69,12 +74,18 @@ export default async function Automation() {
       <Panel title="Automation agents" hint="Last seen is a heartbeat, not proof a browser is ready">
         {workers.map((worker) => <article className="notice subtle" key={worker.id}><strong>{worker.name} · {worker.enabled ? "Credential enabled" : "Revoked"}</strong><p>Last seen: {worker.last_seen_at ? formatTime(worker.last_seen_at, organization.time_zone) : "Never connected"}</p>{manageSetup && worker.enabled && <ActionForm action={revokeWorker} label="Revoke agent" secondary><input type="hidden" name="worker" value={worker.id} /><label className="check-label"><input type="checkbox" name="confirmed" required />Revoke its credential and cancel pending jobs. This does not force-close a browser.</label></ActionForm>}</article>)}
       </Panel>
-      <Panel title="Latest 100 monitoring jobs" hint="Refresh to see new progress; expired leases are not retried automatically">
-        {jobs.length ? <div className="table-wrap"><table><thead><tr><th>Post</th><th>Created</th><th>State</th><th>Result</th><th>Action</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}>
+      <Panel title={jobsPage > 0 ? `Monitoring jobs — page ${jobsPage + 1}` : "Monitoring jobs"} hint="100 per page, newest first. Expired check leases release themselves at the next claim; publish leases always need a person.">
+        {jobs.length ? <>
+          <div className="table-wrap"><table><thead><tr><th>Post</th><th>Created</th><th>State</th><th>Result</th><th>Action</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}>
           <td><Link href={`/dashboard/posts/${job.publication_id}`}>{publications.find((post) => post.id === job.publication_id)?.title || "Open post"}</Link></td><td>{formatTime(job.created_at, organization.time_zone)}</td>
           <td>{job.status}{job.status === "leased" && job.lease_expires_at && <small> · Lease deadline {formatTime(job.lease_expires_at, organization.time_zone)}</small>}</td><td><OutcomeBadge outcome={job.outcome} /></td>
           <td>{job.status === "pending" && <ActionForm action={cancelPendingCheck} label="Cancel pending" secondary><input type="hidden" name="job" value={job.id} /></ActionForm>}{job.status === "leased" && <ActionForm action={reconcileExpiredCheck} label="Reconcile expired lease" secondary><input type="hidden" name="job" value={job.id} /><label className="check-label"><input type="checkbox" name="reconciled" required />I stopped the old agent, closed this profile and reconciled partial results. Only expired leases can be released.</label></ActionForm>}</td>
-        </tr>)}</tbody></table></div> : <EmptyState title="No monitoring jobs yet">Once monitoring is enabled, your connected local agent plans and claims due checks. The dashboard alone never launches local profiles.</EmptyState>}
+        </tr>)}</tbody></table></div>
+          <p>
+            {jobsPage > 0 && <Link className="button secondary" href={jobsPage === 1 ? "/dashboard/automation" : `/dashboard/automation?jobs_page=${jobsPage - 1}`}>← Newer jobs</Link>}{" "}
+            {jobsHasMore && <Link className="button secondary" href={`/dashboard/automation?jobs_page=${jobsPage + 1}`}>Older jobs →</Link>}
+          </p>
+        </> : jobsPage > 0 ? <EmptyState title="No jobs on this page">This page is beyond the recorded history. <Link href="/dashboard/automation">Back to the latest jobs</Link>.</EmptyState> : <EmptyState title="No monitoring jobs yet">Once monitoring is enabled, your connected local agent plans and claims due checks. The dashboard alone never launches local profiles.</EmptyState>}
       </Panel>
     </>}
   </>;

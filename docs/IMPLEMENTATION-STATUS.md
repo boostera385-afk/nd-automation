@@ -1,5 +1,58 @@
 # Implementation status
 
+## Gap-closure tranche: edge outcomes, self-healing leases, paged job history (2026-11-05)
+
+Three reviewed gaps closed under explicit user direction; nothing else was
+claimed as done and publishing stays gated.
+
+**1. Edge-outcome coverage (worker).** The page states that previously had
+only a synthetic `needs_review` behind them now have check_page-level fixtures
+in `apps/worker/test_monitoring.py`: removal-like notice → `needs_review` (never
+`deleted_from_nd`), `unavailable` notice → `unavailable`, login wall →
+`login_required`, verification wall → `verification_required`, HTTP 4xx →
+`needs_review`, HTTP 5xx → `network_error`, `ERR_PROXY_CONNECTION_FAILED` →
+`proxy_issue`, navigation timeout → `network_error`, `/account_disabled`
+redirect → `needs_review`, and a page with no post signal → `needs_review`.
+Worker suite: **40 tests, PASS** (was 30). Real-page proof of these states is
+still unexercised and remains in the runbook.
+
+**2. Self-healing expired leases (database, hosted).** One crashed run used to
+pin the laptop's queue until a person clicked "Reconcile expired lease".
+`reporting_claim_check` and `private_reporting.claim_browser_task` now cancel
+this worker's expired check/task leases — exactly the state the manual buttons
+write (`status='cancelled'`, token cleared; tasks also get `completed_at` and a
+release note), then return null for that call. The expired claim is **not**
+retried automatically; the next poll (~15 s) plans and claims fresh due work.
+Publish leases stay manual (`needs_reconciliation` requires an operator). It
+took three iterations the same day, recorded honestly in the migration files:
+- `20261105200000_expired_lease_self_heal.sql` (v1) claimed fresh work in the
+  same call — crossed the no-automatic-retry contract.
+- `20261105203000_expired_lease_self_heal_v2.sql` (v2) fixed the retry rule but
+  replayed the pre-supervised-workflows task body.
+- `20261105210000_expired_lease_self_heal_v3.sql` (v3, **current**) patches the
+  real private claimant and restores both public wrappers.
+Hosted verification: function bodies inspected via `pg_proc` — self-heal
+present in `reporting_claim_check` and `claim_browser_task`, the supervised
+gates (`workflow_target_current`) intact, both wrappers back to one-line SQL.
+New acceptance test keeps the contract explicit: an expired lease releases at
+the next claim, is cancelled, never retried in that call, and a follow-up
+claim plans fresh work with a new job id.
+
+**3. Job history paging (web).** Automation control showed only the latest 100
+jobs. It now pages `?jobs_page=n` (100 per page, `min 0 / max 999`), with
+Newer/Older links and an honest "beyond history" empty state. Unrelated to the
+"latest-100-per-profile" cohort policy, which stays deliberately separate.
+
+| Validation | Result |
+|---|---|
+| `python -m unittest test_monitoring` | **40/40 PASS** |
+| `npm.cmd run typecheck` | PASS |
+| `npm.cmd run lint` | PASS, 0 warnings |
+| `npm.cmd test` | **87 files, 1159 tests PASS** (incl. four lease/task/check DB suites, 193/193) |
+| `npm.cmd run build` | PASS — Next.js 16.4.3, 14 static pages, 44 dynamic routes |
+
+Still unproven: real-page edge outcomes (deleted post, logged-out session,
+proxy failure) on live Nextdoor; publishing; profile/cookie/proxy workflows.
 ## Production deploy of the monitoring fixes (2026-11-04)
 
 Commit `c156fc3` (pushed to `main`) carried the bounded CDP attach, the

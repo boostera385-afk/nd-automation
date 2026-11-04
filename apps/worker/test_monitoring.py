@@ -317,5 +317,70 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "needs_review")
 
 
+class EdgeOutcomeTests(unittest.TestCase):
+    """check_page-level fixtures for the page states that were previously only
+    theorised: a deleted post, a login wall, a verification wall, server and
+    proxy failures. None of them may ever be reported as an alive post."""
+
+    def _page(self, snapshot=None, status=200, goto_error=None):
+        page = Mock()
+        if goto_error is not None:
+            page.goto.side_effect = goto_error
+        else:
+            page.goto.return_value.status = status
+        if snapshot is not None:
+            page.evaluate.return_value = snapshot
+        return page
+
+    def test_removal_like_notice_is_never_reported_as_gone(self):
+        page = self._page({"url": POST["url"], "removed": True})
+        value = check_page(page, POST, ADAPTER)
+        self.assertEqual(value["outcome"], "needs_review")
+        self.assertNotEqual(value["outcome"], "deleted_from_nd")
+
+    def test_unavailable_notice_is_not_confused_with_removal(self):
+        page = self._page({"url": POST["url"], "unavailable": True})
+        value = check_page(page, POST, ADAPTER)
+        self.assertEqual(value["outcome"], "unavailable")
+        self.assertNotEqual(value["outcome"], "deleted_from_nd")
+
+    def test_login_wall_needs_the_account_owner_not_a_flag_on_the_post(self):
+        page = self._page({"url": POST["url"], "login": True, "exact_post": True})
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "login_required")
+
+    def test_verification_wall_always_needs_a_person(self):
+        page = self._page({"url": POST["url"], "verification": True, "exact_post": True})
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "verification_required")
+
+    def test_http_access_error_is_never_reported_as_removal(self):
+        page = self._page({"url": POST["url"], "exact_post": True}, status=404)
+        value = check_page(page, POST, ADAPTER)
+        self.assertEqual(value["outcome"], "needs_review")
+        self.assertNotEqual(value["outcome"], "deleted_from_nd")
+
+    def test_http_server_failure_is_a_network_result(self):
+        page = self._page(status=500)
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "network_error")
+
+    def test_proxy_failure_maps_to_proxy_issue_not_a_post_verdict(self):
+        page = self._page(goto_error=Exception("net::ERR_PROXY_CONNECTION_FAILED"))
+        value = check_page(page, POST, ADAPTER)
+        self.assertEqual(value["outcome"], "proxy_issue")
+
+    def test_navigation_timeout_is_a_network_error_not_a_post_verdict(self):
+        page = self._page(goto_error=TimeoutError("Timeout 30000ms exceeded"))
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "network_error")
+
+    def test_account_disabled_redirect_is_flagged_for_a_person(self):
+        page = self._page({"url": "https://nextdoor.com/account_disabled", "exact_post": False})
+        value = check_page(page, POST, ADAPTER)
+        self.assertEqual(value["outcome"], "needs_review")
+        self.assertIn("Account Disabled", value["reason"])
+
+    def test_no_post_signal_is_never_mistaken_for_alive(self):
+        page = self._page({"url": POST["url"]})
+        self.assertEqual(check_page(page, POST, ADAPTER)["outcome"], "needs_review")
+
+
 if __name__ == "__main__":
     unittest.main()

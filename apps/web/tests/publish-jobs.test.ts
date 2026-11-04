@@ -52,7 +52,7 @@ beforeAll(async () => {
   for (const file of ["202610260001_reporting_foundation.sql", "202610270001_post_checks_and_notifications.sql", "202610270002_monitoring_worker_bridge.sql", "202610270003_worker_bridge_indexes.sql", "202610270004_content_drafts.sql", "202610270006_publish_jobs.sql"]) {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8"));
   }
-  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "20261031120000_cookie_proxy_write_v1.sql", "20261031150000_inventory_scan_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql", "202611030001_inventory_scan_cap_v2.sql"]) {
+  for (const file of ["20261029175611_sheet_writeback_v1.sql", "20261031093000_automation_tasks_v1.sql", "20261031120000_cookie_proxy_write_v1.sql", "20261031150000_inventory_scan_v1.sql", "202611020001_automation_session_gate.sql", "202611020002_publish_dispatch_guard.sql", "202611020003_publish_scheduling.sql", "202611020004_automatic_sheet_mapping.sql", "202611020005_approved_media.sql", "202611020006_browser_task_receipts.sql", "202611020007_supervised_workflows.sql", "202611030001_inventory_scan_cap_v2.sql", "20261105200000_expired_lease_self_heal.sql", "20261105203000_expired_lease_self_heal_v2.sql", "20261105210000_expired_lease_self_heal_v3.sql"]) {
     try { await db.exec(await readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8")); }
     catch (error) { console.error("Fixture migration failed", file, (error as { position?: string }).position); throw error; }
     if (releaseSmokes[file]) await db.exec(await smokeSql(releaseSmokes[file]));
@@ -578,6 +578,20 @@ describe("claim and complete protocol", () => {
     const check = await agent(() => scalar("select public.reporting_claim_check($1)", [token])) as { publication_id?: string } | null;
     expect(check?.publication_id).toBeTruthy();
   }, 15000);
+  it("releases a crashed check lease at the next claim without retrying it", async () => {
+    await owner(() => scalar("select public.reporting_add_publications($1,$2,$3::jsonb,'manual_entry')", [org, customer, JSON.stringify([{ title: "Due self-heal post", url: "https://nextdoor.com/p/self-heal-fixture", account_label: "Profile A" }])]));
+    await owner(() => scalar("select public.reporting_set_profile_monitoring($1,$2,true)", [org, binding]));
+    const first = await agent(() => scalar("select public.reporting_claim_check($1)", [token])) as { job_id: string } | null;
+    expect(first).not.toBeNull();
+    await db.exec("update public.reporting_check_jobs set lease_expires_at=now()-interval '1 minute'");
+    // The expired claim is released but never retried within the same call.
+    expect(await agent(() => scalar("select public.reporting_claim_check($1)", [token]))).toBeNull();
+    expect(await scalar("select status from public.reporting_check_jobs where id=$1::uuid", [first!.job_id])).toBe("cancelled");
+    // The next poll plans fresh due work normally: a crashed run no longer pins the queue.
+    const next = await agent(() => scalar("select public.reporting_claim_check($1)", [token])) as { job_id: string } | null;
+    expect(next).not.toBeNull();
+    expect(next!.job_id).not.toBe(first!.job_id);
+  });
   it("submits exactly once, creating one not-checked publication with provenance", async () => {
     await approveDraft(); await enqueue();
     const job = (await claim())!;
