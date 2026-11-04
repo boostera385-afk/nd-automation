@@ -176,6 +176,21 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(page.evaluate.call_args[0][1]["title"], "big news today")
         self.assertEqual(page.evaluate.call_args[0][1]["target"], POST["url"])
 
+    def test_comment_scripts_receive_the_same_post_identity(self):
+        expanding = {**ADAPTER, "comment_expand": "[data-testid=more]",
+                     "comment_total": "[data-testid=count]"}
+        empty = {"url": POST["url"], "exact_post": True, "comments": [], "comments_total": 1,
+                 "comments_expand_left": 0, "comments_expandable": True}
+        loaded = {**empty, "comments": [{"external_id": "c1", "body": "One", "author": "A"}]}
+        page = self._page([empty, empty, loaded], mount=True, expand=[True])
+        check_page(page, {**POST, "title": "a stored post title for identity"}, expanding,
+                   allow_expansion=True)
+        calls = {call.args[0]: call.args[1] for call in page.evaluate.call_args_list
+                 if call.args[0] in (MOUNT_JS, EXPAND_JS)}
+        for script in (MOUNT_JS, EXPAND_JS):
+            self.assertEqual(calls[script]["target"], POST["url"])
+            self.assertEqual(calls[script]["title"], "a stored post title for identity")
+
     def test_expansion_is_off_unless_the_operator_asks_for_it(self):
         expanding = {**ADAPTER, "comment_expand": "[data-testid=more]"}
         page = Mock()

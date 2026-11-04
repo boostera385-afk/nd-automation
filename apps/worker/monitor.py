@@ -70,29 +70,62 @@ SNAPSHOT_JS = """({adapter, target, title}) => {
     comments: root ? [...root.querySelectorAll(adapter.comment)].filter(visible).slice(0, 200).map(el => ({
       external_id: commentId(el),
       body: el.querySelector(adapter.comment_body)?.innerText || '',
-      author: adapter.comment_author ? (el.querySelector(adapter.comment_author)?.innerText || '') : ''
+      // The first profile link in a comment is usually the avatar and carries no text;
+      // the visible author name is the first match that actually has text.
+      author: adapter.comment_author
+        ? ([...el.querySelectorAll(adapter.comment_author)].map(node => (node.innerText || '').trim()).find(text => text) || '')
+        : ''
     })) : []};
 }"""
 
+# Shared identity rule for the two interactive scripts. They must act on the same
+# uniquely identified card as the snapshot, never on whatever card renders first.
+ROOT_JS = """
+  const clean = value => { try { const u = new URL(value, location.href); u.hash = ''; u.search = ''; return u.pathname.replace(/\\/$/, ''); } catch { return ''; } };
+  const norm = value => (value || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\\s+/g, ' ').trim();
+  const want = clean(target);
+  const onTarget = clean(location.href) === want;
+  const expect = typeof title === 'string' ? title : '';
+  const words = expect.split(' ').filter(word => word.length > 3);
+  const matches = body => {
+    if (expect.length < 20) return false;
+    if (body.includes(expect.slice(0, 40))) return true;
+    if (words.length < 3) return false;
+    const tokens = new Set(body.split(' '));
+    let shared = 0;
+    for (const word of words) if (tokens.has(word)) shared++;
+    return shared / words.length >= 0.8;
+  };
+  const roots = [...document.querySelectorAll(adapter.post_root)].filter(visible).filter(root => {
+    const bodies = [...root.querySelectorAll(adapter.post_body)].filter(body => visible(body) && body.innerText.trim());
+    if (!bodies.length) return false;
+    const linked = [...root.querySelectorAll(adapter.post_link)].some(link => visible(link) &&
+      ['https://nextdoor.com', 'https://www.nextdoor.com'].includes(new URL(link.href, location.href).origin) &&
+      clean(link.href) === want);
+    return linked || (onTarget && matches(norm(bodies.map(body => body.innerText).join(' '))));
+  });
+  const root = roots.length === 1 ? roots[0] : null;
+"""
+
 # One read-only expansion per call: it presses the thread's own "show more" control.
 # Disabled unless the adapter names the control AND the operator passes --allow-comment-expansion.
-EXPAND_JS = """({adapter}) => {
+EXPAND_JS = """({adapter, target, title}) => {
   const visible = el => el && !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
-  const root = [...document.querySelectorAll(adapter.post_root)].filter(visible)[0];
+__ROOT__
   if (!root || !adapter.comment_expand) return false;
   const control = [...root.querySelectorAll(adapter.comment_expand)].filter(visible)[0];
   if (!control) return false;
   try { control.scrollIntoView({ block: 'center' }); } catch (e) {}
   control.click();
   return true;
-}"""
+}""".replace("__ROOT__", ROOT_JS)
 
 # A hard page load mounts an empty "Comment list". Activating the post's own comment
 # control opens the thread the way a reader does. Nothing is typed or submitted; the
 # composer that gains focus is never written to.
-MOUNT_JS = """({adapter}) => {
+MOUNT_JS = """({adapter, target, title}) => {
   const visible = el => el && !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
-  const root = [...document.querySelectorAll(adapter.post_root)].filter(visible)[0];
+__ROOT__
   if (!root || !adapter.comment_total) return false;
   if (root.querySelector(adapter.comment)) return false;
   const control = [...root.querySelectorAll(adapter.comment_total)].filter(visible)[0];
@@ -101,7 +134,7 @@ MOUNT_JS = """({adapter}) => {
   control.click();
   return true;
 }
-"""
+""".replace("__ROOT__", ROOT_JS)
 
 MOUNT_WAIT_MS = 12000
 MOUNT_POLL_MS = 1500
@@ -140,7 +173,7 @@ def check_page(page, post, adapter, allow_expansion=False):
             # activation of the post's own comment control, never a typed reply.
             if not snapshot.get("comments") and (snapshot.get("comments_total") or 0) > 0:
                 for _ in range(2):
-                    if not page.evaluate(MOUNT_JS, {"adapter": adapter}):
+                    if not page.evaluate(MOUNT_JS, {"adapter": adapter, "target": post["url"], "title": post.get("title", "")}):
                         break
                     waited = 0
                     while waited < MOUNT_WAIT_MS:
@@ -158,7 +191,7 @@ def check_page(page, post, adapter, allow_expansion=False):
             misses = 0
             previous = len(snapshot.get("comments") or [])
             for _ in range(MAX_EXPANSION_ROUNDS):
-                if not page.evaluate(EXPAND_JS, {"adapter": adapter}):
+                if not page.evaluate(EXPAND_JS, {"adapter": adapter, "target": post["url"], "title": post.get("title", "")}):
                     misses += 1
                     if misses >= EXPANSION_MISS_LIMIT:
                         break
@@ -183,6 +216,29 @@ def check_page(page, post, adapter, allow_expansion=False):
         return result(post, "needs_review", "The configured page adapter could not interpret this page.")
 
 
+def connect_browser(chromium, endpoint, seconds=45):
+    """Incogniton answers before Chrome listens on the returned debug port.
+
+    Attach is retried for a bounded time, and the default context is awaited,
+    so a slow browser start is not reported as a profile failure. Nothing is
+    navigated or clicked here, and a permanently dead port still raises.
+    """
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            browser = chromium.connect_over_cdp(endpoint, timeout=30000)
+        except Exception:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(2)
+            continue
+        while not browser.contexts and time.monotonic() < deadline:
+            time.sleep(0.5)
+        if not browser.contexts:
+            raise ValueError("Profile did not provide a browser context")
+        return browser
+
+
 def run_batch(posts, adapter, api, chromium, emit, deadline, allow_expansion=False):
     groups = defaultdict(list)
     for post in posts:
@@ -197,9 +253,7 @@ def run_batch(posts, adapter, api, chromium, emit, deadline, allow_expansion=Fal
             data = api.launch(profile_id)
             launched = True
             endpoint = debug_endpoint(data)
-            browser = chromium.connect_over_cdp(endpoint, timeout=30000)
-            if not browser.contexts:
-                raise ValueError("Profile did not provide a browser context")
+            browser = connect_browser(chromium, endpoint)
             page = browser.contexts[0].new_page()
             def restrict_navigation(route):
                 from urllib.parse import urlsplit

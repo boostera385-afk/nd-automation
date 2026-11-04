@@ -1,5 +1,153 @@
 # Implementation status
 
+## First live read-only post check on the employee laptop (2026-11-04)
+
+Goal: prove the prepared employee laptop can open one real Nextdoor post through
+the local helper, read it, and have the outcome recorded in the hosted database —
+without any write action. Target was publication
+`a4b9cf83-1708-41ab-9e4a-fc4f03a6dc4b` (`https://nextdoor.com/p/YbqRxq7_y_8J`,
+workspace `ND Test`), binding `b4330e39-d6ae-4059-9ca1-31221fe25e2b`, worker
+`Haseeb ND PC`, Incogniton profile `Melvin James` (group `Austin`), adapter
+`monitoring-adapter.json` version 2 (read-only selectors).
+
+**Defect found and fixed: `connect_browser` in `apps/worker/monitor.py`.** The
+runner attached with a single `chromium.connect_over_cdp(endpoint, timeout=30000)`
+call immediately after Incogniton returned its `puppeteerUrl`. Incogniton answers
+before Chrome is listening on that port, so the attach intermittently raised
+`connect ECONNREFUSED 127.0.0.1:<port>` and `run_batch` reported the generic
+`profile_error` ("Profile was busy, unknown, or could not be opened safely") even
+though the browser had opened normally. Traced live: `/profile/status` returned
+`Ready`, `/automation/launch/puppeteer/<id>` returned `ok` after 8.5 s, and the
+failure happened only at the CDP attach. The new helper retries the attach for a
+bounded **45 s** (2 s spacing) and then waits for the default browser context
+before returning. It never retries a navigation or page action, and a permanently
+dead port still raises after the deadline, so real profile failures stay visible.
+`run_batch` now calls `connect_browser(chromium, endpoint)` instead of the inline
+attach/context check. Nothing else in the runner, claim, or adapter contract
+changed.
+
+**Live result: `alive`.** Job `7ce17e26-4c7f-4e50-9cb7-953e0c625f1a` completed in
+**55 s** and recorded **`needs_review`** — the correct verdict at that moment,
+because the publication title was the 17-character placeholder
+`Test post YbqRxq7` and the identity matcher refuses titles under
+`TITLE_MIN_CHARS = 20` before comparing anything, so no card could match.
+
+A supervised read-only DOM capture then proved the target was present: card
+index 0, author `ATX Handyman`, `data-testid="post-body"` carrying
+"TV mounting Service in South Austin, from $100 flat rate…", and
+`self_links: []` on every card — confirming again that Nextdoor never renders a
+self-link inside a post card, so the stored-title rule is the only usable
+identity signal. A corrected title (the post's real opening text, 57 characters)
+was written to the publication; **no selector or matcher code changed**.
+
+Job `17bbf2e6-439d-43eb-8487-3b2932cbf939` then completed in **47 s** and
+recorded **`alive`** — check `fdeb868a-7310-4f8e-b965-8f569a0c80d7`, tone
+`positive`, observation `23cff2d4-3cad-42fb-a785-8cbe12128cb0`, publication
+`visibility = live`. This is the first verified end-to-end read-only check on the
+employee laptop: real profile launch, real CDP attach, real page read, result
+stored in the hosted database. Four earlier jobs (`ad94c760…`, `7b40bd67…`,
+`e1d71bbe…`, `f0b4e916…`) had ended in `profile_error` before the attach fix.
+Verified afterwards: 0 pending/leased check jobs, publish jobs and automation
+tasks; no Nextdoor write of any kind.
+
+**App-planned run, no manual job rows.** Because every earlier job had been
+inserted by the operator, the daily path itself was still unproven. It was then
+exercised for real: the employee session `1bc51648-e9af-4dee-9b03-0b8d7c691cd0`
+was started, the **Run automation** page enabled due checks for `ATX Handyman`
+(binding `b4330e39…` then pointed at that active session), and the helper was
+polled four times. No job row was inserted by hand. Both qualifying publications
+were planned **inside one `reporting_claim_check` transaction** — identical
+`created_at 20:52:19.869439` — which only the server planner can produce:
+
+| Job | Target | Outcome |
+|---|---|---|
+| `15ba91e2-d247-48b7-af66-96b382672d13` | real post, `www.` host | **`alive`**, observation `e48c81c5-872c-4bed-89bd-b25eab0bc1bf`, 45 s |
+| `ebf36b91-a0bd-4fb2-80b5-5c1ac2949182` | synthetic non-existent post | **`needs_review`**, "Navigation did not remain on the exact post", 61 s |
+
+Leases ran 20:52:19 → 20:53:05 and 20:53:15 → 20:54:16 with no overlap — one
+profile at a time. Polls 3 and 4 returned `idle`, proving the queue drained and
+that finished posts are not re-planned inside 24 hours. The synthetic target kept
+`visibility = not_checked`, because nothing about it was ever confirmed. Session
+closed at 20:55:54 UTC; 0 active sessions and 0 open checks, publishes or tasks
+afterwards. The synthetic negative-test publication `545734f2…` was later removed
+together with its job and its negative check (deletion requires removing the job
+first: `reporting_check_jobs` is `NO ACTION`). The `f536f84c…` publication
+(`www.` host of the same real post) was deliberately kept, because it is the only
+database record showing the server planner acting on a real post.
+
+**Comment collection was unproven at that point — now proven (2026-11-04 21:49 UTC).**
+The earlier capture looked at the feed shell only, where no comment list is
+mounted; comments live in a thread that opens on a click. A supervised capture of
+the opened thread confirmed the adapter selectors were already correct and found
+two worker defects, both fixed in `apps/worker/monitor.py`:
+
+1. `comment_author` matched the comment avatar link first, whose text is empty,
+   so every author would have been stored as "Author not collected". The
+   extractor now takes the first matching link that actually has text.
+2. The thread open/expand scripts acted on the first post card rather than the
+   uniquely identified one. They now reuse the snapshot's title/link identity
+   rule and refuse to click when the card is not unique.
+
+Session `850dc336-f3a1-4d94-98ac-0e9453f3800b` then ran one app-planned job,
+`7c575ec4-1441-43c3-8750-1c660d596878`, against publication `8cd5d871…` (the same
+drywall post on its `www.` host, because the original was inside its 24-hour
+window). The helper was started **before** checks were enabled, in continuous mode
+with `--allow-comment-expansion`. The job was planned at 21:49:27.055788 and
+leased 28 ms later by the already-running loop, then completed in 61 s:
+
+| Result | Value |
+|---|---|
+| Outcome | **`alive`** |
+| Comments stored | **14 of 14** |
+| Authors captured | **14 of 14** |
+| `comments_total` | 14 |
+| `comments_complete` | **true** |
+| Notification | "all 14 comments captured" |
+
+All 14 rows are `source = auto_check` and share one check timestamp, so they came
+from a single read of one thread. This also settles the continuous-loop question:
+the claim came from a poller that was already waiting, not from a command started
+after the job appeared. Session closed 21:51:06 UTC; 0 open jobs, 0 active
+sessions.
+
+**Multi-post batch added (2026-11-04 21:17 UTC).** Session
+`b12e83f7-4c84-4c5b-b59d-e14112f753c0` ran three distinct real posts, each
+tracked with its exact on-page opening text: jobs `17cd9352…` (dimmer switches,
+53 s), `2f557623…` (drywall cracks, 55 s) and `2f67dba7…` (TV wall mounting,
+50 s) — all **`alive`**, all `visibility = live`. The three jobs shared one
+`created_at` (`21:17:27.82403`), proving a single server-side planning
+transaction, and were leased strictly in sequence with no overlap
+(21:17:27→21:18:20, 21:18:30→21:19:25, 21:19:35→21:20:25). The two posts already
+checked inside 24 hours were not re-queued. Session closed at 21:20:58 UTC;
+0 open jobs and 0 active sessions afterwards. Still unproven: real page-level
+edge outcomes (deleted post, logged-out session, proxy failure).
+
+Validation after the comment changes: `python -m py_compile monitor.py` PASS,
+`python -m unittest test_monitoring` **30 tests PASS** (the new test asserts both
+interactive scripts receive the same target and title), and Node `--check`
+accepted all three rewritten JS functions. The gallery-wide worker suite was not
+rerun; no web code changed. Posting, onboarding, cookie/proxy writes and Sheet
+writes remain untouched and gated.
+
+**Dashboard accuracy fix and full validation (2026-11-04).** The Results table
+was showing Nextdoor's own comment counter under a column headed "Comments",
+which read as "11 comments saved" when 0 comments are stored. The header is now
+**"Comments on page"**. The cell always says "reported by Nextdoor", and adds
+"· N saved" only when stored comments were loaded for that post. It says
+"· none saved" only when a zero count is positively known, and makes no saved
+claim when the caller did not load comments. The platform value is unchanged and
+still `null` when nothing was read. The same counts are passed on the dashboard,
+posts, sessions and Results views; a new fixture test
+(`tests/publication-table-ui.test.tsx`) covers all four label states.
+Validation from `apps/web` on the final code state, all four run:
+
+| Command | Result |
+|---|---|
+| `npm.cmd run typecheck` | PASS (no output, exit 0) |
+| `npm.cmd run lint` | PASS, 0 warnings |
+| `npm.cmd test` | PASS — 87 files, 1158 tests |
+| `npm.cmd run build` | PASS — Next.js 16.4.3, 14 static pages, 44 dynamic routes |
+
 ## Admin-managed setup / employee daily workflow (2026-11-04 device date)
 
 The operator requested central admin configuration so employees sign in with

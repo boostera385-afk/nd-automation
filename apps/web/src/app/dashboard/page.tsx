@@ -23,6 +23,10 @@ export default async function Home() {
     <Panel title="Your business account"><p>If you belong to an existing team, ask its owner for access instead of creating a duplicate. Otherwise, the button below creates your empty private business account. No reviews are imported and no automation starts.</p><ActionForm action={createWorkspace} label="Set up my private business account"><input type="hidden" name="name" value="My business" /></ActionForm></Panel>
   </>;
   const data = await getDashboardData();
+  const commentCounts = data.comments.reduce<Record<string, number>>((counts, comment) => {
+    counts[comment.publication_id] = (counts[comment.publication_id] || 0) + 1;
+    return counts;
+  }, {});
   const operations = isStaff ? await getOperationsData() : null;
   const jobs = operations?.jobs ?? [];
   const enabledWorkers = operations?.workers.filter((worker) => worker.enabled) ?? [];
@@ -57,7 +61,7 @@ export default async function Home() {
       </Panel>
     </>}
     {(data.truncated || operations?.limited) && <p className="notice">This summary uses limited loaded records (latest 100 monitoring jobs). Counts are partial, not all-time totals.</p>}
-    <Panel title="Latest saved results" hint="Submission and visibility are separate"><PublicationTable publications={data.publications.slice(0, 6)} customers={data.customers} zone={organization.time_zone} /><p><Link className="text-link" href="/dashboard/results">All results →</Link></p></Panel>
+    <Panel title="Latest saved results" hint="Submission and visibility are separate"><PublicationTable publications={data.publications.slice(0, 6)} customers={data.customers} zone={organization.time_zone} commentCounts={data.truncated ? undefined : commentCounts} /><p><Link className="text-link" href="/dashboard/results">All results →</Link></p></Panel>
     <details className="workflow-details"><summary>Refresh & status details</summary><LiveRefresh /><p className="muted small">Sheet configuration does not prove it is reachable. Helper heartbeats do not prove Incogniton is ready. Visibility describes the saved observation time, not guaranteed current status. Sheet delivery requires separate connector setup and an authorized runner.</p></details>
   </>;
 }
