@@ -53,6 +53,16 @@ Newer/Older links and an honest "beyond history" empty state. Unrelated to the
 
 Still unproven: real-page edge outcomes (deleted post, logged-out session,
 proxy failure) on live Nextdoor; publishing; profile/cookie/proxy workflows.
+
+Deployed to production with the user's explicit approval (commit `d459aaa`):
+
+| Item | Value |
+|---|---|
+| Deployment id | `dpl_CbniKeieokUg68JevSuiY7LUcvZN` |
+| Immutable URL | `https://nd-automation-dashboard-aoiut1kjh-jelly-bean2.vercel.app` |
+| Production alias | `https://nd-automation-dashboard.vercel.app` |
+| State | `READY`, target `production` |
+| `check:deployment` | PASS — 5 of 5 route checks; authenticated readiness unverified |
 ## Production deploy of the monitoring fixes (2026-11-04)
 
 Commit `c156fc3` (pushed to `main`) carried the bounded CDP attach, the
