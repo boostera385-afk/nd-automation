@@ -44,6 +44,16 @@ confirmation), friendly error mapping, refresh of every gated view. Setup
 guide and Settings page text updated to the 2-step flow with env vars as the
 advanced option.
 
+Deployed to production with the user's explicit approval (commit `3553fa1`):
+
+| Item | Value |
+|---|---|
+| Deployment id | `dpl_DaZScbErzxAznZnvS8oiUtjzHBXc` |
+| Production alias | `https://nd-automation-dashboard.vercel.app` |
+| State | `READY`, target `production` |
+| `check:deployment` | PASS — 5 of 5 route checks; authenticated readiness unverified |
+| Hosted migration | `20261105220000_sheet_sync_settings.sql` applied; table + 3 staff RPCs verified live via `pg_proc` |
+
 ## Gap-closure tranche: edge outcomes, self-healing leases, paged job history (2026-11-05)
 
 Three reviewed gaps closed under explicit user direction; nothing else was
