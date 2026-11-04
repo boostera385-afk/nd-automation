@@ -1,5 +1,22 @@
 # Implementation status
 
+## Production deploy of the monitoring fixes (2026-11-04)
+
+Commit `c156fc3` (pushed to `main`) carried the bounded CDP attach, the
+identity-based comment open/expand scripts, the author-link fix and the dynamic
+"Comments on page" counts. Deployed from `apps/web` with explicit user approval:
+
+| Item | Value |
+|---|---|
+| Deployment id | `dpl_DsBQYHVqoc6rapcxaAZ65GarvwYY` |
+| Immutable URL | `https://nd-automation-dashboard-j4a6n4elo-jelly-bean2.vercel.app` |
+| Production alias | `https://nd-automation-dashboard.vercel.app` |
+| State | `READY`, target `production` |
+| `check:deployment` | PASS — 5 of 5 route checks; authenticated readiness unverified |
+
+Deploying the web app does not push worker code to the laptop; the helper still
+runs its locally installed `monitor.py`.
+
 ## First live read-only post check on the employee laptop (2026-11-04)
 
 Goal: prove the prepared employee laptop can open one real Nextdoor post through
