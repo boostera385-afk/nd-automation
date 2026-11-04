@@ -39,15 +39,15 @@ describe("internal Sheet setup helpers", () => {
   });
   it("names exactly which inputs are still missing", () => {
     expect(sheetSetupGaps(endpoint, token)).toEqual([]);
-    expect(sheetSetupGaps("", token)).toEqual(["the connector Web app URL ending in /exec (step 4)"]);
-    expect(sheetSetupGaps(endpoint, "")).toEqual(["the 24–256 character SYNC_TOKEN value (step 3)"]);
+    expect(sheetSetupGaps("", token)).toEqual(["the connector Web app URL ending in /exec (from the Google deployment)"]);
+    expect(sheetSetupGaps(endpoint, "")).toEqual(["the 24–256 character SYNC_TOKEN value"]);
     expect(sheetSetupGaps("", "")).toHaveLength(2);
     expect(sheetSetupGaps("https://attacker.test/macros/s/fixture/exec", "short")).toHaveLength(2);
     expect(sheetSetupGaps(endpoint + "?token=hidden", token)).toEqual([]);
   });
   it("always renders the complete three-line block with visible placeholders", () => {
-    expect(sheetEnvironmentTemplate("", "", workspace)).toBe("SHEET_SYNC_URL=<paste the /exec Web app URL from step 4>\nSHEET_SYNC_TOKEN=<paste the SYNC_TOKEN value from step 3>\nSHEET_SYNC_ORGANIZATION_ID=" + workspace);
-    expect(sheetEnvironmentTemplate(endpoint, "", workspace)).toBe(`SHEET_SYNC_URL=${endpoint}\nSHEET_SYNC_TOKEN=<paste the SYNC_TOKEN value from step 3>\nSHEET_SYNC_ORGANIZATION_ID=${workspace}`);
+    expect(sheetEnvironmentTemplate("", "", workspace)).toBe("SHEET_SYNC_URL=<paste the /exec Web app URL from Google>\nSHEET_SYNC_TOKEN=<paste your SYNC_TOKEN value>\nSHEET_SYNC_ORGANIZATION_ID=" + workspace);
+    expect(sheetEnvironmentTemplate(endpoint, "", workspace)).toBe(`SHEET_SYNC_URL=${endpoint}\nSHEET_SYNC_TOKEN=<paste your SYNC_TOKEN value>\nSHEET_SYNC_ORGANIZATION_ID=${workspace}`);
     expect(sheetEnvironmentTemplate(endpoint, token, workspace)).toBe(sheetEnvironmentSnippet(endpoint, token, workspace));
   });
   it("never embeds an invalid or injectable value in the template", () => {

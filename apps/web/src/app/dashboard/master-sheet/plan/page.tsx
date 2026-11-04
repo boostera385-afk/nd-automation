@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CircleCheckBig, FileSpreadsheet, Link2Off } from "lucide-react";
 import { requireWorkspace } from "@/lib/data";
-import { fetchMasterLayout, fetchMasterSections, sheetSyncConfigured, SheetSyncError } from "@/lib/sheet-sync";
+import { fetchMasterLayout, fetchMasterSections, sheetConnectionConfigured, SheetSyncError } from "@/lib/sheet-sync";
 import { describeMasterWarning, planTabCandidates, summarizeMasterSections, type MasterLayout, type MasterSections } from "@/lib/master-sections";
 import { formatTime } from "@/lib/time";
 import { PageHeader, Panel, StatCard } from "@/components/ui";
@@ -14,7 +14,7 @@ export default async function DatedPlan({ searchParams }: { searchParams: Promis
   const { organization } = await requireWorkspace(true);
   const params = await searchParams;
   const requested = typeof params.tab === "string" ? params.tab.trim().slice(0, 100) : "";
-  const configured = sheetSyncConfigured(organization.id);
+  const configured = await sheetConnectionConfigured(organization.id);
 
   let tab = requested;
   let layout: MasterLayout | null = null;

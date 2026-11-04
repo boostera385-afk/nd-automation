@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ workspace: vi.fn(), operations: vi.fn(), data:
 vi.mock("@/lib/data", () => ({ requireWorkspace: mocks.workspace, getDashboardData: mocks.data }));
 vi.mock("@/lib/operations-data", () => ({ getOperationsData: mocks.operations }));
 vi.mock("@/lib/profile-inventory-data", () => ({ loadProfileInventory: mocks.inventory }));
-vi.mock("@/lib/sheet-sync", () => ({ sheetSyncConfigured: () => false }));
+vi.mock("@/lib/sheet-sync", () => ({ sheetConnectionConfigured: () => false }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/actions/automation-tasks", () => ({ enqueueBrowserTask: vi.fn() }));
 vi.mock("@/app/actions/profiles", () => ({ setProfileArchived: vi.fn(), importScannedProfiles: vi.fn(), previewProfiles: vi.fn(), confirmProfileImport: vi.fn() }));

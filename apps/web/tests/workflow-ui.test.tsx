@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => mocks.path, useRouter: ()
 vi.mock("next/link", () => ({ default: ({ href, children, className, "aria-current": current }: { href: string; children: ReactNode; className?: string; "aria-current"?: "page" }) => <a href={href} className={className} aria-current={current}>{children}</a> }));
 vi.mock("@/lib/data", () => ({ getContext: mocks.getContext, requireWorkspace: mocks.requireWorkspace, getDashboardData: mocks.getDashboardData }));
 vi.mock("@/lib/operations-data", () => ({ getOperationsData: mocks.getOperationsData }));
-vi.mock("@/lib/sheet-sync", () => ({ sheetSyncConfigured: mocks.sheetSyncConfigured }));
+vi.mock("@/lib/sheet-sync", () => ({ sheetConnectionConfigured: mocks.sheetSyncConfigured }));
 vi.mock("@/app/actions/reporting", () => ({ createWorkspace: vi.fn() }));
 vi.mock("@/app/actions/workflow", () => ({ setBatchMonitoring: vi.fn() }));
 vi.mock("@/app/actions/automation-tasks", () => ({ enqueueBrowserTask: vi.fn(), cancelBrowserTask: vi.fn(), reconcileExpiredBrowserTask: vi.fn() }));

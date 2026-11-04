@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ requireWorkspace: vi.fn(), fetch: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/data", () => ({ requireWorkspace: mocks.requireWorkspace }));
-import { fetchMasterLayout, fetchMasterRows, fetchMasterSections, fetchSheetRows, sheetSyncConfigured } from "@/lib/sheet-sync";
+import { fetchMasterLayout, fetchMasterRows, fetchMasterSections, fetchSheetRows, sheetConnectionConfigured, sheetSyncConfigured } from "@/lib/sheet-sync";
 
 const org = "11111111-1111-4111-8111-111111111111";
 const otherOrg = "22222222-2222-4222-8222-222222222222";
@@ -157,5 +157,47 @@ describe("workbook structure transport", () => {
     try { await fetchMasterLayout(); } catch (cause) { failure = (cause as Error).message; }
     expect(failure).toContain("rejected the secret token");
     expect(failure).not.toContain(token);
+  });
+});
+
+describe("workspace-saved connection (2-step setup)", () => {
+  const rpc = vi.fn();
+  beforeEach(() => {
+    vi.stubEnv("SHEET_SYNC_URL", ""); vi.stubEnv("SHEET_SYNC_TOKEN", ""); vi.stubEnv("SHEET_SYNC_ORGANIZATION_ID", "");
+    rpc.mockResolvedValue({ data: [{ endpoint_url: endpoint, sync_token: token }], error: null });
+    mocks.requireWorkspace.mockResolvedValue({ db: { rpc }, organization: { id: org } });
+  });
+
+  it("serves the saved row through the staff RPC when no hosted override exists", async () => {
+    expect((await fetchMasterRows("Auto Posting")).rows).toHaveLength(1);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("reporting_get_sheet_sync", { org });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).token).toBe(token);
+  });
+  it("a hosted environment override for this workspace wins and never touches the database", async () => {
+    vi.stubEnv("SHEET_SYNC_URL", endpoint); vi.stubEnv("SHEET_SYNC_TOKEN", token); vi.stubEnv("SHEET_SYNC_ORGANIZATION_ID", org);
+    await fetchMasterRows("Auto Posting");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("refuses reads and never contacts Google without a usable saved row", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("not configured for this workspace");
+    rpc.mockResolvedValue({ data: null, error: { message: "DO_NOT_ECHO" } });
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("not configured for this workspace");
+    rpc.mockResolvedValue({ data: [{ endpoint_url: "https://evil.example.com/exec", sync_token: token }], error: null });
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("not configured for this workspace");
+    rpc.mockResolvedValue({ data: [{ endpoint_url: endpoint, sync_token: "short" }], error: null });
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("not configured for this workspace");
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("treats callers without a database client as unconfigured, never crashing", async () => {
+    mocks.requireWorkspace.mockResolvedValue({ organization: { id: org } });
+    await expect(fetchMasterRows("Auto Posting")).rejects.toThrow("not configured for this workspace");
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("drives the shared configured badge from either connection style", async () => {
+    await expect(sheetConnectionConfigured(org)).resolves.toBe(true);
+    rpc.mockResolvedValue({ data: [], error: null });
+    await expect(sheetConnectionConfigured(org)).resolves.toBe(false);
+    await expect(sheetConnectionConfigured(otherOrg)).resolves.toBe(false);
   });
 });

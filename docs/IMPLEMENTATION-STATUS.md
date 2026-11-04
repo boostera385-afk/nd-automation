@@ -1,5 +1,49 @@
 # Implementation status
 
+## 2-step Master Sheet connection (2026-11-05)
+
+The Sheet setup shrank from six panels — ending in "copy three env var values into
+Vercel and redeploy" — to **two steps, once per workspace**, matching the worker
+("check") credential model the team already uses:
+
+- **Step 1 — Google (unchanged):** paste the Sheet URL, create the small
+  read-only Apps Script connector, add `SHEET_ID` + `SYNC_TOKEN` Script
+  properties, deploy as a Web app. The connector code itself is untouched.
+- **Step 2 — Dashboard:** paste the `/exec` URL and the private token →
+  **Save connection**, then **Test saved connection**. No hosting settings,
+  restart or redeploy. A disclosure-folded **Disconnect** and an **Advanced:
+  hosted environment settings** fallback (the old env-var path, which still
+  takes precedence when present) live in the same panel.
+
+**Storage.** New hosted migration `20261105220000_sheet_sync_settings.sql`:
+`private_reporting.sheet_sync_settings` (one row per workspace; sheet id, `/exec`
+endpoint and token formats enforced as CHECK constraints) behind three narrow
+staff RPCs — `reporting_save_sheet_sync`, `reporting_get_sheet_sync`,
+`reporting_clear_sheet_sync`. The table has no API grants (verified: anon and
+customer members get `permission denied`); the token is stored, not hashed,
+because the server must present it to Google on each read — it protects a
+READ-ONLY metadata projection only and never re-renders on any page. Hosted
+environment values win over the saved row so a deployment override cannot be
+blocked by the database.
+
+**Server resolution.** `sheet-sync.ts` resolves the connector env-first, then
+the workspace row; every Sheet read (`fetchSheetRows`, `fetchMasterRows`,
+`fetchMasterLayout`, `fetchMasterSections`) uses that chain. Pages and badges
+now use `await sheetConnectionConfigured(org)` (env OR saved row); the legacy
+sync `sheetSyncConfigured` remains as the env-only signal.
+
+**Validation.** New PGlite suite `sheet-sync-settings-db.test.ts` (6 tests):
+staff save/replace/read/clear, in-place upsert with `updated_by` audit, format
+enforcement at the database (including Postgres `RE_DUP_MAX` learned the hard
+way: `{24,256}` rejected → bounded-length + charset checks), and no API
+reachability of the raw table. Transport suite extended (5 tests): saved-row
+resolution, env override precedence, malformed rows never contacting Google,
+no-db callers never crashing, badge semantics. Action suite extended (4 tests):
+save validation gating (Sheet from step 1, `/exec` URL, token shape,
+confirmation), friendly error mapping, refresh of every gated view. Setup
+guide and Settings page text updated to the 2-step flow with env vars as the
+advanced option.
+
 ## Gap-closure tranche: edge outcomes, self-healing leases, paged job history (2026-11-05)
 
 Three reviewed gaps closed under explicit user direction; nothing else was

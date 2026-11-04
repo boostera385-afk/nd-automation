@@ -3,7 +3,7 @@ import { ClipboardList, Clock3, CircleCheck, TriangleAlert } from "lucide-react"
 import { getContext, getDashboardData } from "@/lib/data";
 import { getOperationsData } from "@/lib/operations-data";
 import { heartbeatState } from "@/lib/workflow";
-import { sheetSyncConfigured } from "@/lib/sheet-sync";
+import { sheetConnectionConfigured } from "@/lib/sheet-sync";
 import { createWorkspace } from "@/app/actions/reporting";
 import { ActionForm } from "@/components/action-form";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -32,7 +32,7 @@ export default async function Home() {
   const enabledWorkers = operations?.workers.filter((worker) => worker.enabled) ?? [];
   const recent = enabledWorkers.filter((worker) => heartbeatState(worker, operations?.loadedAt) === "Seen recently").length;
   const issues = data.publications.filter((post) => post.last_check_outcome && !["alive"].includes(post.last_check_outcome));
-  const configured = isStaff && sheetSyncConfigured(organization.id);
+  const configured = isStaff && (await sheetConnectionConfigured(organization.id));
   const now = new Date().getTime();
   const board = profileDayBoard({ publications: data.publications, comments: data.comments, customers: data.customers, now });
   return <>

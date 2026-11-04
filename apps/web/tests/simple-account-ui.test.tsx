@@ -5,7 +5,7 @@ import { expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ context: vi.fn(), data: vi.fn(), operations: vi.fn() }));
 vi.mock("@/lib/data", () => ({ getContext: mocks.context, getDashboardData: mocks.data }));
 vi.mock("@/lib/operations-data", () => ({ getOperationsData: mocks.operations }));
-vi.mock("@/lib/sheet-sync", () => ({ sheetSyncConfigured: vi.fn() }));
+vi.mock("@/lib/sheet-sync", () => ({ sheetConnectionConfigured: vi.fn() }));
 vi.mock("@/app/actions/reporting", () => ({ createWorkspace: vi.fn() }));
 vi.mock("@/components/action-form", () => ({ ActionForm: ({ children, label }: { children: ReactNode; label: string }) => <form>{children}<button>{label}</button></form> }));
 vi.mock("@/components/auth-screen", () => ({ AuthScreen: ({ description }: { description: string }) => <p>{description}</p> }));

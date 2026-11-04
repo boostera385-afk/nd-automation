@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
     <a href={href} className={className}>{children}</a>,
 }));
 vi.mock("@/lib/data", () => ({ requireWorkspace: mocks.requireWorkspace }));
-vi.mock("@/lib/sheet-sync", () => ({ sheetSyncConfigured: mocks.sheetSyncConfigured }));
+vi.mock("@/lib/sheet-sync", () => ({ sheetConnectionConfigured: mocks.sheetSyncConfigured }));
 
 import SetupGuide from "@/app/dashboard/settings/guide/page";
 import Settings from "@/app/dashboard/settings/page";
@@ -32,7 +32,7 @@ describe("first-time setup guide", () => {
     expect(html).toContain("Map the exact profile, not a guessed name");
     expect(html).toContain("Sync the Master Sheet");
     expect(html).toContain("Read your dated plan");
-    expect(html).toContain("Add the Sheet-sync variables to your hosting (Vercel)");
+    expect(html).toContain("Hosted environment values stay optional");
     expect(html).toContain("Confirm a monitoring batch once");
     expect(html).toContain("guide-tone-blue");
     expect(html).toContain("guide-tone-violet");

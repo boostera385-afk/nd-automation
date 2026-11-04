@@ -2,7 +2,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/data";
 import { MASTER_TABS } from "@/lib/workflow";
-import { fetchMasterRows, sheetSyncConfigured, SheetSyncError } from "@/lib/sheet-sync";
+import { fetchMasterRows, sheetConnectionConfigured, SheetSyncError } from "@/lib/sheet-sync";
 import { formatTime } from "@/lib/time";
 import { PageHeader, Panel } from "@/components/ui";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -14,7 +14,7 @@ export default async function MasterSheet({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const parsed = z.enum(MASTER_TABS).safeParse(params.tab);
   const tab = parsed.success ? parsed.data : MASTER_TABS[0];
-  const configured = sheetSyncConfigured(organization.id);
+  const configured = await sheetConnectionConfigured(organization.id);
   let snapshot: Awaited<ReturnType<typeof fetchMasterRows>> | null = null;
   let error: string | null = null;
   let optionalProxyTabMissing = false;

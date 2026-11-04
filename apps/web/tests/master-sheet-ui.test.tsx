@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ requireWorkspace: vi.fn(), configured: vi.fn()
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 vi.mock("@/lib/data", () => ({ requireWorkspace: mocks.requireWorkspace }));
 vi.mock("@/lib/sheet-sync", () => ({
-  sheetSyncConfigured: mocks.configured,
+  sheetConnectionConfigured: mocks.configured,
   fetchMasterRows: mocks.fetchRows,
   SheetSyncError: class extends Error {
     constructor(readonly code: string, message: string) { super(message); }

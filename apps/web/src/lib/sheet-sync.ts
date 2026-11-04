@@ -27,8 +27,52 @@ function settings() {
   return endpoint && token.length >= 24 && organization.success ? { endpoint, token, organizationId: organization.data, linkHeader } : null;
 }
 
+// Legacy signal: true only for the hosting-environment connection. Pages and
+// actions should prefer sheetConnectionConfigured, which is also true once a
+// workspace-saved connection (the 2-step setup) exists.
 export function sheetSyncConfigured(organizationId: string): boolean {
   return settings()?.organizationId === organizationId;
+}
+
+export type ConnectorConfig = { endpoint: URL; token: string; organizationId: string; linkHeader: string };
+
+// Reads the workspace-saved connector row through the narrow staff RPC. Any
+// failure — no database client in unit fixtures, a revoked session, an older
+// database — simply means "no saved connection", never an exception.
+async function storedConnection(db: unknown, organizationId: string): Promise<{ endpoint: URL; token: string } | null> {
+  const rpc = (db as { rpc?: unknown } | null | undefined)?.rpc;
+  if (typeof rpc !== "function") return null;
+  let result: { data?: unknown; error?: unknown };
+  try { result = await (rpc as (name: string, args: Record<string, unknown>) => Promise<{ data?: unknown; error?: unknown }>).call(db, "reporting_get_sheet_sync", { org: organizationId }); }
+  catch { return null; }
+  const { data, error } = result;
+  if (error || !Array.isArray(data) || !data.length) return null;
+  const row = data[0] as { endpoint_url?: unknown; sync_token?: unknown };
+  const endpoint = parseSyncEndpoint(typeof row.endpoint_url === "string" ? row.endpoint_url : undefined);
+  const token = typeof row.sync_token === "string" ? row.sync_token : "";
+  return endpoint && token.length >= 24 ? { endpoint, token } : null;
+}
+
+// The connection the server actually uses for this workspace: a hosting
+// environment override wins when a deployment keeps one, otherwise the
+// workspace-saved row from the 2-step wizard.
+async function resolveConnector(db: unknown, organizationId: string): Promise<ConnectorConfig | null> {
+  const env = settings();
+  if (env?.organizationId === organizationId) return env;
+  const stored = await storedConnection(db, organizationId);
+  return stored ? { ...stored, organizationId, linkHeader: env?.linkHeader ?? "" } : null;
+}
+
+// True when either connection style is ready for this workspace. Never throws:
+// it only drives status badges and setup links; the reads themselves surface
+// the real error if configuration later fails.
+export async function sheetConnectionConfigured(organizationId: string): Promise<boolean> {
+  if (sheetSyncConfigured(organizationId)) return true;
+  try {
+    const { db, organization } = await requireWorkspace(true);
+    if (organization.id !== organizationId) return false;
+    return Boolean(await storedConnection(db, organizationId));
+  } catch { return false; }
 }
 
 // The token and endpoint stay on the server. Messages are written for the user and never echo either value.
@@ -41,9 +85,9 @@ export async function fetchMasterRows(sheet: MasterTab): Promise<{ rows: SheetRo
 }
 
 async function fetchRows(sheet: MasterTab, action: "getTaskRows" | "getPostRecords"): Promise<{ rows: SheetRow[]; fetchedAt: string; truncated: boolean }> {
-  const { organization } = await requireWorkspace(true);
-  const config = settings();
-  if (!config || config.organizationId !== organization.id) throw new SheetSyncError("not_configured", "The Sheet connection is not configured for this workspace. Ask your administrator to finish one-time setup.");
+  const { db, organization } = await requireWorkspace(true);
+  const config = await resolveConnector(db, organization.id);
+  if (!config) throw new SheetSyncError("not_configured", "The Sheet connection is not configured for this workspace. Ask your administrator to finish one-time setup.");
 
   const text = await postConnector(config, { action, sheet, token: config.token });
 
@@ -65,8 +109,6 @@ async function fetchRows(sheet: MasterTab, action: "getTaskRows" | "getPostRecor
   if (parsed.data.sheet !== sheet) throw bad();
   return { rows: parsed.data.rows, fetchedAt: parsed.data.fetchedAt, truncated: parsed.data.truncated };
 }
-
-type ConnectorConfig = NonNullable<ReturnType<typeof settings>>;
 
 async function postConnector(config: ConnectorConfig, body: Record<string, unknown>): Promise<string> {
   const controller = new AbortController();
@@ -94,8 +136,8 @@ async function postConnector(config: ConnectorConfig, body: Record<string, unkno
 // recognised labels. No cell text leaves the workbook, so this is safe to call
 // before the operator has chosen a tab.
 export async function fetchMasterLayout(): Promise<MasterLayout> {
-  const { organization } = await requireWorkspace(true);
-  const config = requireConnector(settings(), organization.id);
+  const { db, organization } = await requireWorkspace(true);
+  const config = requireConnector(await resolveConnector(db, organization.id), organization.id);
 
   const text = await postConnector(config, { action: "getMasterLayout", token: config.token });
   const parsed = masterLayoutResponseSchema.safeParse(parseConnectorBody(text, MAX_LAYOUT_BODY_CHARS));
@@ -107,8 +149,8 @@ export async function fetchMasterLayout(): Promise<MasterLayout> {
 // Reads a dated-plan tab (banner + repeated headers). Read-only: it returns a
 // safe projection and never triggers an import, mapping or browser job.
 export async function fetchMasterSections(sheet: string, linkHeader?: string): Promise<MasterSections> {
-  const { organization } = await requireWorkspace(true);
-  const config = requireConnector(settings(), organization.id);
+  const { db, organization } = await requireWorkspace(true);
+  const config = requireConnector(await resolveConnector(db, organization.id), organization.id);
 
   const text = await postConnector(config, {
     action: "getMasterSections",

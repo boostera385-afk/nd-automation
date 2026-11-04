@@ -23,8 +23,8 @@ export function generateSetupToken(): string {
 /** Names the exact inputs still missing, so the page never shows a vague "complete the fields" notice. */
 export function sheetSetupGaps(endpoint: string, token: string): string[] {
   const gaps: string[] = [];
-  if (!parseSyncEndpoint(endpoint)) gaps.push("the connector Web app URL ending in /exec (step 4)");
-  if (!validSetupToken(token)) gaps.push("the 24–256 character SYNC_TOKEN value (step 3)");
+  if (!parseSyncEndpoint(endpoint)) gaps.push("the connector Web app URL ending in /exec (from the Google deployment)");
+  if (!validSetupToken(token)) gaps.push("the 24–256 character SYNC_TOKEN value");
   return gaps;
 }
 
@@ -36,8 +36,8 @@ export function sheetSetupGaps(endpoint: string, token: string): string[] {
 export function sheetEnvironmentTemplate(endpoint: string, token: string, workspaceId: string): string {
   const url = parseSyncEndpoint(endpoint);
   return [
-    `SHEET_SYNC_URL=${url ? url.href : "<paste the /exec Web app URL from step 4>"}`,
-    `SHEET_SYNC_TOKEN=${validSetupToken(token) ? token : "<paste the SYNC_TOKEN value from step 3>"}`,
+    `SHEET_SYNC_URL=${url ? url.href : "<paste the /exec Web app URL from Google>"}`,
+    `SHEET_SYNC_TOKEN=${validSetupToken(token) ? token : "<paste your SYNC_TOKEN value>"}`,
     `SHEET_SYNC_ORGANIZATION_ID=${workspaceId}`,
   ].join("\n");
 }
